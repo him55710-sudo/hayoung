@@ -2,7 +2,7 @@
   "FileVersion": 3,
   "EngineAssociation": "5.8",
   "Category": "Game",
-  "Description": "500-day anniversary escape-room project with Unreal MCP tooling.",
+  "Description": "400-day anniversary escape-room project with Unreal MCP tooling.",
   "Plugins": [
     {
       "Name": "ModelContextProtocol",

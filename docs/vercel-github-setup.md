@@ -17,12 +17,10 @@
 4. Framework Preset은 `Vite`, Build Command는 `npm run build`, Output Directory는 `dist`를 사용합니다.
 5. 연결 후 GitHub `main` 브랜치에 push하면 Vercel이 자동 배포합니다.
 
-## 프로젝트 이름 변경 추천
+## 프로젝트 이름
 
-기념일이 500일로 변경되었으므로 Vercel 프로젝트 이름도 나중에 다음처럼 바꾸는 것을 추천합니다.
+현재 Vercel 프로젝트 이름은 400일 기념 URL을 유지합니다.
 
 ```text
-hyunsu-hayoung-500
+hyunsu-hayoung-400
 ```
-
-Vercel URL을 유지해야 하면 이름만 바꾸지 않고 앱 내부 문구만 500일로 유지해도 됩니다.

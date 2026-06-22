@@ -1,26 +1,20 @@
-Original prompt: [him55710-sudo/hayoung](https://github.com/him55710-sudo/hayoung)에서 나는 https://vercel.com/mongben/hyunsu-hayoung-400이걸 만들고 있어. 여자친구와의 400일 기념 방탈출 게임을 만드려고 해. 근데 아쉅게도 400일이 넘어버려서 500일 기념일로 긴급하게 수정하게 되었어. 일단 이번 프로젝트에서 epic games에서 출시한 unreal engine 5.8의 mcp를 이용하고 싶어. ai에이전트를 언리얼 에디터와 연결해 자연어로 오브젝트 배치, 도시 생성 , 조명 설정같은 작업을 하고 싶어. [@컴퓨터](plugin://computer-use@openai-bundled) 너가 일단 vercel, github연결을 해줘서 코드개발 환경을 제대로 만들고 브라우저를 활용해서 너가 epic games의 unreal engine 5.8와 연결해서 바로 연동작업을 가능하게 하는 환경을 만들어줘
+Original prompt: 여자친구랑 400일 기념일이야. 임현수와 정하영의 400일 기념 웹사이트를 만들고, 처음에는 도망가는 `네` 버튼을 보여준 뒤 풀스크린 3D 방탈출 게임으로 이어지게 한다. 총 5개 방, 총 10문제, 힌트 3회 제한과 벌칙, 마지막 400일 방은 구름길과 사진, 섬광, 편지 엔딩으로 구성한다.
 
 ## Progress
 
-- Cloned `https://github.com/him55710-sudo/hayoung.git` into the workspace. The remote repository was empty.
-- Checked local tooling: Git, Node, npm, and Python are installed. `gh` and `vercel` CLI are not globally installed.
-- Checked standard Unreal install paths and Windows app list. Unreal Engine 5.8 / Epic Games Launcher were not found on this PC.
-- Confirmed from Epic docs that UE 5.8 Unreal MCP runs at `http://127.0.0.1:8000/mcp` after enabling the plugin.
-- Generated and copied first-screen concept art to `public/images/anniversary-room.png`.
-- Added a React + Vite web game starter themed around `500일의 방`.
-- Installed dependencies, upgraded Vite to remove npm audit findings, and verified `npm run build`.
-- Started a local dev server on `http://127.0.0.1:5173`.
-- Verified with browser automation:
-  - desktop flow reaches `mode: "complete"` after START, desk key, notebook, window, box, code `0500`, and door.
-  - mobile title and playing layouts render without text/control overlap after final CSS adjustment.
-- Downloaded the official Epic Games Launcher installer to `C:\Users\임현수\Downloads\EpicInstaller-20.1.0.msi`.
-- Confirmed UE 5.8 still needs Epic Launcher login, license/EULA acceptance, and likely more free disk space than the current ~55GB.
-- Added `docs/game-design-500-3d.md` with the 5-room Roblox-like 3D escape UX plan.
-- Extended the Unreal MCP Python toolset with `create_five_room_escape_level`.
+- GitHub repository `him55710-sudo/hayoung` is connected and pushed.
+- Vercel project `mongben/hyunsu-hayoung-400` is linked.
+- Replaced the earlier 2D starter with a 400-day fullscreen Three.js escape-game draft.
+- Added evasive desktop/mobile `네` button intro.
+- Added 5 themed rooms matching 1-100, 101-200, 201-300, 301-399, and 400 days.
+- Added 10 placeholder puzzles, 3 hint penalties, inventory, mobile controls, fullscreen action, and ending letter.
+- Added `docs/game-design-400-3d.md`.
+- Build currently passes with `npm run build`.
 
 ## Next TODOs
 
-- Get user confirmation before running `C:\Users\임현수\Downloads\EpicInstaller-20.1.0.msi`.
-- After Launcher install, user must sign in to Epic and accept the Unreal Engine license/EULA prompts.
-- Free additional disk space or install UE 5.8 to another drive if the Launcher warns about capacity.
-- Install Unreal Engine 5.8, open `unreal/Hayoung500.uproject`, enable Unreal MCP, and generate the Codex client config from the editor console.
+- Replace placeholder puzzle prompts and answers with user-provided real puzzle content.
+- Replace placeholder photo frames with actual couple photos when the user sends them.
+- Add higher fidelity GLB character/props or Unreal-exported assets.
+- Add bloom/postprocessing pass and richer materials for a stronger Steam-like finish.
+- Verify latest build visually in desktop and mobile browsers before each deploy.
