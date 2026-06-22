@@ -18,7 +18,7 @@
 - Puzzle input: modal locks now use tactile numeric pads, direction pads, and choice chips while keeping the keyboard input for accessibility and automation.
 - Hint system: 3 uses, escalating real-world penalties.
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
-- Unlock feedback: correct answers trigger door/ring/bolt/dial animation and a screen flash.
+- Unlock feedback: correct answers trigger latch lift, door seam glow, sliding bolts, hinge/handle motion, gear/dial motion, unlock sparks, and a screen flash.
 - Performance: procedural geometry, cached procedural material textures, shared simple materials, pixel ratio capped, bloom strength kept moderate.
 
 ## Open-Source Usage

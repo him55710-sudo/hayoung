@@ -347,6 +347,7 @@ function App() {
         nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
         cameraMode: "first-person",
         embodiedView: "Hayoung first-person hands with flashlight and heart key",
+        unlockDetail: "animated latch lift, sliding bolts, glowing door seam, hinges, handle, and unlock sparks",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -1392,12 +1393,44 @@ function addPuzzleDesk(group: THREE.Group, room: Room, accentMaterial: THREE.Mat
   });
 
   const latch = box(0.34, 0.16, 0.07, brass, 0.02, 1.78, -0.16);
+  latch.userData.lockLatch = true;
+  latch.userData.baseY = latch.position.y;
+  latch.userData.baseZ = latch.position.z;
   const latchRing = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.014, 10, 36), signalMaterial.clone());
   latchRing.position.set(0.02, 1.73, -0.12);
   latchRing.userData.statusLight = true;
+  latchRing.userData.lockShackle = true;
+  latchRing.userData.baseY = latchRing.position.y;
+  latchRing.userData.baseZ = latchRing.position.z;
   const lockBody = box(0.34, 0.26, 0.08, mat(0xd95f78, { roughness: 0.44, metalness: 0.14, emissive: 0x733447, emissiveIntensity: 0.08 }), 0.02, 1.58, -0.09);
+  lockBody.userData.lockBody = true;
+  lockBody.userData.baseY = lockBody.position.y;
+  lockBody.userData.baseZ = lockBody.position.z;
   const keyhole = box(0.046, 0.12, 0.026, darkGlass, 0.02, 1.56, -0.04);
+  keyhole.userData.keyhole = true;
   group.add(latch, latchRing, lockBody, keyhole);
+  group.userData.consoleLatch = latch;
+  group.userData.consoleShackle = latchRing;
+  group.userData.consoleLockBody = lockBody;
+
+  const sparkMaterial = mat(0xffe6a6, {
+    roughness: 0.26,
+    metalness: 0.1,
+    emissive: 0xffd27d,
+    emissiveIntensity: 0.65,
+    transparent: true,
+    opacity: 0.18,
+  });
+  for (let i = 0; i < 12; i += 1) {
+    const spark = new THREE.Mesh(new THREE.SphereGeometry(0.024 + (i % 3) * 0.006, 10, 8), sparkMaterial.clone());
+    spark.position.set(-0.42 + ((i * 29) % 84) / 100, 1.18 + ((i * 17) % 58) / 100, -0.11 + Math.sin(i) * 0.05);
+    spark.userData.unlockSpark = true;
+    spark.userData.baseX = spark.position.x;
+    spark.userData.baseY = spark.position.y;
+    spark.userData.baseZ = spark.position.z;
+    spark.userData.sparkSeed = i;
+    group.add(spark);
+  }
 
   const diary = box(1.35, 0.08, 0.9, paper, -2.25, 1.01, -0.55);
   diary.rotation.y = -0.22;
@@ -1456,6 +1489,50 @@ function addDoorAssembly(group: THREE.Group, room: Room, accentMaterial: THREE.M
   const frame = box(2.62, 3.55, 0.12, mat(0x2a211f, { roughness: 0.55, metalness: 0.1 }), 4.95, 1.72, -4.61);
   group.add(frame);
 
+  const sealMaterial = mat(room.palette[2], {
+    roughness: 0.22,
+    metalness: 0.12,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.52,
+    transparent: true,
+    opacity: 0.34,
+  });
+  const doorSeals = [
+    box(0.045, 3.08, 0.035, sealMaterial.clone(), 3.86, 1.66, -4.2),
+    box(0.045, 3.08, 0.035, sealMaterial.clone(), 6.04, 1.66, -4.2),
+    box(2.18, 0.045, 0.035, sealMaterial.clone(), 4.95, 3.2, -4.2),
+    box(2.18, 0.045, 0.035, sealMaterial.clone(), 4.95, 0.12, -4.2),
+  ];
+  doorSeals.forEach((seal, index) => {
+    seal.userData.doorSeal = true;
+    seal.userData.baseScaleX = seal.scale.x;
+    seal.userData.baseScaleY = seal.scale.y;
+    seal.userData.sealIndex = index;
+    group.add(seal);
+  });
+  group.userData.doorSeals = doorSeals;
+
+  const hingeMaterial = mat(0x5a514c, { roughness: 0.3, metalness: 0.82, emissive: 0x171313, emissiveIntensity: 0.05 });
+  const hinges: THREE.Mesh[] = [];
+  [0.68, 1.72, 2.76].forEach((y, index) => {
+    const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.52, 18), hingeMaterial);
+    hinge.position.set(3.78, y, -4.2);
+    hinge.rotation.z = Math.PI / 2;
+    hinge.castShadow = true;
+    hinge.userData.hinge = true;
+    hinge.userData.hingeIndex = index;
+    hinges.push(hinge);
+    group.add(hinge);
+  });
+  group.userData.hinges = hinges;
+
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.025, 10, 32), metal);
+  handle.position.set(5.55, 1.58, -4.12);
+  handle.rotation.y = Math.PI / 2;
+  handle.userData.doorHandle = true;
+  group.add(handle);
+  group.userData.doorHandle = handle;
+
   const bolts: THREE.Mesh[] = [];
   [-0.52, 0.52].forEach((x) => {
     const bolt = box(0.78, 0.12, 0.12, metal, 4.95 + x, 2.25, -4.22);
@@ -1482,6 +1559,25 @@ function addDoorAssembly(group: THREE.Group, room: Room, accentMaterial: THREE.M
     group.add(gear);
   }
   group.userData.gears = gears;
+
+  const sparkMaterial = mat(room.palette[2], {
+    roughness: 0.18,
+    metalness: 0.12,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.8,
+    transparent: true,
+    opacity: 0.18,
+  });
+  for (let i = 0; i < 14; i += 1) {
+    const spark = new THREE.Mesh(new THREE.SphereGeometry(0.028 + (i % 2) * 0.008, 10, 8), sparkMaterial.clone());
+    spark.position.set(4.25 + ((i * 37) % 140) / 100, 0.7 + ((i * 19) % 230) / 100, -4.08 + Math.sin(i * 1.2) * 0.04);
+    spark.userData.unlockSpark = true;
+    spark.userData.baseX = spark.position.x;
+    spark.userData.baseY = spark.position.y;
+    spark.userData.baseZ = spark.position.z;
+    spark.userData.sparkSeed = i + 40;
+    group.add(spark);
+  }
 }
 
 function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
@@ -1846,24 +1942,61 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
   const bolts = group.userData.bolts as THREE.Mesh[] | undefined;
   const gears = group.userData.gears as THREE.Mesh[] | undefined;
   const keyLight = group.userData.keyLight as THREE.PointLight | undefined;
+  const doorHandle = group.userData.doorHandle as THREE.Mesh | undefined;
+  const hinges = group.userData.hinges as THREE.Mesh[] | undefined;
+  const consoleLatch = group.userData.consoleLatch as THREE.Mesh | undefined;
+  const consoleShackle = group.userData.consoleShackle as THREE.Mesh | undefined;
+  const consoleLockBody = group.userData.consoleLockBody as THREE.Mesh | undefined;
 
   if (door) {
-    door.rotation.y = -0.16 * eased;
-    door.position.z = -4.45 + eased * 0.08;
+    door.rotation.y = -0.38 * eased;
+    door.position.x = 4.95 - eased * 0.14;
+    door.position.z = -4.45 + eased * 0.14;
   }
   if (ring) {
-    ring.rotation.z = elapsedTime * 0.55 + eased * Math.PI * 2;
-    ring.scale.setScalar(1 + Math.sin(elapsedTime * 2.2) * 0.018 + eased * 0.08);
+    ring.rotation.z = elapsedTime * 0.55 + eased * Math.PI * 3.2;
+    ring.scale.setScalar(1 + Math.sin(elapsedTime * 2.2) * 0.018 + eased * 0.16);
   }
   if (lockBox) {
-    lockBox.scale.set(1 + eased * 0.035, 1 + Math.sin(elapsedTime * 2.1) * 0.01, 1 + eased * 0.025);
+    lockBox.scale.set(1 + eased * 0.05, 1 + Math.sin(elapsedTime * 2.1) * 0.01 + eased * 0.035, 1 + eased * 0.035);
+  }
+  if (doorHandle) {
+    doorHandle.rotation.z = -0.5 * eased + Math.sin(elapsedTime * 5.8) * 0.03 * unlockProgress;
+    doorHandle.scale.setScalar(1 + eased * 0.08);
+  }
+  hinges?.forEach((hinge, index) => {
+    hinge.rotation.x = eased * (1.1 + index * 0.08);
+    hinge.rotation.z = Math.PI / 2;
+  });
+  if (consoleLatch) {
+    const baseY = (consoleLatch.userData.baseY as number | undefined) ?? consoleLatch.position.y;
+    const baseZ = (consoleLatch.userData.baseZ as number | undefined) ?? consoleLatch.position.z;
+    consoleLatch.position.y = baseY + eased * 0.18 + Math.sin(elapsedTime * 8) * 0.006 * unlockProgress;
+    consoleLatch.position.z = baseZ + eased * 0.055;
+    consoleLatch.rotation.x = eased * 0.08;
+  }
+  if (consoleShackle) {
+    const baseY = (consoleShackle.userData.baseY as number | undefined) ?? consoleShackle.position.y;
+    const baseZ = (consoleShackle.userData.baseZ as number | undefined) ?? consoleShackle.position.z;
+    consoleShackle.position.y = baseY + eased * 0.2;
+    consoleShackle.position.z = baseZ + eased * 0.07;
+    consoleShackle.rotation.z = -eased * 0.72 + Math.sin(elapsedTime * 4.2) * 0.03;
+    consoleShackle.scale.setScalar(1 + eased * 0.1);
+  }
+  if (consoleLockBody) {
+    const baseY = (consoleLockBody.userData.baseY as number | undefined) ?? consoleLockBody.position.y;
+    const baseZ = (consoleLockBody.userData.baseZ as number | undefined) ?? consoleLockBody.position.z;
+    consoleLockBody.position.y = baseY - Math.sin(eased * Math.PI) * 0.035;
+    consoleLockBody.position.z = baseZ + eased * 0.035;
+    consoleLockBody.rotation.z = Math.sin(eased * Math.PI) * -0.08;
   }
   bolts?.forEach((bolt, index) => {
     const baseX = bolt.userData.baseX as number;
-    bolt.position.x = baseX + (index === 0 ? -0.42 : 0.42) * eased;
+    bolt.position.x = baseX + (index === 0 ? -0.72 : 0.72) * eased;
+    bolt.rotation.z = (index === 0 ? -0.16 : 0.16) * eased;
   });
   gears?.forEach((gear, index) => {
-    gear.rotation.z += 0.012 + unlockProgress * (0.06 + index * 0.01);
+    gear.rotation.z += 0.012 + unlockProgress * (0.1 + index * 0.018);
   });
   if (keyLight) {
     keyLight.intensity = 2.1 + Math.sin(elapsedTime * 2.4) * 0.24 + unlockProgress * 1.6 + (phase === "ending" ? 1.1 : 0);
@@ -1889,6 +2022,31 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
       const material = object.material as THREE.MeshStandardMaterial;
       material.emissiveIntensity = 0.24 + Math.sin(elapsedTime * 3 + object.id) * 0.18 + unlockProgress * 0.7;
       object.scale.setScalar(1 + Math.sin(elapsedTime * 2.2 + object.id) * 0.035 + unlockProgress * 0.12);
+    }
+    if (object instanceof THREE.Mesh && object.userData.doorSeal) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const sealIndex = (object.userData.sealIndex as number | undefined) ?? 0;
+      material.opacity = 0.18 + Math.sin(elapsedTime * 3.2 + sealIndex) * 0.05 + unlockProgress * 0.42;
+      material.emissiveIntensity = 0.38 + Math.sin(elapsedTime * 4.1 + sealIndex) * 0.1 + unlockProgress * 1.05;
+      object.scale.setScalar(1 + unlockProgress * 0.14 + Math.sin(elapsedTime * 4 + object.id) * 0.018);
+    }
+    if (object instanceof THREE.Mesh && object.userData.unlockSpark) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const seed = (object.userData.sparkSeed as number | undefined) ?? object.id;
+      const baseX = (object.userData.baseX as number | undefined) ?? object.position.x;
+      const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;
+      const baseZ = (object.userData.baseZ as number | undefined) ?? object.position.z;
+      object.position.x = baseX + Math.sin(seed * 1.7) * unlockProgress * 0.16;
+      object.position.y = baseY + Math.sin(elapsedTime * 5.2 + seed) * 0.018 + unlockProgress * (0.1 + (seed % 5) * 0.018);
+      object.position.z = baseZ + Math.cos(seed * 1.3) * unlockProgress * 0.09;
+      object.scale.setScalar(0.45 + unlockProgress * (1.35 + Math.sin(elapsedTime * 8 + seed) * 0.28));
+      material.opacity = 0.05 + unlockProgress * (0.32 + Math.sin(elapsedTime * 7 + seed) * 0.08);
+      material.emissiveIntensity = 0.4 + unlockProgress * 1.25;
+    }
+    if (object instanceof THREE.Mesh && object.userData.keyhole) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = 0.1 + unlockProgress * 0.82;
+      object.scale.set(1 + unlockProgress * 0.28, 1 + unlockProgress * 0.08, 1);
     }
     if (object instanceof THREE.Mesh && object.userData.padGlow) {
       const material = object.material as THREE.MeshStandardMaterial;
