@@ -868,6 +868,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     let lastFrameTime = performance.now();
     let elapsedTime = 0;
     let animation = 0;
+    let lastActiveRoomIndex = roomIndexRef.current;
     let lastUnlockTick = unlockTickRef.current;
     let unlockStartedAt = -99;
     let lastNearPing = 0;
@@ -910,6 +911,13 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       elapsedTime += delta;
       const activeRoom = rooms[roomIndexRef.current];
       const targetX = roomIndexRef.current * 24;
+      if (roomIndexRef.current !== lastActiveRoomIndex) {
+        lastActiveRoomIndex = roomIndexRef.current;
+        player.position.set(targetX, 1.66, 3.25);
+        player.yaw = 0;
+        player.pitch = roomIndexRef.current === 4 ? -0.02 : -0.04;
+        bob = 0;
+      }
       const move = movementRef.current;
       const speed = 4.4 * delta;
       const forward = new THREE.Vector3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -937,7 +945,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       const targetBackground = new THREE.Color(activeRoom.palette[0]).lerp(new THREE.Color(activeRoom.palette[3]), roomIndexRef.current === 4 ? 0.08 : 0.5);
       scene.background = targetBackground;
       scene.fog!.color.copy(targetBackground.clone().lerp(new THREE.Color(0x08090e), 0.45));
-      bloomPass.strength = roomIndexRef.current === 4 || phaseRef.current === "ending" ? 0.3 : 0.14;
+      bloomPass.strength = roomIndexRef.current === 4 || phaseRef.current === "ending" ? 0.24 : 0.14;
 
       if (unlockTickRef.current !== lastUnlockTick) {
         lastUnlockTick = unlockTickRef.current;
@@ -1378,6 +1386,7 @@ function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
 
   if (index === 4) {
     addHeavenPath(group, room);
+    addFinalMemoryCorridor(group, room);
     addLightBeams(group, room);
   }
 }
@@ -1494,6 +1503,56 @@ function addHeavenPath(group: THREE.Group, room: Room) {
     group.add(cloud);
   }
   addCurtainWindow(group, room, 0, 3.0, -4.34);
+}
+
+function addFinalMemoryCorridor(group: THREE.Group, room: Room) {
+  const gold = mat(0xecc77a, { roughness: 0.28, metalness: 0.62, emissive: 0xffcf7c, emissiveIntensity: 0.16, texture: "metal", textureSeed: 840 });
+  const pearl = mat(0xfaf8ee, { roughness: 0.5, metalness: 0.08, emissive: 0xfff0c4, emissiveIntensity: 0.22, texture: "paper", textureSeed: 841 });
+  const glass = mat(0x8fc7ff, { roughness: 0.18, metalness: 0.12, emissive: 0xbcdcff, emissiveIntensity: 0.24, transparent: true, opacity: 0.58 });
+  const warmPhoto = mat(0xffd6a0, { roughness: 0.58, emissive: 0xffb86d, emissiveIntensity: 0.14, texture: "paper", textureSeed: 842 });
+  const coolPhoto = mat(0xaed9ff, { roughness: 0.54, emissive: 0x92c7ff, emissiveIntensity: 0.14, texture: "paper", textureSeed: 843 });
+  const labelMat = mat(0xfff1cf, { roughness: 0.38, emissive: 0xffda8d, emissiveIntensity: 0.26 });
+  const cloudMat = mat(0xffffff, { roughness: 0.86, transparent: true, opacity: 0.84 });
+
+  for (let i = 0; i < 10; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const pairIndex = Math.floor(i / 2);
+    const z = -2.9 + pairIndex * 1.12;
+    const x = side * (3.25 + (pairIndex % 2) * 0.24);
+    const y = 1.75 + (i % 3) * 0.12;
+    const frame = box(0.92, 0.68, 0.08, gold, x, y, z);
+    const photo = box(0.76, 0.52, 0.09, i % 4 < 2 ? warmPhoto : coolPhoto, x, y, z + 0.055);
+    const shine = box(0.72, 0.04, 0.095, labelMat, x, y - 0.35, z + 0.065);
+    frame.rotation.y = side < 0 ? 0.38 : -0.38;
+    photo.rotation.copy(frame.rotation);
+    shine.rotation.copy(frame.rotation);
+    photo.userData.statusLight = true;
+    group.add(frame, photo, shine);
+  }
+
+  for (let i = 0; i < 9; i += 1) {
+    const pad = new THREE.Mesh(new THREE.SphereGeometry(0.42 + (i % 3) * 0.08, 18, 12), cloudMat);
+    pad.position.set(-2.6 + i * 0.65, 0.18 + Math.sin(i) * 0.04, -2.9 + i * 0.58);
+    pad.scale.set(1.65, 0.28, 0.72);
+    pad.userData.cloud = true;
+    group.add(pad);
+  }
+
+  const gateLeft = box(0.16, 2.6, 0.12, gold, -1.18, 2.02, -4.05);
+  const gateRight = box(0.16, 2.6, 0.12, gold, 1.18, 2.02, -4.05);
+  const gateTop = box(2.54, 0.16, 0.12, gold, 0, 3.28, -4.05);
+  const gateCore = box(1.86, 2.08, 0.08, glass, 0, 2.1, -4.0);
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.035, 10, 76), labelMat);
+  halo.position.set(0, 2.36, -3.92);
+  halo.rotation.x = Math.PI / 2;
+  halo.userData.statusLight = true;
+  const title = box(1.35, 0.055, 0.06, labelMat, 0, 3.58, -3.85);
+  title.userData.statusLight = true;
+  group.add(gateLeft, gateRight, gateTop, gateCore, halo, title);
+
+  const heavenlyKeyLight = new THREE.PointLight(room.palette[1], 1.8, 8.5);
+  heavenlyKeyLight.position.set(0, 2.45, -3.1);
+  group.add(heavenlyKeyLight);
 }
 
 function addLightBeams(group: THREE.Group, room: Room) {

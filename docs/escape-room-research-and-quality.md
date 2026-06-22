@@ -12,6 +12,7 @@
 
 - Camera: first-person, eye-height camera with optional pointer-lock mouse look.
 - Embodiment: desktop first-person hands, flashlight, and heart-key rig; mobile hides the beam and keeps controls clear.
+- Final room: centered spawn, photo corridor, cloud stepping stones, and luminous gate to make the finale read immediately after room transition.
 - Puzzle count: 10 total, 2 per room.
 - Puzzle forms: numeric lock, direction lock, memory/photo choice, symbol lock, final confirmation.
 - Hint system: 3 uses, escalating real-world penalties.
@@ -55,6 +56,7 @@ npm audit --omit=dev
 - runaway button actually moves
 - app enters first-person game mode
 - first-person embodied state is exposed through `render_game_to_text`
+- all 10 placeholder puzzles still solve after room-transition spawn reset
 - WebGL canvas is not blank on desktop and mobile
 - all 10 placeholder puzzles can be solved
 - ending state is reached
