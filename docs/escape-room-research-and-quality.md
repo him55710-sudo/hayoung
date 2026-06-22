@@ -16,7 +16,7 @@
 - Hint system: 3 uses, escalating real-world penalties.
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
 - Unlock feedback: correct answers trigger door/ring/bolt/dial animation and a screen flash.
-- Performance: procedural geometry, shared simple materials, pixel ratio capped, bloom strength kept moderate.
+- Performance: procedural geometry, cached procedural material textures, shared simple materials, pixel ratio capped, bloom strength kept moderate.
 
 ## Open-Source Usage
 
@@ -25,6 +25,7 @@ Already used:
 - React and Vite for the app shell.
 - Three.js for WebGL rendering.
 - Three.js postprocessing `EffectComposer`, `RenderPass`, and `UnrealBloomPass`.
+- Three.js `CanvasTexture` for lightweight wood, plaster, fabric, paper, and metal surface detail.
 - Lucide React for HUD icons.
 - Playwright for the verification harness.
 
@@ -63,10 +64,11 @@ $env:GAME_URL="https://hyunsu-hayoung-400.vercel.app"; npm run verify:game
 
 ## References Used
 
-- Korean room-escape lock overview: https://brunch.co.kr/@dnsplove/19
+- Korean room-escape lock/device style and beginner-friendly linear flow note: https://brunch.co.kr/@angiethinks/13
 - Korean room-escape device/lock ratio note: https://realitat32.tistory.com/6
 - Korean room-escape cafe wiki on common locks/devices: https://escroom.fandom.com/ko/wiki/자물쇠_및_일반적인_장치의_종류
 - The Codex escape-room design rules: https://thecodex.ca/13-rules-for-escape-room-puzzle-design/
+- Escape-room beginner advice on searching the room and identifying locks/clues: https://www.reddit.com/r/escaperooms/comments/115jwnc/escape_rooms_tips_tricks_for_beginners/?tl=ko
 - Big Escape Rooms guide on clue maps and flow: https://www.bigescaperooms.com/design-an-escape-room-game/
 - Red Door guide on setting, clue discovery, and gameflow: https://reddoorescape.com/blog/blog-the-process-of-designing-an-escape-room/
 - LazyCodex / Oh My OpenAgent repository: https://github.com/code-yeongyu/oh-my-openagent

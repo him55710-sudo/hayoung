@@ -45,11 +45,11 @@ def _point_light(label, location, color, intensity, radius):
 
 @unreal.uclass()
 class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
-    """Creates 400-day anniversary escape-room layouts, lighting, and city-block mood tests."""
+    """Creates 500-day anniversary escape-room layouts, lighting, and city-block mood tests."""
 
     @staticmethod
     @toolset_registry.tool_call
-    def create_anniversary_room(room_label: str = "400일의 방") -> dict:
+    def create_anniversary_room(room_label: str = "500일의 방") -> dict:
         """Create a simple playable escape-room blockout.
 
         Args:
@@ -64,13 +64,13 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
         spawned.append(_cube("Back_Wall", unreal.Vector(0, 380, 190), unreal.Vector(8, 0.12, 4)))
         spawned.append(_cube("Left_Wall", unreal.Vector(-400, 0, 190), unreal.Vector(0.12, 8, 4)))
         spawned.append(_cube("Right_Wall", unreal.Vector(400, 0, 190), unreal.Vector(0.12, 8, 4)))
-        spawned.append(_cube("Locked_Door_400", unreal.Vector(0, 374, 120), unreal.Vector(1.4, 0.08, 2.4)))
+        spawned.append(_cube("Locked_Door_500", unreal.Vector(0, 374, 120), unreal.Vector(1.4, 0.08, 2.4)))
         spawned.append(_cube("Puzzle_Desk", unreal.Vector(-190, 150, 45), unreal.Vector(1.7, 0.8, 0.35)))
         spawned.append(_cube("Clue_Box_Heart", unreal.Vector(230, 135, 72), unreal.Vector(0.55, 0.55, 0.55)))
         spawned.append(_cube("Moon_Window", unreal.Vector(255, 377, 185), unreal.Vector(1.2, 0.06, 1.15)))
         spawned.append(
             _text(
-                "Door_Title_400",
+                "Door_Title_500",
                 room_label,
                 unreal.Vector(0, 365, 265),
                 unreal.Rotator(0.0, 180.0, 0.0),
@@ -136,8 +136,8 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
             )
 
         _text(
-            "Memory_City_Sign_400",
-            "D+400",
+            "Memory_City_Sign_500",
+            "D+500",
             unreal.Vector(0, -455, 225),
             unreal.Rotator(0.0, 0.0, 0.0),
             38.0,
@@ -150,7 +150,7 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
 
     @staticmethod
     @toolset_registry.tool_call
-    def create_five_room_escape_level(theme_label: str = "400일의 방") -> dict:
+    def create_five_room_escape_level(theme_label: str = "500일의 방") -> dict:
         """Create a five-room Roblox-like 3D escape-game blockout.
 
         Args:
@@ -164,7 +164,7 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
                 "name": "Room_01_Memory_Lobby",
                 "title": "기억의 로비",
                 "x": 0,
-                "accent": "combination lock 0400",
+                "accent": "combination lock 0500",
                 "puzzle": "자물쇠 문제",
             },
             {

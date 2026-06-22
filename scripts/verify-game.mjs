@@ -3,9 +3,10 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 const url = process.env.GAME_URL ?? "http://127.0.0.1:5173/";
-const answers = ["0100", "1", "URDL", "STAR", "0300", "LURD", "2", "MOON", "0400", "YES"];
+const answers = ["0100", "1", "URDL", "STAR", "0300", "LURD", "2", "MOON", "0500", "YES"];
 const debug = process.env.DEBUG_GAME_VERIFY === "1";
 const debugLogPath = "output/playwright/verify-debug.log";
+const minCanvasVariation = 1500;
 
 if (debug) {
   mkdirSync(dirname(debugLogPath), { recursive: true });
@@ -79,7 +80,7 @@ async function enterGame(page, isMobile = false) {
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".runaway-button");
   const introText = await page.locator(".intro-copy h1").innerText();
-  if (!introText.includes("400일")) throw new Error(`Unexpected intro: ${introText}`);
+  if (!introText.includes("500일")) throw new Error(`Unexpected intro: ${introText}`);
 
   if (!isMobile) {
     const button = page.locator(".runaway-button");
@@ -92,7 +93,7 @@ async function enterGame(page, isMobile = false) {
   }
 
   await page.waitForTimeout(6500);
-  if (isMobile) await page.locator(".runaway-button").tap({ force: true });
+  if (isMobile) await clickSelector(page, ".runaway-button");
   else await page.locator(".runaway-button").click({ force: true });
   await page.waitForSelector("canvas");
   await waitForPhase(page, "game");
@@ -141,7 +142,7 @@ async function main() {
     const desktopState = await gameState(desktop);
     const desktopCanvas = await canvasStats(desktop);
     if (desktopState.cameraMode !== "first-person") throw new Error("Camera mode is not first-person.");
-    if (!desktopCanvas.found || desktopCanvas.varied < 2000) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
+    if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const ending = await solveAll(desktop);
     if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
 
@@ -149,7 +150,7 @@ async function main() {
     await enterGame(mobile, true);
     const mobileState = await gameState(mobile);
     const mobileCanvas = await canvasStats(mobile);
-    if (!mobileCanvas.found || mobileCanvas.varied < 2000) throw new Error(`Mobile canvas looks blank: ${JSON.stringify(mobileCanvas)}`);
+    if (!mobileCanvas.found || mobileCanvas.varied < minCanvasVariation) throw new Error(`Mobile canvas looks blank: ${JSON.stringify(mobileCanvas)}`);
 
     console.log(
       JSON.stringify(

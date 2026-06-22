@@ -49,20 +49,42 @@ button {
   place-items: center;
   overflow: hidden;
   background:
-    linear-gradient(130deg, rgba(255, 190, 93, 0.34), transparent 34%),
-    linear-gradient(230deg, rgba(96, 194, 255, 0.28), transparent 40%),
-    #10131a;
+    linear-gradient(110deg, rgba(255, 190, 93, 0.22), transparent 36%),
+    linear-gradient(250deg, rgba(96, 194, 255, 0.2), transparent 42%),
+    linear-gradient(180deg, #1b1210 0%, #0c1118 56%, #050608 100%);
 }
 
 .intro-backdrop {
   position: absolute;
   inset: -8%;
   background:
-    radial-gradient(circle at 22% 22%, rgba(255, 125, 142, 0.62), transparent 18rem),
-    radial-gradient(circle at 72% 28%, rgba(255, 217, 118, 0.5), transparent 20rem),
-    radial-gradient(circle at 50% 84%, rgba(112, 201, 255, 0.42), transparent 24rem);
-  filter: blur(2px);
+    repeating-linear-gradient(90deg, rgba(255, 232, 184, 0.08) 0 1px, transparent 1px 132px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 7px),
+    linear-gradient(116deg, transparent 0 42%, rgba(255, 219, 146, 0.18) 43% 48%, transparent 57%),
+    linear-gradient(246deg, transparent 0 34%, rgba(122, 205, 255, 0.14) 35% 41%, transparent 54%);
+  opacity: 0.86;
   animation: introDrift 12s ease-in-out infinite alternate;
+}
+
+.intro-backdrop::before,
+.intro-backdrop::after {
+  position: absolute;
+  inset: 8%;
+  content: "";
+  pointer-events: none;
+}
+
+.intro-backdrop::before {
+  border: 1px solid rgba(255, 229, 184, 0.12);
+  box-shadow:
+    inset 0 0 0 12px rgba(0, 0, 0, 0.12),
+    inset 0 -26vh 80px rgba(0, 0, 0, 0.38);
+}
+
+.intro-backdrop::after {
+  background:
+    linear-gradient(90deg, transparent 0 16%, rgba(255, 229, 184, 0.08) 16% 16.5%, transparent 16.5% 34%),
+    linear-gradient(90deg, transparent 0 68%, rgba(255, 229, 184, 0.07) 68% 68.5%, transparent 68.5% 100%);
 }
 
 .intro-copy {

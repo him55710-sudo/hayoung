@@ -54,6 +54,10 @@ type Puzzle = {
   chainNote: string;
 };
 
+type ProceduralTextureKind = "wood" | "plaster" | "fabric" | "paper" | "metal";
+
+const proceduralTextureCache = new Map<string, THREE.CanvasTexture>();
+
 declare global {
   interface Window {
     advanceTime?: (ms?: number) => void;
@@ -94,7 +98,7 @@ const rooms: Room[] = [
   },
   {
     id: 4,
-    days: "301-399일",
+    days: "301-400일",
     title: "다사다난한 밤의 방",
     subtitle: "각자의 문제로 지쳤지만 서로를 놓지 않았던 시간",
     mood: "밤 도시, 열린 창문, 흔들리는 불빛, 오래 버틴 마음",
@@ -104,8 +108,8 @@ const rooms: Room[] = [
   },
   {
     id: 5,
-    days: "400일",
-    title: "400일의 문",
+    days: "401-500일",
+    title: "500일의 문",
     subtitle: "구름 위 사진 길을 지나 섬광 속 편지로",
     mood: "하늘, 구름길, 시간순 사진 프레임, 천국 같은 빛",
     palette: [0xf8fbff, 0xffd87a, 0x92c7ff, 0xdfefff],
@@ -200,15 +204,15 @@ const puzzles: Puzzle[] = [
     answer: "MOON",
     reward: "달빛 실마리",
     requires: [7],
-    chainNote: "달빛 실마리가 400일 하늘문에 들어가는 마지막 장치입니다.",
+    chainNote: "달빛 실마리가 500일 하늘문에 들어가는 마지막 장치입니다.",
   },
   {
     id: 9,
     roomId: 5,
     kind: "code",
-    title: "400일 하늘문",
+    title: "500일 하늘문",
     prompt: "사진 길의 순서와 하늘문에 새겨진 숫자를 연결하는 최종 코드 문제입니다.",
-    answer: "0400",
+    answer: "0500",
     reward: "하늘문 열쇠",
     requires: [8],
     chainNote: "하늘문 열쇠가 편지 장치를 열어 마지막 확인을 보여줍니다.",
@@ -218,9 +222,9 @@ const puzzles: Puzzle[] = [
     roomId: 5,
     kind: "final",
     title: "편지의 마지막 문장",
-    prompt: "400일부터 더 다정하게 같이 걷자는 마음을 담은 최종 확인입니다.",
+    prompt: "500일부터 더 다정하게 같이 걷자는 마음을 담은 최종 확인입니다.",
     answer: "YES",
-    reward: "400일 엔딩 편지",
+    reward: "500일 엔딩 편지",
     requires: [9],
     chainNote: "모든 방의 단서가 끝나고 엔딩 편지가 열립니다.",
   },
@@ -442,7 +446,7 @@ function App() {
           <div className="intro-backdrop" />
           <div className="intro-copy">
             <p className="couple-mark">임현수 × 정하영</p>
-            <h1>임현수와의 400일을 함께하실 준비가 되셨나요?</h1>
+            <h1>임현수와의 500일을 함께하실 준비가 되셨나요?</h1>
             <p>버튼은 잠시 망설이다가 마음이 열리면 멈춰요.</p>
             <button
               className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
@@ -465,7 +469,7 @@ function App() {
       )}
 
       {(phase === "game" || phase === "ending") && (
-        <section className={`game-screen${unlocking ? " is-unlocking" : ""}`} aria-label="400일 1인칭 3D 방탈출">
+        <section className={`game-screen${unlocking ? " is-unlocking" : ""}`} aria-label="500일 1인칭 3D 방탈출">
           <AnniversaryScene
             roomIndex={roomIndex}
             phase={phase}
@@ -480,7 +484,7 @@ function App() {
           <header className="hud top-hud">
             <div className="hud-cluster brand-chip">
               <Heart aria-hidden="true" />
-              <span>400일의 방</span>
+              <span>500일의 방</span>
             </div>
             <div className="hud-cluster progress-chip">
               <span>Room {roomProgress}</span>
@@ -603,8 +607,8 @@ function App() {
 
           {phase === "ending" && (
             <div className="ending-letter">
-              <span>400일의 문이 열렸어</span>
-              <h2>하영아, 400일부터는 더 다정하게 같이 걷자.</h2>
+              <span>500일의 문이 열렸어</span>
+              <h2>하영아, 500일부터는 더 다정하게 같이 걷자.</h2>
               <p>
                 지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로 돌아왔어. 앞으로의 방은 혼자 푸는 문제가 아니라,
                 둘이 같이 만드는 추억이면 좋겠어.
@@ -977,13 +981,18 @@ function createRoom(room: Room, index: number) {
   const group = new THREE.Group();
   group.position.x = index * 24;
 
-  const floorMaterial = mat(room.palette[0], { roughness: 0.72, metalness: 0.04 });
-  const wallMaterial = mat(new THREE.Color(room.palette[0]).lerp(new THREE.Color(room.palette[3]), 0.48).getHex(), { roughness: 0.86 });
-  const trimMaterial = mat(0x2d211b, { roughness: 0.52, metalness: 0.04 });
-  const accentMaterial = mat(room.palette[1], { roughness: 0.28, metalness: 0.18, emissive: room.palette[1], emissiveIntensity: 0.16 });
+  const floorMaterial = mat(room.palette[0], { roughness: 0.72, metalness: 0.04, texture: "wood", textureRepeat: [3.2, 2.2], textureSeed: index * 23 + 1 });
+  const wallMaterial = mat(new THREE.Color(room.palette[0]).lerp(new THREE.Color(room.palette[3]), 0.48).getHex(), {
+    roughness: 0.86,
+    texture: "plaster",
+    textureRepeat: [3.8, 1.8],
+    textureSeed: index * 29 + 4,
+  });
+  const trimMaterial = mat(0x2d211b, { roughness: 0.52, metalness: 0.04, texture: "wood", textureRepeat: [1.4, 3.4], textureSeed: index * 31 + 2 });
+  const accentMaterial = mat(room.palette[1], { roughness: 0.28, metalness: 0.18, emissive: room.palette[1], emissiveIntensity: 0.16, texture: "metal", textureSeed: index + 12 });
   const glowMaterial = mat(room.palette[2], { roughness: 0.18, metalness: 0.12, emissive: room.palette[2], emissiveIntensity: 0.46 });
 
-  addRoomShell(group, floorMaterial, wallMaterial, trimMaterial, index);
+  addRoomShell(group, room, floorMaterial, wallMaterial, trimMaterial, index);
   addPhotoWall(group, room, index);
   addPuzzleDesk(group, room, accentMaterial, glowMaterial);
   addDoorAssembly(group, room, accentMaterial, glowMaterial);
@@ -1001,14 +1010,21 @@ function createRoom(room: Room, index: number) {
   return group;
 }
 
-function addRoomShell(group: THREE.Group, floorMaterial: THREE.Material, wallMaterial: THREE.Material, trimMaterial: THREE.Material, index: number) {
+function addRoomShell(
+  group: THREE.Group,
+  room: Room,
+  floorMaterial: THREE.Material,
+  wallMaterial: THREE.Material,
+  trimMaterial: THREE.Material,
+  index: number,
+) {
   const floor = box(14, 0.28, 9.4, floorMaterial, 0, -0.14, 0);
   floor.receiveShadow = true;
   group.add(floor);
 
   for (let i = 0; i < 14; i += 1) {
     const plank = box(0.9, 0.035, 8.8, trimMaterial, -6.2 + i * 0.95, 0.035, 0);
-    plank.material = mat(i % 2 ? 0x765234 : 0x916944, { roughness: 0.78 });
+    plank.material = mat(i % 2 ? 0x765234 : 0x916944, { roughness: 0.78, texture: "wood", textureRepeat: [0.35, 4.8], textureSeed: index * 41 + i });
     plank.receiveShadow = true;
     group.add(plank);
   }
@@ -1016,7 +1032,7 @@ function addRoomShell(group: THREE.Group, floorMaterial: THREE.Material, wallMat
   const backWall = box(14.4, 5.4, 0.32, wallMaterial, 0, 2.55, -4.72);
   const leftWall = box(0.32, 5.4, 9.4, wallMaterial, -7.2, 2.55, 0);
   const rightWall = box(0.32, 5.4, 9.4, wallMaterial, 7.2, 2.55, 0);
-  const ceiling = box(14.4, 0.22, 9.4, mat(0x151318, { roughness: 0.82 }), 0, 5.18, 0);
+  const ceiling = box(14.4, 0.22, 9.4, mat(0x151318, { roughness: 0.82, texture: "plaster", textureRepeat: [3, 2], textureSeed: index + 80 }), 0, 5.18, 0);
   [backWall, leftWall, rightWall, ceiling].forEach((mesh) => {
     mesh.receiveShadow = true;
     mesh.castShadow = true;
@@ -1029,14 +1045,67 @@ function addRoomShell(group: THREE.Group, floorMaterial: THREE.Material, wallMat
     group.add(beam);
   }
 
-  const rug = box(4.8, 0.045, 2.2, mat(index === 2 ? 0x243557 : 0x4f2f2d, { roughness: 0.92 }), -1.4, 0.09, 1.25);
+  const rug = box(4.8, 0.045, 2.2, mat(index === 2 ? 0x243557 : 0x4f2f2d, { roughness: 0.92, texture: "fabric", textureRepeat: [2.4, 1.2], textureSeed: index + 100 }), -1.4, 0.09, 1.25);
   rug.receiveShadow = true;
   group.add(rug);
+
+  addArchitecturalDetails(group, room, trimMaterial, index);
+}
+
+function addArchitecturalDetails(group: THREE.Group, room: Room, trimMaterial: THREE.Material, index: number) {
+  const panelMaterial = mat(new THREE.Color(room.palette[0]).lerp(new THREE.Color(room.palette[3]), 0.62).getHex(), {
+    roughness: 0.88,
+    texture: "plaster",
+    textureRepeat: [1.2, 1.4],
+    textureSeed: index + 320,
+  });
+  const edgeGlow = mat(room.palette[1], {
+    roughness: 0.5,
+    metalness: 0.12,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.2,
+    transparent: true,
+    opacity: 0.64,
+  });
+  const shadowWood = mat(0x21140f, { roughness: 0.7, metalness: 0.04, texture: "wood", textureRepeat: [1.8, 1], textureSeed: index + 340 });
+
+  const baseboards = [
+    box(14.1, 0.18, 0.08, trimMaterial, 0, 0.42, -4.36),
+    box(0.08, 0.18, 8.6, trimMaterial, -7.02, 0.42, -0.04),
+    box(0.08, 0.18, 8.6, trimMaterial, 7.02, 0.42, -0.04),
+    box(14.1, 0.14, 0.08, shadowWood, 0, 4.78, -4.36),
+    box(0.08, 0.14, 8.6, shadowWood, -7.02, 4.78, -0.04),
+    box(0.08, 0.14, 8.6, shadowWood, 7.02, 4.78, -0.04),
+  ];
+  group.add(...baseboards);
+
+  for (let column = 0; column < 5; column += 1) {
+    const x = -5.55 + column * 2.75;
+    const panel = box(1.48, 1.58, 0.035, panelMaterial, x, 2.72, -4.34);
+    const top = box(1.62, 0.045, 0.055, trimMaterial, x, 3.55, -4.28);
+    const bottom = box(1.62, 0.045, 0.055, trimMaterial, x, 1.9, -4.28);
+    const left = box(0.045, 1.62, 0.055, trimMaterial, x - 0.82, 2.72, -4.28);
+    const right = box(0.045, 1.62, 0.055, trimMaterial, x + 0.82, 2.72, -4.28);
+    group.add(panel, top, bottom, left, right);
+  }
+
+  [-4.8, -1.6, 1.6, 4.8].forEach((x, lightIndex) => {
+    const rail = box(0.035, 0.018, 7.5, edgeGlow, x, 0.13, -0.05);
+    rail.userData.statusLight = true;
+    rail.userData.baseGlow = 0.12 + lightIndex * 0.03;
+    group.add(rail);
+  });
+
+  for (let i = 0; i < 8; i += 1) {
+    const cable = box(0.035, 0.035, 0.95 + (i % 3) * 0.3, shadowWood, -6.1 + i * 1.7, 4.54 + Math.sin(i) * 0.05, -4.18);
+    cable.rotation.z = Math.sin(i * 1.3) * 0.08;
+    group.add(cable);
+  }
 }
 
 function addPhotoWall(group: THREE.Group, room: Room, index: number) {
-  const frameMaterial = mat(index === 4 ? 0xe9d18d : 0x6f4e32, { roughness: 0.46, metalness: 0.12 });
-  const photoMaterial = mat(room.palette[2], { roughness: 0.5, emissive: room.palette[2], emissiveIntensity: index === 4 ? 0.35 : 0.08 });
+  const frameMaterial = mat(index === 4 ? 0xe9d18d : 0x6f4e32, { roughness: 0.46, metalness: 0.12, texture: "wood", textureRepeat: [0.8, 0.8], textureSeed: index + 140 });
+  const photoMaterial = mat(room.palette[2], { roughness: 0.5, emissive: room.palette[2], emissiveIntensity: index === 4 ? 0.35 : 0.08, texture: "paper", textureSeed: index + 160 });
   const count = index === 4 ? 14 : 9;
   for (let i = 0; i < count; i += 1) {
     const width = 0.55 + ((i * 37) % 4) * 0.13;
@@ -1053,11 +1122,11 @@ function addPhotoWall(group: THREE.Group, room: Room, index: number) {
 }
 
 function addPuzzleDesk(group: THREE.Group, room: Room, accentMaterial: THREE.Material, glowMaterial: THREE.Material) {
-  const wood = mat(0x70472c, { roughness: 0.58, metalness: 0.03, emissive: 0x2a160b, emissiveIntensity: 0.05 });
-  const darkWood = mat(0x2d1d16, { roughness: 0.62, metalness: 0.04 });
-  const metal = mat(0x463d37, { roughness: 0.32, metalness: 0.72 });
-  const brass = mat(0xd5a45f, { roughness: 0.34, metalness: 0.68, emissive: 0xffb35f, emissiveIntensity: 0.04 });
-  const paper = mat(0xffedd1, { roughness: 0.82 });
+  const wood = mat(0x70472c, { roughness: 0.58, metalness: 0.03, emissive: 0x2a160b, emissiveIntensity: 0.05, texture: "wood", textureRepeat: [2.2, 1.4], textureSeed: room.id + 200 });
+  const darkWood = mat(0x2d1d16, { roughness: 0.62, metalness: 0.04, texture: "wood", textureRepeat: [1.7, 1.2], textureSeed: room.id + 220 });
+  const metal = mat(0x463d37, { roughness: 0.32, metalness: 0.72, texture: "metal", textureSeed: room.id + 230 });
+  const brass = mat(0xd5a45f, { roughness: 0.34, metalness: 0.68, emissive: 0xffb35f, emissiveIntensity: 0.04, texture: "metal", textureSeed: room.id + 240 });
+  const paper = mat(0xffedd1, { roughness: 0.82, texture: "paper", textureSeed: room.id + 250 });
   const darkGlass = mat(0x0d1118, { roughness: 0.2, metalness: 0.18, emissive: room.palette[3], emissiveIntensity: 0.16 });
   const outlineMaterial = mat(0xffdc91, {
     roughness: 0.18,
@@ -1081,7 +1150,7 @@ function addPuzzleDesk(group: THREE.Group, room: Room, accentMaterial: THREE.Mat
   const deskBack = box(5.9, 0.32, 0.2, darkWood, -0.7, 0.98, -1.38);
   const deskLip = box(5.85, 0.08, 0.08, brass, -0.7, 0.96, 0.22);
   const deskGlow = box(4.8, 0.026, 0.035, brass, -0.7, 0.97, 0.27);
-  const frontPanelMaterial = mat(0x6b4028, { roughness: 0.66, metalness: 0.04, emissive: 0x2a160b, emissiveIntensity: 0.08 });
+  const frontPanelMaterial = mat(0x6b4028, { roughness: 0.66, metalness: 0.04, emissive: 0x2a160b, emissiveIntensity: 0.08, texture: "wood", textureRepeat: [2.8, 0.8], textureSeed: room.id + 260 });
   const frontPanel = box(5.45, 0.42, 0.045, frontPanelMaterial, -0.7, 0.5, 0.26);
   const frontTopRail = box(5.55, 0.035, 0.05, brass, -0.7, 0.72, 0.3);
   const frontBottomRail = box(5.55, 0.035, 0.05, darkWood, -0.7, 0.28, 0.3);
@@ -1512,6 +1581,9 @@ function mat(
     emissiveIntensity?: number;
     transparent?: boolean;
     opacity?: number;
+    texture?: ProceduralTextureKind;
+    textureRepeat?: [number, number];
+    textureSeed?: number;
   } = {},
 ) {
   const materialOptions: THREE.MeshStandardMaterialParameters = {
@@ -1521,6 +1593,12 @@ function mat(
     emissive: options.emissive ?? 0x000000,
     emissiveIntensity: options.emissiveIntensity ?? 0,
   };
+  if (options.texture) {
+    const texture = createProceduralTexture(options.texture, color, options.textureSeed ?? 0, options.textureRepeat ?? [1, 1]);
+    materialOptions.map = texture;
+    materialOptions.bumpMap = texture;
+    materialOptions.bumpScale = options.texture === "metal" ? 0.008 : 0.025;
+  }
   if (typeof options.transparent === "boolean") {
     materialOptions.transparent = options.transparent;
   }
@@ -1528,6 +1606,146 @@ function mat(
     materialOptions.opacity = options.opacity;
   }
   return new THREE.MeshStandardMaterial(materialOptions);
+}
+
+function createProceduralTexture(kind: ProceduralTextureKind, baseColor: number, seed: number, repeat: [number, number]) {
+  const cacheKey = `${kind}:${baseColor}:${seed}:${repeat[0]}:${repeat[1]}`;
+  const cached = proceduralTextureCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas texture context unavailable.");
+  }
+
+  const base = new THREE.Color(baseColor);
+  const random = seededRandom(seed + baseColor * 0.000001);
+  const color = (shade = 0, alpha = 1) => {
+    const c = base.clone().offsetHSL(0, 0, shade);
+    return `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${alpha})`;
+  };
+
+  ctx.fillStyle = color(0);
+  ctx.fillRect(0, 0, size, size);
+
+  if (kind === "wood") {
+    for (let y = 0; y < size; y += 5) {
+      const wobble = Math.sin(y * 0.11 + seed) * 8;
+      ctx.strokeStyle = color(random() * 0.16 - 0.08, 0.34);
+      ctx.lineWidth = 1 + random() * 2;
+      ctx.beginPath();
+      for (let x = -6; x <= size + 6; x += 8) {
+        const nextY = y + Math.sin(x * 0.075 + seed * 0.7) * 4 + wobble * 0.18;
+        if (x === -6) ctx.moveTo(x, nextY);
+        else ctx.lineTo(x, nextY);
+      }
+      ctx.stroke();
+    }
+    for (let i = 0; i < 12; i += 1) {
+      const x = random() * size;
+      const y = random() * size;
+      ctx.strokeStyle = color(-0.1, 0.18);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 8 + random() * 12, 2 + random() * 4, random() * Math.PI, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  if (kind === "plaster") {
+    for (let i = 0; i < 360; i += 1) {
+      const x = random() * size;
+      const y = random() * size;
+      const radius = 0.5 + random() * 2.2;
+      ctx.fillStyle = color(random() * 0.18 - 0.09, 0.08 + random() * 0.12);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let i = 0; i < 12; i += 1) {
+      ctx.strokeStyle = color(random() * 0.12 - 0.06, 0.08);
+      ctx.lineWidth = 2 + random() * 5;
+      ctx.beginPath();
+      ctx.moveTo(random() * size, random() * size);
+      ctx.bezierCurveTo(random() * size, random() * size, random() * size, random() * size, random() * size, random() * size);
+      ctx.stroke();
+    }
+  }
+
+  if (kind === "fabric") {
+    for (let i = 0; i < size; i += 6) {
+      ctx.strokeStyle = color(i % 12 === 0 ? 0.1 : -0.06, 0.24);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, size);
+      ctx.moveTo(0, i);
+      ctx.lineTo(size, i);
+      ctx.stroke();
+    }
+    for (let i = 0; i < 180; i += 1) {
+      ctx.fillStyle = color(random() * 0.12 - 0.06, 0.12);
+      ctx.fillRect(random() * size, random() * size, 1 + random() * 2, 1);
+    }
+  }
+
+  if (kind === "paper") {
+    for (let i = 0; i < 160; i += 1) {
+      ctx.strokeStyle = color(random() * 0.1 - 0.05, 0.12);
+      ctx.lineWidth = 0.75;
+      ctx.beginPath();
+      const y = random() * size;
+      ctx.moveTo(random() * size, y);
+      ctx.lineTo(random() * size, y + random() * 10 - 5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(255, 255, 255, 0.06)";
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  if (kind === "metal") {
+    for (let i = 0; i < 120; i += 1) {
+      const y = random() * size;
+      ctx.strokeStyle = color(random() * 0.12 - 0.08, 0.12);
+      ctx.lineWidth = random() > 0.8 ? 1.4 : 0.6;
+      ctx.beginPath();
+      ctx.moveTo(random() * size, y);
+      ctx.lineTo(size, y + random() * 12 - 6);
+      ctx.stroke();
+    }
+    const gradient = ctx.createLinearGradient(0, 0, size, size);
+    gradient.addColorStop(0, "rgba(255,255,255,0.08)");
+    gradient.addColorStop(0.5, "rgba(0,0,0,0.08)");
+    gradient.addColorStop(1, "rgba(255,255,255,0.04)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(repeat[0], repeat[1]);
+  texture.anisotropy = 4;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  proceduralTextureCache.set(cacheKey, texture);
+  return texture;
+}
+
+function seededRandom(seed: number) {
+  let value = Math.floor(seed * 1000) || 1;
+  return () => {
+    value = (value * 1664525 + 1013904223) % 4294967296;
+    return value / 4294967296;
+  };
 }
 
 function easeOutCubic(value: number) {
