@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="500일 이후 기억 사진 자리">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#1f1a2e"/>
+      <stop offset=".48" stop-color="#ff6f7c"/>
+      <stop offset="1" stop-color="#ffdf9a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="45%" r="54%">
+      <stop offset="0" stop-color="#fff8ec" stop-opacity=".82"/>
+      <stop offset="1" stop-color="#fff8ec" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
+  <path d="M400 164 C488 70 642 136 642 280 C642 414 484 472 400 520 C316 472 158 414 158 280 C158 136 312 70 400 164 Z" fill="#fff8ec" opacity=".28"/>
+  <path d="M302 290 H498 M400 192 V398" stroke="#fff8ec" stroke-width="18" stroke-linecap="round" opacity=".6"/>
+  <text x="64" y="92" fill="#fff8ec" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700">Next room</text>
+  <text x="64" y="518" fill="#fff8ec" font-family="Arial, sans-serif" font-size="22" font-weight="700" opacity=".82">future memories go here</text>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="1-100일 기억 사진 자리">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffe7a8"/>
+      <stop offset="0.55" stop-color="#ff8da0"/>
+      <stop offset="1" stop-color="#7fd7ff"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="32%" cy="24%" r="52%">
+      <stop offset="0" stop-color="#fff8de" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#fff8de" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
+  <circle cx="638" cy="122" r="68" fill="#fff4d6" opacity=".42"/>
+  <path d="M110 440 C230 330 330 420 455 300 C560 200 650 280 715 210" fill="none" stroke="#fff8ec" stroke-width="18" stroke-linecap="round" opacity=".56"/>
+  <text x="64" y="92" fill="#2a1c15" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700">1-100 days</text>
+  <text x="64" y="142" fill="#2a1c15" font-family="Arial, sans-serif" font-size="22" opacity=".72">first bright memory slot</text>
+  <rect x="56" y="470" width="288" height="54" rx="8" fill="#2a1c15" opacity=".28"/>
+  <text x="80" y="506" fill="#fff8ec" font-family="Arial, sans-serif" font-size="21" font-weight="700">Replace with your photo</text>
+</svg>

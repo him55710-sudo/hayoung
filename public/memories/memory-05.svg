@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="401-500일 기억 사진 자리">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset=".52" stop-color="#92c7ff"/>
+      <stop offset="1" stop-color="#f9dc8c"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="26%" r="38%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".98"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="url(#sun)"/>
+  <ellipse cx="215" cy="420" rx="160" ry="54" fill="#ffffff" opacity=".74"/>
+  <ellipse cx="438" cy="438" rx="188" ry="62" fill="#ffffff" opacity=".68"/>
+  <ellipse cx="632" cy="412" rx="142" ry="48" fill="#ffffff" opacity=".66"/>
+  <path d="M134 306 C260 230 356 330 470 248 C570 176 642 230 708 188" fill="none" stroke="#fff8ec" stroke-width="18" stroke-linecap="round" opacity=".72"/>
+  <text x="64" y="92" fill="#20384d" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700">401-500 days</text>
+  <text x="64" y="518" fill="#20384d" font-family="Arial, sans-serif" font-size="22" font-weight="700" opacity=".76">the cloud road opens</text>
+</svg>

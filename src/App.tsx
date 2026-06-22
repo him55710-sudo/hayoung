@@ -55,9 +55,19 @@ type Puzzle = {
   chainNote: string;
 };
 
+type MemorySlot = {
+  id: string;
+  dayRange: string;
+  title: string;
+  caption: string;
+  image: string;
+};
+
 type ProceduralTextureKind = "wood" | "plaster" | "fabric" | "paper" | "metal";
 
 const proceduralTextureCache = new Map<string, THREE.CanvasTexture>();
+const memoryTextureCache = new Map<string, THREE.Texture>();
+const memoryTextureLoader = new THREE.TextureLoader();
 
 declare global {
   interface Window {
@@ -116,6 +126,51 @@ const rooms: Room[] = [
     palette: [0xf8fbff, 0xffd87a, 0x92c7ff, 0xdfefff],
     accent: "#f9dc8c",
     ambience: { label: "celestial choir shimmer", base: 329.63, harmony: 493.88, pulse: 0.72 },
+  },
+];
+
+const memorySlots: MemorySlot[] = [
+  {
+    id: "memory-01",
+    dayRange: "1-100일",
+    title: "처음 설렌 날들",
+    caption: "밝은 마음으로 서로를 알아가던 시작",
+    image: "/memories/memory-01.svg",
+  },
+  {
+    id: "memory-02",
+    dayRange: "101-200일",
+    title: "조금 더 가까이",
+    caption: "약속과 일상이 편안해지던 시간",
+    image: "/memories/memory-02.svg",
+  },
+  {
+    id: "memory-03",
+    dayRange: "201-300일",
+    title: "비 온 뒤의 마음",
+    caption: "싸움 뒤에도 다시 서로를 고르던 날들",
+    image: "/memories/memory-03.svg",
+  },
+  {
+    id: "memory-04",
+    dayRange: "301-400일",
+    title: "지친 밤의 편",
+    caption: "각자의 문제 속에서도 놓지 않았던 손",
+    image: "/memories/memory-04.svg",
+  },
+  {
+    id: "memory-05",
+    dayRange: "401-500일",
+    title: "구름길",
+    caption: "다시 환하게 걸어온 기념의 복도",
+    image: "/memories/memory-05.svg",
+  },
+  {
+    id: "memory-06",
+    dayRange: "500일 이후",
+    title: "다음 방",
+    caption: "앞으로 같이 만들 새로운 장면",
+    image: "/memories/memory-06.svg",
   },
 ];
 
@@ -341,6 +396,7 @@ function App() {
         roomIndex: roomIndex + 1,
         solvedPuzzles: solvedIds.length,
         totalPuzzles: puzzles.length,
+        memorySlots: memorySlots.length,
         hintsLeft,
         penalties: hintPenalties.slice(0, hintCount),
         nextPuzzle: availablePuzzle?.title ?? (canAdvanceRoom ? "room clear" : blockedPuzzle?.title ?? "none"),
@@ -635,12 +691,26 @@ function App() {
 
           {phase === "ending" && (
             <div className="ending-letter">
-              <span>500일의 문이 열렸어</span>
-              <h2>하영아, 500일부터는 더 다정하게 같이 걷자.</h2>
-              <p>
-                지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로 돌아왔어. 앞으로의 방은 혼자 푸는 문제가 아니라,
-                둘이 같이 만드는 추억이면 좋겠어.
-              </p>
+              <div className="ending-copy">
+                <span>500일의 문이 열렸어</span>
+                <h2>하영아, 500일부터는 더 다정하게 같이 걷자.</h2>
+                <p>
+                  지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로 돌아왔어. 앞으로의 방은 혼자 푸는 문제가 아니라,
+                  둘이 같이 만드는 추억이면 좋겠어.
+                </p>
+              </div>
+              <div className="memory-timeline" aria-label="500일 기억 타임라인">
+                {memorySlots.map((slot) => (
+                  <figure className="memory-card" key={slot.id}>
+                    <img src={slot.image} alt={`${slot.dayRange} ${slot.title}`} />
+                    <figcaption>
+                      <b>{slot.dayRange}</b>
+                      <strong>{slot.title}</strong>
+                      <small>{slot.caption}</small>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
             </div>
           )}
         </section>
@@ -1727,8 +1797,6 @@ function addFinalMemoryCorridor(group: THREE.Group, room: Room) {
   const gold = mat(0xecc77a, { roughness: 0.28, metalness: 0.62, emissive: 0xffcf7c, emissiveIntensity: 0.16, texture: "metal", textureSeed: 840 });
   const pearl = mat(0xfaf8ee, { roughness: 0.5, metalness: 0.08, emissive: 0xfff0c4, emissiveIntensity: 0.22, texture: "paper", textureSeed: 841 });
   const glass = mat(0x8fc7ff, { roughness: 0.18, metalness: 0.12, emissive: 0xbcdcff, emissiveIntensity: 0.24, transparent: true, opacity: 0.58 });
-  const warmPhoto = mat(0xffd6a0, { roughness: 0.58, emissive: 0xffb86d, emissiveIntensity: 0.14, texture: "paper", textureSeed: 842 });
-  const coolPhoto = mat(0xaed9ff, { roughness: 0.54, emissive: 0x92c7ff, emissiveIntensity: 0.14, texture: "paper", textureSeed: 843 });
   const labelMat = mat(0xfff1cf, { roughness: 0.38, emissive: 0xffda8d, emissiveIntensity: 0.26 });
   const cloudMat = mat(0xffffff, { roughness: 0.86, transparent: true, opacity: 0.84 });
 
@@ -1739,7 +1807,8 @@ function addFinalMemoryCorridor(group: THREE.Group, room: Room) {
     const x = side * (3.25 + (pairIndex % 2) * 0.24);
     const y = 1.75 + (i % 3) * 0.12;
     const frame = box(0.92, 0.68, 0.08, gold, x, y, z);
-    const photo = box(0.76, 0.52, 0.09, i % 4 < 2 ? warmPhoto : coolPhoto, x, y, z + 0.055);
+    const slot = memorySlots[i % memorySlots.length];
+    const photo = box(0.76, 0.52, 0.09, createMemoryPhotoMaterial(slot, i), x, y, z + 0.055);
     const shine = box(0.72, 0.04, 0.095, labelMat, x, y - 0.35, z + 0.065);
     frame.rotation.y = side < 0 ? 0.38 : -0.38;
     photo.rotation.copy(frame.rotation);
@@ -1771,6 +1840,34 @@ function addFinalMemoryCorridor(group: THREE.Group, room: Room) {
   const heavenlyKeyLight = new THREE.PointLight(room.palette[1], 1.8, 8.5);
   heavenlyKeyLight.position.set(0, 2.45, -3.1);
   group.add(heavenlyKeyLight);
+}
+
+function createMemoryPhotoMaterial(slot: MemorySlot, index: number) {
+  const texture = getMemoryTexture(slot.image);
+  const accent = index % 2 === 0 ? 0xffc36f : 0x92c7ff;
+  return new THREE.MeshStandardMaterial({
+    map: texture,
+    color: 0xffffff,
+    roughness: 0.5,
+    metalness: 0.02,
+    emissive: accent,
+    emissiveIntensity: 0.1,
+  });
+}
+
+function getMemoryTexture(path: string) {
+  const cached = memoryTextureCache.get(path);
+  if (cached) {
+    return cached;
+  }
+
+  const texture = memoryTextureLoader.load(path);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  memoryTextureCache.set(path, texture);
+  return texture;
 }
 
 function addLightBeams(group: THREE.Group, room: Room) {

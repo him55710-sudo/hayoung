@@ -13,6 +13,7 @@
 - Camera: first-person, eye-height camera with optional pointer-lock mouse look.
 - Embodiment: desktop first-person hands, flashlight, and heart-key rig; mobile hides the beam and keeps controls clear.
 - Final room: centered spawn, photo corridor, cloud stepping stones, and luminous gate to make the finale read immediately after room transition.
+- Memory assets: six replaceable files in `public/memories` feed both the HTML ending timeline and final-room Three.js photo frames.
 - Puzzle count: 10 total, 2 per room.
 - Puzzle forms: numeric lock, direction lock, memory/photo choice, symbol lock, final confirmation.
 - Puzzle input: modal locks now use tactile numeric pads, direction pads, and choice chips while keeping the keyboard input for accessibility and automation.

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="301-400일 기억 사진 자리">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#090d14"/>
+      <stop offset=".58" stop-color="#20384d"/>
+      <stop offset="1" stop-color="#ffa36c"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect x="82" y="100" width="636" height="380" rx="22" fill="#fff8ec" opacity=".08"/>
+  <path d="M120 432 C220 350 260 456 356 356 C452 256 520 410 682 248" fill="none" stroke="#ffd6ad" stroke-width="16" stroke-linecap="round" opacity=".62"/>
+  <circle cx="230" cy="196" r="18" fill="#ffd6ad" opacity=".7"/>
+  <circle cx="578" cy="172" r="12" fill="#ffd6ad" opacity=".55"/>
+  <circle cx="650" cy="420" r="15" fill="#ffd6ad" opacity=".5"/>
+  <text x="64" y="92" fill="#fff8ec" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700">301-400 days</text>
+  <text x="64" y="518" fill="#fff8ec" font-family="Arial, sans-serif" font-size="22" font-weight="700" opacity=".78">tired nights, same side</text>
+</svg>

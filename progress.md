@@ -14,6 +14,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added first-person camera, pointer-lock mouse look, desktop/mobile movement, and a center reticle.
 - Added a camera-attached Hayoung first-person hands/flashlight/heart-key rig with movement sway, unlock reaction, and mobile-safe beam hiding.
 - Added a stronger final-room memory corridor with placeholder chronological photo frames, cloud stepping stones, a luminous heaven gate, centered room-transition spawn, and reduced finale bloom clipping.
+- Added six replaceable memory image slots under `public/memories` and connected them to both the ending timeline and final-room 3D photo frames.
 - Added lock-device modal previews for numeric, direction, symbol, and final locks.
 - Added tactile puzzle input pads: numeric keypad, direction pad, memory/symbol/final choice chips, sanitized answer input, and corrected direction preview layout.
 - Upgraded unlock motion detail with latch/shackle lift, door seam glow, hinge/handle motion, sliding bolts, faster gears, and unlock sparks.
@@ -35,13 +36,13 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run build` passes.
 - `npm run verify:game` passes locally.
 - `npm audit --omit=dev` passes with 0 vulnerabilities.
-- Latest visual QA screenshots inspected: `output/playwright/500-unlock-motion-detail.png`, `output/playwright/500-puzzle-pad-desktop.png`, and `output/playwright/500-direction-pad-desktop-fixed.png` (ignored artifacts).
+- Latest visual QA screenshots inspected: `output/playwright/500-ending-memory-timeline-polished.png`, `output/playwright/500-memory-slots-corridor.png`, and `output/playwright/500-unlock-motion-detail.png` (ignored artifacts).
 - Unreal Python toolset compiles with `python -m py_compile`.
 
 ## Known Limitations
 
 - Visual quality is improved but still not final paid-game quality. It is now a richer procedural prototype, not a real asset-authored Unreal/Steam-level scene.
-- Real couple photos are not inserted yet.
+- Real couple photos are not inserted yet; replace the six `public/memories/memory-*.svg` placeholders when photos arrive.
 - Puzzle prompts and answers are placeholders awaiting user-provided content.
 - BGM is procedural oscillator ambience; replace with authored or open-licensed loops later if desired.
 - High-end GLB room props, hand/flashlight model, compressed textures, and better collision are still future art/tech passes.
