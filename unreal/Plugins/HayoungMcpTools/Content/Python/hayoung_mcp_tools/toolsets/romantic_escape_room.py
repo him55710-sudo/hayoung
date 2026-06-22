@@ -147,3 +147,116 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
             "building_count": count,
             "layout": "simple skyline blockout for later replacement with city assets",
         }
+
+    @staticmethod
+    @toolset_registry.tool_call
+    def create_five_room_escape_level(theme_label: str = "500일의 방") -> dict:
+        """Create a five-room Roblox-like 3D escape-game blockout.
+
+        Args:
+            theme_label: Main theme label placed in the lobby and final room.
+
+        Returns:
+            Room names, puzzle types, and actor count created for the level.
+        """
+        room_specs = [
+            {
+                "name": "Room_01_Memory_Lobby",
+                "title": "기억의 로비",
+                "x": 0,
+                "accent": "combination lock 0500",
+                "puzzle": "자물쇠 문제",
+            },
+            {
+                "name": "Room_02_Direction_Gallery",
+                "title": "방향의 복도",
+                "x": 900,
+                "accent": "arrow sequence",
+                "puzzle": "방향키 문제",
+            },
+            {
+                "name": "Room_03_Light_Studio",
+                "title": "빛의 작업실",
+                "x": 1800,
+                "accent": "moon and lamp order",
+                "puzzle": "조명 순서 문제",
+            },
+            {
+                "name": "Room_04_City_Memory",
+                "title": "추억의 도시",
+                "x": 2700,
+                "accent": "mini city route",
+                "puzzle": "3D 이동/점프 문제",
+            },
+            {
+                "name": "Room_05_Final_Vault",
+                "title": "마지막 금고",
+                "x": 3600,
+                "accent": "heart key finale",
+                "puzzle": "최종 조합 문제",
+            },
+        ]
+
+        spawned_count = 0
+        for index, room in enumerate(room_specs):
+            x = room["x"]
+            _cube(f"{room['name']}_Floor", unreal.Vector(x, 0, -10), unreal.Vector(6, 6, 0.1))
+            _cube(f"{room['name']}_BackWall", unreal.Vector(x, 300, 180), unreal.Vector(6, 0.12, 3.6))
+            _cube(f"{room['name']}_LeftWall", unreal.Vector(x - 300, 0, 180), unreal.Vector(0.12, 6, 3.6))
+            _cube(f"{room['name']}_RightWall", unreal.Vector(x + 300, 0, 180), unreal.Vector(0.12, 6, 3.6))
+            _cube(f"{room['name']}_Door_Out", unreal.Vector(x + 280, 250, 120), unreal.Vector(0.12, 0.75, 2.4))
+            _cube(f"{room['name']}_Puzzle_Device", unreal.Vector(x, 180, 60), unreal.Vector(0.9, 0.35, 0.55))
+            _cube(f"{room['name']}_Reward_Pedestal", unreal.Vector(x - 185, -125, 45), unreal.Vector(0.55, 0.55, 0.45))
+            _text(
+                f"{room['name']}_Title",
+                room["title"],
+                unreal.Vector(x, 286, 250),
+                unreal.Rotator(0.0, 180.0, 0.0),
+                36.0,
+            )
+            _text(
+                f"{room['name']}_Puzzle_Label",
+                room["puzzle"],
+                unreal.Vector(x, 165, 120),
+                unreal.Rotator(0.0, 180.0, 0.0),
+                22.0,
+            )
+            _point_light(
+                f"{room['name']}_Warm_Key_Light",
+                unreal.Vector(x - 160, 30, 210),
+                unreal.LinearColor(1.0, 0.55, 0.36, 1.0),
+                1000.0 + index * 180,
+                520.0,
+            )
+            spawned_count += 10
+
+            if index < len(room_specs) - 1:
+                _cube(
+                    f"Connector_{index + 1}_To_{index + 2}",
+                    unreal.Vector(x + 450, 250, 0),
+                    unreal.Vector(3.0, 0.8, 0.08),
+                )
+                spawned_count += 1
+
+        _text(
+            "Five_Room_Main_Title",
+            theme_label,
+            unreal.Vector(0, -230, 210),
+            unreal.Rotator(0.0, 0.0, 0.0),
+            44.0,
+        )
+        _point_light(
+            "Five_Room_Final_Heart_Glow",
+            unreal.Vector(3600, -95, 165),
+            unreal.LinearColor(1.0, 0.18, 0.22, 1.0),
+            1800.0,
+            650.0,
+        )
+        spawned_count += 2
+
+        return {
+            "spawned_count": spawned_count,
+            "rooms": [room["name"] for room in room_specs],
+            "puzzles": {room["name"]: room["puzzle"] for room in room_specs},
+            "recommended_next_prompt": "Replace blockout puzzle devices with interactive Blueprint actors and connect them to the HUD room progress state.",
+        }

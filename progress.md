@@ -13,9 +13,14 @@ Original prompt: [him55710-sudo/hayoung](https://github.com/him55710-sudo/hayoun
 - Verified with browser automation:
   - desktop flow reaches `mode: "complete"` after START, desk key, notebook, window, box, code `0500`, and door.
   - mobile title and playing layouts render without text/control overlap after final CSS adjustment.
+- Downloaded the official Epic Games Launcher installer to `C:\Users\임현수\Downloads\EpicInstaller-20.1.0.msi`.
+- Confirmed UE 5.8 still needs Epic Launcher login, license/EULA acceptance, and likely more free disk space than the current ~55GB.
+- Added `docs/game-design-500-3d.md` with the 5-room Roblox-like 3D escape UX plan.
+- Extended the Unreal MCP Python toolset with `create_five_room_escape_level`.
 
 ## Next TODOs
 
-- Commit and push once GitHub auth is available.
-- Connect the Vercel project to the GitHub repository from the Vercel dashboard.
+- Get user confirmation before running `C:\Users\임현수\Downloads\EpicInstaller-20.1.0.msi`.
+- After Launcher install, user must sign in to Epic and accept the Unreal Engine license/EULA prompts.
+- Free additional disk space or install UE 5.8 to another drive if the Launcher warns about capacity.
 - Install Unreal Engine 5.8, open `unreal/Hayoung500.uproject`, enable Unreal MCP, and generate the Codex client config from the editor console.

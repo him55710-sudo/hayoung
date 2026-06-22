@@ -8,4 +8,6 @@ output
 *.local
 *.log
 *.tsbuildinfo
+__pycache__
+*.pyc
 Thumbs.db
