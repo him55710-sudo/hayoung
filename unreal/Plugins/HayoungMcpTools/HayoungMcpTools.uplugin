@@ -1,0 +1,11 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Hayoung MCP Tools",
+  "Description": "Python toolsets for the 500-day escape-room Unreal MCP workflow.",
+  "Category": "AI",
+  "CanContainContent": true,
+  "EnabledByDefault": false,
+  "SupportedTargetPlatforms": ["Win64"]
+}

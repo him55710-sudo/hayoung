@@ -1,0 +1,11 @@
+node_modules
+dist
+.vercel
+.tmp
+.playwright-mcp
+output
+.DS_Store
+*.local
+*.log
+*.tsbuildinfo
+Thumbs.db
