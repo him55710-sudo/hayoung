@@ -672,8 +672,15 @@ function useRoomAmbience(phase: Phase, roomIndex: number, enabled: boolean) {
 
   useEffect(() => {
     if (phase !== "game" || !enabled) {
-      audioRef.current?.master.gain.setTargetAtTime(0, audioRef.current.context.currentTime, 0.12);
+      const audio = audioRef.current;
+      if (audio && audio.context.state !== "closed") {
+        audio.master.gain.setTargetAtTime(0, audio.context.currentTime, 0.12);
+      }
       return;
+    }
+
+    if (audioRef.current?.context.state === "closed") {
+      audioRef.current = null;
     }
 
     if (!audioRef.current) {
@@ -711,7 +718,9 @@ function useRoomAmbience(phase: Phase, roomIndex: number, enabled: boolean) {
     }
 
     const audio = audioRef.current;
-    void audio.context.resume();
+    if (audio.context.state !== "closed") {
+      void audio.context.resume().catch(() => undefined);
+    }
     const now = audio.context.currentTime;
     const ambience = rooms[roomIndex].ambience;
     audio.oscA.frequency.setTargetAtTime(ambience.base, now, 0.35);
@@ -726,10 +735,17 @@ function useRoomAmbience(phase: Phase, roomIndex: number, enabled: boolean) {
       if (!audio) {
         return;
       }
-      audio.oscA.stop();
-      audio.oscB.stop();
-      audio.lfo.stop();
-      void audio.context.close();
+      try {
+        audio.oscA.stop();
+        audio.oscB.stop();
+        audio.lfo.stop();
+      } catch {
+        // The browser can stop oscillator nodes during hot reload cleanup.
+      }
+      if (audio.context.state !== "closed") {
+        void audio.context.close().catch(() => undefined);
+      }
+      audioRef.current = null;
     };
   }, []);
 }
@@ -781,7 +797,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     scene.fog = new THREE.FogExp2(0x120f12, 0.018);
 
     const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.08, 260);
-    camera.position.set(0, 1.65, 2.4);
+    camera.position.set(0, 1.65, 3.25);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -795,12 +811,12 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.92;
+    renderer.toneMappingExposure = 0.88;
     mount.appendChild(renderer.domElement);
 
     const composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(mount.clientWidth, mount.clientHeight), 0.18, 0.42, 0.42);
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(mount.clientWidth, mount.clientHeight), 0.14, 0.38, 0.5);
     composer.addPass(renderPass);
     composer.addPass(bloomPass);
 
@@ -825,9 +841,9 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     scene.add(dust);
 
     const player = {
-      position: new THREE.Vector3(0, 1.65, 2.45),
+      position: new THREE.Vector3(0, 1.65, 3.25),
       yaw: 0,
-      pitch: -0.06,
+      pitch: -0.04,
     };
     let bob = 0;
     let lastFrameTime = performance.now();
@@ -896,7 +912,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       const targetBackground = new THREE.Color(activeRoom.palette[0]).lerp(new THREE.Color(activeRoom.palette[3]), roomIndexRef.current === 4 ? 0.08 : 0.5);
       scene.background = targetBackground;
       scene.fog!.color.copy(targetBackground.clone().lerp(new THREE.Color(0x08090e), 0.45));
-      bloomPass.strength = roomIndexRef.current === 4 || phaseRef.current === "ending" ? 0.34 : 0.18;
+      bloomPass.strength = roomIndexRef.current === 4 || phaseRef.current === "ending" ? 0.3 : 0.14;
 
       if (unlockTickRef.current !== lastUnlockTick) {
         lastUnlockTick = unlockTickRef.current;
@@ -1037,67 +1053,168 @@ function addPhotoWall(group: THREE.Group, room: Room, index: number) {
 }
 
 function addPuzzleDesk(group: THREE.Group, room: Room, accentMaterial: THREE.Material, glowMaterial: THREE.Material) {
-  const wood = mat(0x5a3824, { roughness: 0.52, metalness: 0.03 });
+  const wood = mat(0x70472c, { roughness: 0.58, metalness: 0.03, emissive: 0x2a160b, emissiveIntensity: 0.05 });
+  const darkWood = mat(0x2d1d16, { roughness: 0.62, metalness: 0.04 });
   const metal = mat(0x463d37, { roughness: 0.32, metalness: 0.72 });
+  const brass = mat(0xd5a45f, { roughness: 0.34, metalness: 0.68, emissive: 0xffb35f, emissiveIntensity: 0.04 });
   const paper = mat(0xffedd1, { roughness: 0.82 });
+  const darkGlass = mat(0x0d1118, { roughness: 0.2, metalness: 0.18, emissive: room.palette[3], emissiveIntensity: 0.16 });
+  const outlineMaterial = mat(0xffdc91, {
+    roughness: 0.18,
+    metalness: 0.24,
+    emissive: 0xffd07a,
+    emissiveIntensity: 0.24,
+    transparent: true,
+    opacity: 0.34,
+  });
+  const glyphMaterial = mat(0xfff3cd, {
+    roughness: 0.28,
+    metalness: 0.08,
+    emissive: 0xffe1a6,
+    emissiveIntensity: 0.22,
+  });
+  glyphMaterial.side = THREE.DoubleSide;
+  const padMaterial = glowMaterial.clone();
+  const signalMaterial = outlineMaterial.clone();
 
-  const desk = box(5.6, 0.34, 1.65, wood, -0.7, 0.74, -0.55);
-  const deskBack = box(5.8, 0.38, 0.2, wood, -0.7, 1.0, -1.42);
+  const desk = box(5.7, 0.3, 1.55, wood, -0.7, 0.72, -0.55);
+  const deskBack = box(5.9, 0.32, 0.2, darkWood, -0.7, 0.98, -1.38);
+  const deskLip = box(5.85, 0.08, 0.08, brass, -0.7, 0.96, 0.22);
+  const deskGlow = box(4.8, 0.026, 0.035, brass, -0.7, 0.97, 0.27);
+  const frontPanelMaterial = mat(0x6b4028, { roughness: 0.66, metalness: 0.04, emissive: 0x2a160b, emissiveIntensity: 0.08 });
+  const frontPanel = box(5.45, 0.42, 0.045, frontPanelMaterial, -0.7, 0.5, 0.26);
+  const frontTopRail = box(5.55, 0.035, 0.05, brass, -0.7, 0.72, 0.3);
+  const frontBottomRail = box(5.55, 0.035, 0.05, darkWood, -0.7, 0.28, 0.3);
+  const frontDividers = [-2.55, -0.7, 1.15].map((x) => box(0.035, 0.35, 0.052, darkWood, x, 0.5, 0.31));
   desk.castShadow = true;
   desk.receiveShadow = true;
-  group.add(desk, deskBack);
+  group.add(desk, deskBack, deskLip, deskGlow, frontPanel, frontTopRail, frontBottomRail, ...frontDividers);
   [-2.9, 1.45].forEach((x) => {
-    const legA = box(0.25, 1.1, 0.25, wood, x, 0.15, -1.15);
-    const legB = box(0.25, 1.1, 0.25, wood, x, 0.15, 0.0);
+    const legA = box(0.22, 1.04, 0.22, darkWood, x, 0.14, -1.12);
+    const legB = box(0.22, 1.04, 0.22, darkWood, x, 0.14, -0.02);
     group.add(legA, legB);
   });
 
-  const lockBox = box(1.8, 1.1, 0.88, accentMaterial, 0.08, 1.48, -0.82);
+  const lockBox = box(1.68, 0.9, 0.74, accentMaterial, 0.02, 1.43, -0.82);
   lockBox.castShadow = true;
   lockBox.userData.pulse = true;
   group.add(lockBox);
   group.userData.lockBox = lockBox;
 
-  const panel = box(1.52, 0.62, 0.08, metal, 0.08, 1.47, -0.34);
-  group.add(panel);
+  const consoleBase = box(2.05, 1.12, 0.12, darkWood, 0.02, 1.42, -0.41);
+  const panel = box(1.68, 0.72, 0.07, darkGlass, 0.02, 1.43, -0.32);
+  const topRail = box(1.82, 0.06, 0.08, brass, 0.02, 1.82, -0.27);
+  const bottomRail = box(1.82, 0.06, 0.08, brass, 0.02, 1.04, -0.27);
+  const leftRail = box(0.06, 0.78, 0.08, brass, -0.94, 1.43, -0.27);
+  const rightRail = box(0.06, 0.78, 0.08, brass, 0.98, 1.43, -0.27);
+  group.add(consoleBase, panel, topRail, bottomRail, leftRail, rightRail);
+
+  const outlineSegments = [
+    box(1.68, 0.018, 0.032, outlineMaterial, 0.02, 1.8, -0.215),
+    box(1.68, 0.018, 0.032, outlineMaterial, 0.02, 1.06, -0.215),
+    box(0.018, 0.72, 0.032, outlineMaterial, -0.82, 1.43, -0.215),
+    box(0.018, 0.72, 0.032, outlineMaterial, 0.86, 1.43, -0.215),
+  ];
+  outlineSegments.forEach((segment) => {
+    segment.userData.statusLight = true;
+    group.add(segment);
+  });
+
+  const scanLine = box(1.22, 0.016, 0.032, outlineMaterial, 0.02, 1.43, -0.205);
+  scanLine.userData.scanLine = true;
+  scanLine.userData.baseY = scanLine.position.y;
+  group.add(scanLine);
 
   const padPositions = [
-    [0, 0.18],
-    [-0.22, 0],
-    [0.22, 0],
-    [0, -0.18],
+    [0, 0.18, 0],
+    [-0.23, 0, Math.PI / 2],
+    [0.23, 0, -Math.PI / 2],
+    [0, -0.18, Math.PI],
   ];
-  padPositions.forEach(([x, y]) => {
-    const pad = box(0.16, 0.12, 0.05, glowMaterial, -0.34 + x, 1.48 + y, -0.27);
+  padPositions.forEach(([x, y, angle], index) => {
+    const pad = box(0.22, 0.16, 0.06, padMaterial, -0.36 + x, 1.45 + y, -0.2);
     pad.userData.glow = true;
+    pad.userData.padGlow = true;
     group.add(pad);
+
+    const arrow = new THREE.Mesh(new THREE.CircleGeometry(0.06, 3), glyphMaterial);
+    arrow.position.set(-0.36 + x, 1.45 + y + 0.004, -0.163);
+    arrow.rotation.z = angle + Math.PI;
+    arrow.userData.padGlyph = index;
+    group.add(arrow);
   });
 
   for (let i = 0; i < 4; i += 1) {
-    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.12, 24), metal);
-    dial.position.set(0.34 + i * 0.19, 1.48, -0.27);
+    const x = 0.24 + i * 0.22;
+    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.09, 32), metal);
+    dial.position.set(x, 1.44, -0.19);
     dial.rotation.x = Math.PI / 2;
     dial.castShadow = true;
     dial.userData.dial = true;
     group.add(dial);
+
+    const dialRing = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.012, 8, 32), brass);
+    dialRing.position.set(x, 1.44, -0.14);
+    dialRing.userData.dial = true;
+    group.add(dialRing);
+
+    const notch = box(0.025, 0.12, 0.025, outlineMaterial, x, 1.5, -0.11);
+    notch.userData.statusLight = true;
+    group.add(notch);
   }
+
+  [0, 1, 2].forEach((step) => {
+    const pip = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), step === 0 ? padMaterial.clone() : signalMaterial.clone());
+    pip.position.set(-0.72 + step * 0.18, 1.08, -0.18);
+    pip.userData.statusLight = true;
+    group.add(pip);
+  });
+
+  const latch = box(0.34, 0.16, 0.07, brass, 0.02, 1.78, -0.16);
+  const latchRing = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.014, 10, 36), signalMaterial.clone());
+  latchRing.position.set(0.02, 1.73, -0.12);
+  latchRing.userData.statusLight = true;
+  const lockBody = box(0.34, 0.26, 0.08, mat(0xd95f78, { roughness: 0.44, metalness: 0.14, emissive: 0x733447, emissiveIntensity: 0.08 }), 0.02, 1.58, -0.09);
+  const keyhole = box(0.046, 0.12, 0.026, darkGlass, 0.02, 1.56, -0.04);
+  group.add(latch, latchRing, lockBody, keyhole);
 
   const diary = box(1.35, 0.08, 0.9, paper, -2.25, 1.01, -0.55);
   diary.rotation.y = -0.22;
   diary.castShadow = true;
-  group.add(diary);
+  const ribbon = box(1.25, 0.025, 0.08, mat(0xd65f74, { roughness: 0.64, emissive: 0xd65f74, emissiveIntensity: 0.06 }), -2.25, 1.08, -0.55);
+  ribbon.rotation.y = -0.22;
+  group.add(diary, ribbon);
 
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.25, 24, 18), glowMaterial);
-  orb.position.set(2.05, 1.18, -0.52);
+  const lens = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.018, 10, 38), brass);
+  lens.position.set(-1.38, 1.04, -0.24);
+  lens.rotation.z = -0.4;
+  const lensHandle = box(0.08, 0.45, 0.045, brass, -1.23, 1.02, -0.25);
+  lensHandle.rotation.z = -0.72;
+  group.add(lens, lensHandle);
+
+  const orbMaterial = mat(room.palette[2], {
+    roughness: 0.18,
+    metalness: 0.06,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.2,
+    transparent: true,
+    opacity: 0.86,
+  });
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 24, 18), orbMaterial);
+  orb.position.set(2.05, 1.17, -0.52);
   orb.castShadow = true;
   orb.userData.orb = true;
   group.add(orb);
 
-  const orbBase = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.12, 28), metal);
+  const orbBase = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.39, 0.12, 28), metal);
   orbBase.position.set(2.05, 1.02, -0.52);
-  group.add(orbBase);
+  const orbRing = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.016, 8, 48), signalMaterial.clone());
+  orbRing.position.set(2.05, 1.19, -0.52);
+  orbRing.rotation.x = Math.PI / 2;
+  orbRing.userData.statusLight = true;
+  group.add(orbBase, orbRing);
 
-  const lamp = new THREE.PointLight(room.palette[2], 2.3, 5);
+  const lamp = new THREE.PointLight(room.palette[2], 1.25, 4.2);
   lamp.position.set(2.05, 1.6, -0.52);
   group.add(lamp);
 }
@@ -1344,6 +1461,27 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
   group.traverse((object) => {
     if (object instanceof THREE.Mesh && object.userData.orb) {
       object.position.y = 1.18 + Math.sin(elapsedTime * 1.8) * 0.045;
+    }
+    if (object instanceof THREE.Mesh && object.userData.interactHalo) {
+      const pulse = 1 + Math.sin(elapsedTime * 2.4 + object.id) * 0.028 + unlockProgress * 0.1;
+      object.scale.setScalar(pulse);
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.opacity = 0.42 + Math.sin(elapsedTime * 1.8 + object.id) * 0.14 + unlockProgress * 0.2;
+    }
+    if (object instanceof THREE.Mesh && object.userData.scanLine) {
+      const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;
+      object.position.y = baseY + Math.sin(elapsedTime * 1.7 + object.id) * 0.14;
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = 0.42 + Math.sin(elapsedTime * 3.1 + object.id) * 0.12 + unlockProgress * 0.28;
+    }
+    if (object instanceof THREE.Mesh && object.userData.statusLight) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = 0.24 + Math.sin(elapsedTime * 3 + object.id) * 0.18 + unlockProgress * 0.7;
+      object.scale.setScalar(1 + Math.sin(elapsedTime * 2.2 + object.id) * 0.035 + unlockProgress * 0.12);
+    }
+    if (object instanceof THREE.Mesh && object.userData.padGlow) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = 0.34 + Math.sin(elapsedTime * 2.8 + object.id) * 0.12 + unlockProgress * 0.46;
     }
     if (object instanceof THREE.Mesh && object.userData.float) {
       object.position.y += Math.sin(elapsedTime + object.id) * 0.0008;

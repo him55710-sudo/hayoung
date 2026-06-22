@@ -22,6 +22,8 @@ npm run dev
 - 힌트: 3회 제한, 사용 횟수별 벌칙 표시
 - 배경음: 방마다 다른 절차형 Web Audio 앰비언스
 - 잠금 연출: 정답 입력 시 링/볼트/기어/문 애니메이션과 섬광
+- 중앙 장치: 방향키 패널, 다이얼, 하트 자물쇠, 스캔 라인, 상태등이 있는 조작대형 잠금 장치
+- 모바일 HUD: 상단 상태/아이콘/방 제목이 겹치지 않도록 압축 배치
 - 엔딩: 400일 하늘문, 구름길, 편지 오버레이
 
 ## 검증
@@ -30,6 +32,12 @@ npm run dev
 npm run build
 npm run verify:game
 npm audit --omit=dev
+```
+
+검증 단계가 멈출 때만 디버그 로그를 남기려면:
+
+```bash
+$env:DEBUG_GAME_VERIFY="1"; npm run verify:game
 ```
 
 배포 URL을 검증할 때:
@@ -62,4 +70,3 @@ npx vercel deploy --prod
 Unreal Engine 5.8에서 MCP 플러그인을 켜면 이 저장소 루트의 `.mcp.json`이 `http://127.0.0.1:8000/mcp`로 연결되도록 준비되어 있습니다.
 
 자세한 절차는 [docs/unreal-mcp-setup.md](docs/unreal-mcp-setup.md)를 확인하세요.
-
