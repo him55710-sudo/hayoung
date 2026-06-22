@@ -349,6 +349,34 @@ button {
   cursor: pointer;
 }
 
+.icon-actions button[data-quality] {
+  position: relative;
+}
+
+.icon-actions button[data-quality]::after {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+  content: "";
+}
+
+.icon-actions button[data-quality="cinematic"] {
+  color: #ffcf7c;
+}
+
+.icon-actions button[data-quality="balanced"] {
+  color: #91e8c7;
+}
+
+.icon-actions button[data-quality="performance"] {
+  color: #8dc8ff;
+}
+
 .icon-actions svg {
   width: 17px;
   height: 17px;

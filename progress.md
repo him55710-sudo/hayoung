@@ -35,12 +35,17 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Extended `scripts/verify-game.mjs` to assert room-clear overlays and CTAs after every non-final room.
 - Added `docs/escape-room-research-and-quality.md`.
 - Created global Codex skill `~/.codex/skills/unreal-58-mcp-connect` and validated it with `quick_validate.py`.
+- Added HUD graphics quality cycling: cinematic, balanced, and performance modes now tune render pixel ratio, bloom strength, shadows, and dust without recreating the Three.js scene.
+- Extended `scripts/verify-game.mjs` to assert graphics quality metadata and verify that performance mode lowers the canvas render buffer.
+- Added a develop-web-game skill `node_modules` junction to the local project modules so the installed game harness can resolve Playwright from this workspace.
 
 ## Current QA
 
 - `npm run build` passes.
 - `npm run verify:game` passes locally.
 - `npm audit --omit=dev` passes with 0 vulnerabilities.
+- Latest graphics quality QA screenshots inspected: `output/playwright/500-graphics-quality-desktop.png` and `output/playwright/500-graphics-quality-mobile.png`.
+- `develop-web-game` Playwright harness ran successfully after resolving local Playwright; its default run captures the intro state, while gameplay flow is covered by `npm run verify:game`.
 - Latest visual QA screenshots inspected: `output/playwright/500-room-clear-desktop-final.png`, `output/playwright/500-room-clear-mobile-final.png`, `output/playwright/500-focus-system-desktop-polished.png`, `output/playwright/500-focus-system-mobile-polished.png`, `output/playwright/500-player-chip-desktop.png`, `output/playwright/500-player-chip-mobile.png`, `output/playwright/500-ending-memory-timeline-polished.png`, `output/playwright/500-memory-slots-corridor.png`, and `output/playwright/500-unlock-motion-detail.png` (ignored artifacts).
 - Unreal Python toolset compiles with `python -m py_compile`.
 

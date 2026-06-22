@@ -75,6 +75,22 @@ async function clickSelector(page, selector) {
   }, selector);
 }
 
+async function clickGraphicsQuality(page, expectedQuality) {
+  const qualityButton = page.locator(".icon-actions button[data-quality]");
+  const count = await qualityButton.count();
+  if (count !== 1) throw new Error(`Expected one graphics quality button, got ${count}`);
+  await qualityButton.click({ force: true });
+  await page.waitForFunction(
+    (quality) => {
+      const button = document.querySelector(".icon-actions button[data-quality]");
+      const state = JSON.parse(window.render_game_to_text());
+      return button?.getAttribute("data-quality") === quality && state.graphicsQuality === quality;
+    },
+    expectedQuality,
+    { timeout: 15000 },
+  );
+}
+
 async function enterGame(page, isMobile = false) {
   log(`enter ${isMobile ? "mobile" : "desktop"}`);
   await page.goto(url, { waitUntil: "domcontentloaded" });
@@ -99,6 +115,47 @@ async function enterGame(page, isMobile = false) {
   await waitForPhase(page, "game");
   await page.waitForTimeout(900);
   log(`entered ${isMobile ? "mobile" : "desktop"}`);
+}
+
+async function verifyGraphicsQuality(page, initialCanvas) {
+  const initialState = await gameState(page);
+  if (initialState.graphicsQuality !== "cinematic") {
+    throw new Error(`Expected cinematic graphics by default: ${JSON.stringify(initialState)}`);
+  }
+
+  await clickGraphicsQuality(page, "balanced");
+  const balancedState = await gameState(page);
+
+  await clickGraphicsQuality(page, "performance");
+  await page.waitForTimeout(180);
+  const performanceState = await gameState(page);
+  const performanceCanvas = await canvasStats(page);
+
+  if (!performanceState.performanceMode) {
+    throw new Error(`Performance graphics mode not exposed: ${JSON.stringify(performanceState)}`);
+  }
+  if (performanceCanvas.width >= initialCanvas.width || performanceCanvas.height >= initialCanvas.height) {
+    throw new Error(`Performance mode did not reduce render buffer: ${JSON.stringify({ initialCanvas, performanceCanvas })}`);
+  }
+
+  await clickGraphicsQuality(page, "cinematic");
+
+  return {
+    initial: {
+      quality: initialState.graphicsQuality,
+      renderScaleCap: initialState.renderScaleCap,
+      canvas: initialCanvas,
+    },
+    balanced: {
+      quality: balancedState.graphicsQuality,
+      renderScaleCap: balancedState.renderScaleCap,
+    },
+    performance: {
+      quality: performanceState.graphicsQuality,
+      renderScaleCap: performanceState.renderScaleCap,
+      canvas: performanceCanvas,
+    },
+  };
 }
 
 async function solveAll(page) {
@@ -153,6 +210,7 @@ async function main() {
     const desktopCanvas = await canvasStats(desktop);
     if (desktopState.cameraMode !== "first-person") throw new Error("Camera mode is not first-person.");
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
+    const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
     if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
 
@@ -168,6 +226,7 @@ async function main() {
           url,
           desktopState,
           desktopCanvas,
+          graphicsCheck,
           ending,
           mobileState,
           mobileCanvas,

@@ -26,6 +26,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 
 type Phase = "intro" | "game" | "ending";
 type PuzzleKind = "code" | "direction" | "symbol" | "memory" | "device" | "final";
+type GraphicsQuality = "cinematic" | "balanced" | "performance";
 
 type Room = {
   id: number;
@@ -68,6 +69,23 @@ type ProceduralTextureKind = "wood" | "plaster" | "fabric" | "paper" | "metal";
 const proceduralTextureCache = new Map<string, THREE.CanvasTexture>();
 const memoryTextureCache = new Map<string, THREE.Texture>();
 const memoryTextureLoader = new THREE.TextureLoader();
+
+const graphicsQualitySettings: Record<
+  GraphicsQuality,
+  {
+    label: string;
+    renderScale: number;
+    bloomMultiplier: number;
+    shadows: boolean;
+    dust: boolean;
+  }
+> = {
+  cinematic: { label: "시네마틱", renderScale: 1.65, bloomMultiplier: 1, shadows: true, dust: true },
+  balanced: { label: "균형", renderScale: 1.25, bloomMultiplier: 0.78, shadows: true, dust: true },
+  performance: { label: "부드럽게", renderScale: 0.95, bloomMultiplier: 0.48, shadows: false, dust: false },
+};
+
+const graphicsQualityCycle: GraphicsQuality[] = ["cinematic", "balanced", "performance"];
 
 declare global {
   interface Window {
@@ -322,8 +340,10 @@ function App() {
   const [unlocking, setUnlocking] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [nearInteractable, setNearInteractable] = useState(false);
+  const [graphicsQuality, setGraphicsQuality] = useState<GraphicsQuality>("cinematic");
 
   const currentRoom = rooms[roomIndex];
+  const graphicsQualitySetting = graphicsQualitySettings[graphicsQuality];
   const solvedSet = useMemo(() => new Set(solvedIds), [solvedIds]);
   const currentRoomPuzzles = puzzles.filter((puzzle) => puzzle.roomId === currentRoom.id);
   const availablePuzzle = currentRoomPuzzles.find((puzzle) => {
@@ -409,6 +429,10 @@ function App() {
         nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
         roomClearReady: roomClearVisible,
         nextRoomTitle,
+        graphicsQuality,
+        graphicsQualityLabel: graphicsQualitySetting.label,
+        renderScaleCap: graphicsQualitySetting.renderScale,
+        performanceMode: graphicsQuality === "performance",
         cameraMode: "first-person",
         embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
         characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
@@ -426,6 +450,9 @@ function App() {
     canAdvanceRoom,
     currentRoom.ambience.label,
     currentRoom.title,
+    graphicsQuality,
+    graphicsQualitySetting.label,
+    graphicsQualitySetting.renderScale,
     hintCount,
     hintsLeft,
     message,
@@ -521,6 +548,10 @@ function App() {
     setMessage(`힌트 사용! 벌칙: ${penalty}. 지금 문제는 ${availablePuzzle?.kind ?? "마지막"} 장치입니다.`);
   }
 
+  function cycleGraphicsQuality() {
+    setGraphicsQuality((value) => graphicsQualityCycle[(graphicsQualityCycle.indexOf(value) + 1) % graphicsQualityCycle.length]);
+  }
+
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => undefined);
@@ -569,6 +600,7 @@ function App() {
             solvedCount={solvedIds.length}
             movement={movement}
             unlockTick={unlockTick}
+            graphicsQuality={graphicsQuality}
             onNearObject={handleNearObject}
             onInteractFocusChange={handleInteractFocusChange}
           />
@@ -591,6 +623,15 @@ function App() {
               </button>
               <button type="button" onClick={() => setAudioEnabled((value) => !value)} title="배경음 전환" aria-label="배경음 전환">
                 {audioEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
+              </button>
+              <button
+                type="button"
+                onClick={cycleGraphicsQuality}
+                title={`그래픽 품질: ${graphicsQualitySetting.label}`}
+                aria-label={`그래픽 품질: ${graphicsQualitySetting.label}`}
+                data-quality={graphicsQuality}
+              >
+                <Sparkles aria-hidden="true" />
               </button>
               <button type="button" onClick={toggleFullscreen} title="전체화면" aria-label="전체화면">
                 <Expand aria-hidden="true" />
@@ -993,6 +1034,7 @@ type SceneProps = {
   solvedCount: number;
   movement: { forward: boolean; back: boolean; left: boolean; right: boolean };
   unlockTick: number;
+  graphicsQuality: GraphicsQuality;
   onNearObject: (label: string) => void;
   onInteractFocusChange: (active: boolean) => void;
 };
@@ -1007,13 +1049,14 @@ type FirstPersonRig = {
   light: THREE.SpotLight;
 };
 
-function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick, onNearObject, onInteractFocusChange }: SceneProps) {
+function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick, graphicsQuality, onNearObject, onInteractFocusChange }: SceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const movementRef = useRef(movement);
   const roomIndexRef = useRef(roomIndex);
   const phaseRef = useRef(phase);
   const solvedRef = useRef(solvedCount);
   const unlockTickRef = useRef(unlockTick);
+  const graphicsQualityRef = useRef(graphicsQuality);
 
   useEffect(() => {
     movementRef.current = movement;
@@ -1034,6 +1077,10 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
   useEffect(() => {
     unlockTickRef.current = unlockTick;
   }, [unlockTick]);
+
+  useEffect(() => {
+    graphicsQualityRef.current = graphicsQuality;
+  }, [graphicsQuality]);
 
   useEffect(() => {
     if (!mountRef.current) {
@@ -1106,6 +1153,32 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     let unlockStartedAt = -99;
     let lastNearPing = 0;
     let lastFocusState = false;
+    let activePixelRatio = 0;
+    let activeShadowMode: boolean | null = null;
+
+    const applyGraphicsQuality = (forceSize = false) => {
+      const setting = graphicsQualitySettings[graphicsQualityRef.current];
+      const width = mount.clientWidth;
+      const height = mount.clientHeight;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, setting.renderScale);
+
+      if (forceSize || Math.abs(pixelRatio - activePixelRatio) > 0.01) {
+        renderer.setPixelRatio(pixelRatio);
+        renderer.setSize(width, height);
+        composer.setSize(width, height);
+        bloomPass.setSize(width, height);
+        activePixelRatio = pixelRatio;
+      }
+
+      if (activeShadowMode !== setting.shadows) {
+        renderer.shadowMap.enabled = setting.shadows;
+        sun.castShadow = setting.shadows;
+        activeShadowMode = setting.shadows;
+      }
+
+      dust.visible = setting.dust;
+      return setting;
+    };
 
     const resize = () => {
       const width = mount.clientWidth;
@@ -1117,9 +1190,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       firstPersonRig.beam.visible = !narrowView;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-      composer.setSize(width, height);
-      bloomPass.setSize(width, height);
+      applyGraphicsQuality(true);
     };
 
     const onPointerDown = () => {
@@ -1142,6 +1213,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     resize();
 
     const step = (delta: number) => {
+      const qualitySetting = applyGraphicsQuality();
       elapsedTime += delta;
       const activeRoom = rooms[roomIndexRef.current];
       const targetX = roomIndexRef.current * 24;
@@ -1179,7 +1251,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       const targetBackground = new THREE.Color(activeRoom.palette[0]).lerp(new THREE.Color(activeRoom.palette[3]), roomIndexRef.current === 4 ? 0.08 : 0.5);
       scene.background = targetBackground;
       scene.fog!.color.copy(targetBackground.clone().lerp(new THREE.Color(0x08090e), 0.45));
-      bloomPass.strength = roomIndexRef.current === 4 || phaseRef.current === "ending" ? 0.24 : 0.14;
+      bloomPass.strength = (roomIndexRef.current === 4 || phaseRef.current === "ending" ? 0.24 : 0.14) * qualitySetting.bloomMultiplier;
 
       if (unlockTickRef.current !== lastUnlockTick) {
         lastUnlockTick = unlockTickRef.current;
@@ -1205,9 +1277,11 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
         animateRoom(group, elapsedTime, index === roomIndexRef.current ? unlockProgress : 0, solvedRef.current, phaseRef.current);
       });
 
-      dust.children.forEach((particle, index) => {
-        particle.position.y += Math.sin(elapsedTime * 0.7 + index) * 0.0009;
-      });
+      if (qualitySetting.dust) {
+        dust.children.forEach((particle, index) => {
+          particle.position.y += Math.sin(elapsedTime * 0.7 + index) * 0.0009;
+        });
+      }
 
       if (distance < 3.1 && elapsedTime - lastNearPing > 2.5) {
         onNearObject("잠금 장치 내부에서 금속 핀이 움직이는 소리가 납니다.");
