@@ -18,6 +18,7 @@
 - Puzzle count: 10 total, 2 per room.
 - Puzzle forms: numeric lock, direction lock, memory/photo choice, symbol lock, final confirmation.
 - Puzzle input: modal locks now use tactile numeric pads, direction pads, and choice chips while keeping the keyboard input for accessibility and automation.
+- Room clear moment: after each non-final room's two puzzles, a centered completion overlay shows the earned clue rewards and next room CTA.
 - Hint system: 3 uses, escalating real-world penalties.
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
 - Interaction focus: the active puzzle console has distance-reactive reticle/button styling plus a restrained in-world floor glyph, lock halo, and focus light.
@@ -61,6 +62,7 @@ npm audit --omit=dev
 - app enters first-person game mode
 - first-person embodied state is exposed through `render_game_to_text`
 - interaction focus metadata is exposed through `render_game_to_text`
+- room-clear overlays appear after every non-final room's second solved puzzle
 - all 10 placeholder puzzles still solve after room-transition spawn reset
 - WebGL canvas is not blank on desktop and mobile
 - all 10 placeholder puzzles can be solved

@@ -102,11 +102,16 @@ async function enterGame(page, isMobile = false) {
 }
 
 async function solveAll(page) {
-  for (const answer of answers) {
+  for (const [index, answer] of answers.entries()) {
     log(`solve ${answer}`);
     let opened = false;
     for (let attempt = 0; attempt < 6; attempt += 1) {
       log(`attempt ${answer} ${attempt}`);
+      const clearCount = await page.locator(".room-clear-button").count();
+      if (clearCount) {
+        await clickSelector(page, ".room-clear-button");
+        await page.waitForTimeout(420);
+      }
       await clickSelector(page, ".interact-button");
       await page.waitForTimeout(260);
       const modalCount = await page.locator(".puzzle-modal").count();
@@ -123,6 +128,11 @@ async function solveAll(page) {
     await clickSelector(page, ".answer-row button");
     await page.waitForFunction(() => !document.querySelector(".puzzle-modal"), null, { timeout: 15000 });
     await page.waitForTimeout(160);
+    if ((index + 1) % 2 === 0 && index < answers.length - 1) {
+      await page.waitForSelector(".room-clear-panel", { timeout: 15000 });
+      const roomClearButtonCount = await page.locator(".room-clear-button").count();
+      if (!roomClearButtonCount) throw new Error(`Room clear CTA missing after answer ${answer}`);
+    }
     log(`solved ${answer}`);
   }
   await waitForPhase(page, "ending");

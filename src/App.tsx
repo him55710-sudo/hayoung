@@ -338,6 +338,8 @@ function App() {
   const hintsLeft = Math.max(0, 3 - hintCount);
   const inventory = puzzles.filter((puzzle) => solvedSet.has(puzzle.id)).map((puzzle) => puzzle.reward);
   const canAdvanceRoom = currentRoomPuzzles.every((puzzle) => solvedSet.has(puzzle.id));
+  const roomClearVisible = phase === "game" && canAdvanceRoom && roomIndex < rooms.length - 1 && !activePuzzle;
+  const nextRoomTitle = rooms[roomIndex + 1]?.title ?? "엔딩";
 
   const handleNearObject = useCallback((label: string) => {
     setMessage((current) => (current === label ? current : label));
@@ -405,6 +407,8 @@ function App() {
         penalties: hintPenalties.slice(0, hintCount),
         nextPuzzle: availablePuzzle?.title ?? (canAdvanceRoom ? "room clear" : blockedPuzzle?.title ?? "none"),
         nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
+        roomClearReady: roomClearVisible,
+        nextRoomTitle,
         cameraMode: "first-person",
         embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
         characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
@@ -426,8 +430,10 @@ function App() {
     hintsLeft,
     message,
     nearInteractable,
+    nextRoomTitle,
     phase,
     roomIndex,
+    roomClearVisible,
     solvedIds.length,
     solvedSet,
   ]);
@@ -638,10 +644,12 @@ function App() {
             </div>
           </footer>
 
-          <button className={`interact-button${nearInteractable ? " is-focused" : ""}`} type="button" onClick={openNextPuzzle}>
-            {canAdvanceRoom && roomIndex < rooms.length - 1 ? <DoorOpen aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
-            {availablePuzzle ? "E 조사하기" : roomIndex < rooms.length - 1 ? "다음 방" : "엔딩 보기"}
-          </button>
+          {!roomClearVisible && (
+            <button className={`interact-button${nearInteractable ? " is-focused" : ""}`} type="button" onClick={openNextPuzzle}>
+              {canAdvanceRoom && roomIndex < rooms.length - 1 ? <DoorOpen aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
+              {availablePuzzle ? "E 조사하기" : roomIndex < rooms.length - 1 ? "다음 방" : "엔딩 보기"}
+            </button>
+          )}
 
           <div className="mobile-pad" aria-label="모바일 이동 패드">
             <button type="button" onPointerDown={() => setMovement((v) => ({ ...v, forward: true }))} onPointerUp={() => setMovement((v) => ({ ...v, forward: false }))}>
@@ -665,6 +673,25 @@ function App() {
                 <span key={penalty}>{penalty}</span>
               ))}
             </aside>
+          )}
+
+          {roomClearVisible && (
+            <div className="room-clear-layer" aria-live="polite">
+              <section className="room-clear-panel" aria-label={`${currentRoom.title} 클리어`}>
+                <span className="clear-kicker">Room {roomProgress} Clear</span>
+                <h2>{currentRoom.title} 탈출 성공</h2>
+                <p>{currentRoom.mood}</p>
+                <div className="room-clear-rewards" aria-label="획득한 단서">
+                  {currentRoomPuzzles.map((puzzle) => (
+                    <span key={puzzle.id}>{puzzle.reward}</span>
+                  ))}
+                </div>
+                <button className="room-clear-button" type="button" onClick={openNextPuzzle}>
+                  <DoorOpen aria-hidden="true" />
+                  {nextRoomTitle}으로 이동
+                </button>
+              </section>
+            </div>
           )}
 
           {activePuzzle && (

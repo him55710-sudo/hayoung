@@ -18,6 +18,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added six replaceable memory image slots under `public/memories` and connected them to both the ending timeline and final-room 3D photo frames.
 - Added lock-device modal previews for numeric, direction, symbol, and final locks.
 - Added tactile puzzle input pads: numeric keypad, direction pad, memory/symbol/final choice chips, sanitized answer input, and corrected direction preview layout.
+- Added room-clear cinematic overlays after each non-final room's two puzzles, with earned clue chips and a next-room CTA.
 - Added distance-reactive interaction focus for the central puzzle console: reticle/button focus states, in-world floor glyph, lock halo, and focus light.
 - Upgraded unlock motion detail with latch/shackle lift, door seam glow, hinge/handle motion, sliding bolts, faster gears, and unlock sparks.
 - Added unlock feedback: ring/bolt/gear/door animation plus screen flash.
@@ -31,6 +32,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Compressed the desktop and mobile HUD, including a mobile grid fix so icon actions no longer overlap the room objective bar.
 - Added `scripts/verify-game.mjs` and `npm run verify:game` for repeatable Playwright validation.
 - Hardened `scripts/verify-game.mjs` with DOM-click fallback for fixed HUD controls, explicit close handling, optional `DEBUG_GAME_VERIFY=1` file logging, and timeouts for modal transitions.
+- Extended `scripts/verify-game.mjs` to assert room-clear overlays and CTAs after every non-final room.
 - Added `docs/escape-room-research-and-quality.md`.
 - Created global Codex skill `~/.codex/skills/unreal-58-mcp-connect` and validated it with `quick_validate.py`.
 
@@ -39,7 +41,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run build` passes.
 - `npm run verify:game` passes locally.
 - `npm audit --omit=dev` passes with 0 vulnerabilities.
-- Latest visual QA screenshots inspected: `output/playwright/500-focus-system-desktop-polished.png`, `output/playwright/500-focus-system-mobile-polished.png`, `output/playwright/500-player-chip-desktop.png`, `output/playwright/500-player-chip-mobile.png`, `output/playwright/500-ending-memory-timeline-polished.png`, `output/playwright/500-memory-slots-corridor.png`, and `output/playwright/500-unlock-motion-detail.png` (ignored artifacts).
+- Latest visual QA screenshots inspected: `output/playwright/500-room-clear-desktop-final.png`, `output/playwright/500-room-clear-mobile-final.png`, `output/playwright/500-focus-system-desktop-polished.png`, `output/playwright/500-focus-system-mobile-polished.png`, `output/playwright/500-player-chip-desktop.png`, `output/playwright/500-player-chip-mobile.png`, `output/playwright/500-ending-memory-timeline-polished.png`, `output/playwright/500-memory-slots-corridor.png`, and `output/playwright/500-unlock-motion-detail.png` (ignored artifacts).
 - Unreal Python toolset compiles with `python -m py_compile`.
 
 ## Known Limitations
