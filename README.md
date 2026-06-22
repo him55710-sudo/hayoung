@@ -79,3 +79,5 @@ npx vercel deploy --prod
 Unreal Engine 5.8에서 MCP 플러그인을 켜면 이 저장소 루트의 `.mcp.json`이 `http://127.0.0.1:8000/mcp`로 연결되도록 준비되어 있습니다.
 
 자세한 절차는 [docs/unreal-mcp-setup.md](docs/unreal-mcp-setup.md)를 확인하세요.
+
+현재 PC에는 Epic Games Launcher / UE 5.8이 아직 설치 완료되지 않았습니다. `scripts/setup-unreal-58.ps1`로 상태 확인, 설치 재시도, 프로젝트 실행, MCP endpoint 확인을 할 수 있습니다.

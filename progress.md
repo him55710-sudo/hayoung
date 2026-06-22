@@ -38,6 +38,10 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added HUD graphics quality cycling: cinematic, balanced, and performance modes now tune render pixel ratio, bloom strength, shadows, and dust without recreating the Three.js scene.
 - Extended `scripts/verify-game.mjs` to assert graphics quality metadata and verify that performance mode lowers the canvas render buffer.
 - Added a develop-web-game skill `node_modules` junction to the local project modules so the installed game harness can resolve Playwright from this workspace.
+- Attempted Epic Games Launcher install through `winget`; the MSI downloaded successfully but the Windows Installer process remained stuck under administrator rights.
+- Copied the official Epic MSI to `C:\Users\임현수\Downloads\EpicInstaller-20.1.0.msi`.
+- Added `scripts/setup-unreal-58.ps1` to inspect Epic/UE state, restart the Epic installer with UAC, open the Launcher, launch `Hayoung500.uproject`, and check the Unreal MCP endpoint.
+- Expanded the Unreal MCP Python toolset with `create_cinematic_500_escape_level`, which creates a denser five-room cinematic blockout with lock-motion reference parts, puzzle consoles, memory frames, cloud path, and accent lighting.
 
 ## Current QA
 
@@ -48,6 +52,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `develop-web-game` Playwright harness ran successfully after resolving local Playwright; its default run captures the intro state, while gameplay flow is covered by `npm run verify:game`.
 - Latest visual QA screenshots inspected: `output/playwright/500-room-clear-desktop-final.png`, `output/playwright/500-room-clear-mobile-final.png`, `output/playwright/500-focus-system-desktop-polished.png`, `output/playwright/500-focus-system-mobile-polished.png`, `output/playwright/500-player-chip-desktop.png`, `output/playwright/500-player-chip-mobile.png`, `output/playwright/500-ending-memory-timeline-polished.png`, `output/playwright/500-memory-slots-corridor.png`, and `output/playwright/500-unlock-motion-detail.png` (ignored artifacts).
 - Unreal Python toolset compiles with `python -m py_compile`.
+- `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` reports the Epic installer MSI exists, Unreal Editor is absent, and one elevated `msiexec` process is still active.
 
 ## Known Limitations
 
@@ -63,6 +68,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Replace placeholder puzzle prompts and answers with user-provided real puzzle content.
 - Replace placeholder photo frames with actual couple photos when the user sends them.
 - Add authored GLB assets and use Draco/KTX2 compression for high detail without heavy load.
+- Finish Epic Games Launcher installation after approving or clearing the elevated Windows Installer process, then install UE 5.8 and run `ModelContextProtocol.GenerateClientConfig Codex`.
 - Consider `howler` if real music loops replace Web Audio ambience.
 - Consider `three-mesh-bvh` if raycasting/collision with imported rooms becomes heavy.
 - Run `npm run build`, `npm run verify:game`, and deployed `GAME_URL` verification before each production deploy.
