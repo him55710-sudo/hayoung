@@ -15,6 +15,7 @@
 - Final room: centered spawn, photo corridor, cloud stepping stones, and luminous gate to make the finale read immediately after room transition.
 - Puzzle count: 10 total, 2 per room.
 - Puzzle forms: numeric lock, direction lock, memory/photo choice, symbol lock, final confirmation.
+- Puzzle input: modal locks now use tactile numeric pads, direction pads, and choice chips while keeping the keyboard input for accessibility and automation.
 - Hint system: 3 uses, escalating real-world penalties.
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
 - Unlock feedback: correct answers trigger door/ring/bolt/dial animation and a screen flash.

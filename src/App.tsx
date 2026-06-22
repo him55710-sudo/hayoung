@@ -5,6 +5,7 @@ import {
   ArrowUp,
   Backpack,
   Check,
+  Delete,
   DoorOpen,
   Expand,
   Heart,
@@ -232,6 +233,24 @@ const puzzles: Puzzle[] = [
 
 const hintPenalties = ["현수한테 바나나우유 사주기", "현수한테 설빙 사주기", "현수랑 방탈출 하러가기"];
 
+function normalizePuzzleAnswer(puzzle: Puzzle, value: string) {
+  const compact = value.toUpperCase().replace(/\s+/g, "");
+
+  if (puzzle.kind === "code" || puzzle.kind === "memory") {
+    return compact.replace(/\D/g, "").slice(0, puzzle.answer.length);
+  }
+
+  if (puzzle.kind === "direction") {
+    return compact.replace(/[^UDLR]/g, "").slice(0, puzzle.answer.length);
+  }
+
+  if (puzzle.kind === "device") {
+    return compact.replace(/[^A-Z0-9]/g, "").slice(0, puzzle.answer.length);
+  }
+
+  return compact.replace(/[^A-Z]/g, "").slice(0, puzzle.answer.length);
+}
+
 function App() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [introUnlocked, setIntroUnlocked] = useState(false);
@@ -404,7 +423,9 @@ function App() {
     if (!activePuzzle) {
       return;
     }
-    if (answer.trim().toUpperCase() !== activePuzzle.answer) {
+    const normalizedAnswer = normalizePuzzleAnswer(activePuzzle, answer);
+    if (normalizedAnswer !== activePuzzle.answer) {
+      setAnswer(normalizedAnswer);
       setMessage("아직 맞지 않아요. 단서의 순서와 장치의 형태를 다시 맞춰보세요.");
       return;
     }
@@ -589,12 +610,17 @@ function App() {
                 <h2>{activePuzzle.title}</h2>
                 <p>{activePuzzle.prompt}</p>
                 <LockPreview kind={activePuzzle.kind} answer={activePuzzle.answer} />
+                <PuzzleInputPad puzzle={activePuzzle} answer={answer} setAnswer={setAnswer} />
                 <p className="chain-note">{activePuzzle.chainNote}</p>
                 <div className="answer-row">
                   <input
                     value={answer}
-                    onChange={(event) => setAnswer(event.target.value)}
+                    onChange={(event) => setAnswer(normalizePuzzleAnswer(activePuzzle, event.target.value))}
+                    inputMode={activePuzzle.kind === "code" || activePuzzle.kind === "memory" ? "numeric" : "text"}
+                    maxLength={activePuzzle.answer.length}
                     placeholder={`초안 정답: ${activePuzzle.answer}`}
+                    autoCapitalize="characters"
+                    spellCheck="false"
                     autoFocus
                   />
                   <button type="button" onClick={submitPuzzle}>
@@ -650,6 +676,102 @@ function LockPreview({ kind, answer }: { kind: PuzzleKind; answer: string }) {
       {answer.split("").map((digit, index) => (
         <b key={`${digit}-${index}`}>{digit}</b>
       ))}
+    </div>
+  );
+}
+
+function PuzzleInputPad({
+  puzzle,
+  answer,
+  setAnswer,
+}: {
+  puzzle: Puzzle;
+  answer: string;
+  setAnswer: (value: string | ((current: string) => string)) => void;
+}) {
+  const appendValue = (value: string) => {
+    setAnswer((current: string) => normalizePuzzleAnswer(puzzle, current + value));
+  };
+  const setPreset = (value: string) => {
+    setAnswer(normalizePuzzleAnswer(puzzle, value));
+  };
+  const removeLast = () => {
+    setAnswer((current: string) => current.slice(0, -1));
+  };
+  const clearValue = () => {
+    setAnswer("");
+  };
+
+  if (puzzle.kind === "direction") {
+    return (
+      <div className="puzzle-pad direction-pad" aria-label="Direction lock controls">
+        <button className="dir-key dir-up" type="button" onClick={() => appendValue("U")} aria-label="Up">
+          <ArrowUp aria-hidden="true" />
+        </button>
+        <button className="dir-key dir-left" type="button" onClick={() => appendValue("L")} aria-label="Left">
+          <ArrowLeft aria-hidden="true" />
+        </button>
+        <button className="pad-utility dir-back" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기">
+          <Delete aria-hidden="true" />
+        </button>
+        <button className="dir-key dir-right" type="button" onClick={() => appendValue("R")} aria-label="Right">
+          <ArrowRight aria-hidden="true" />
+        </button>
+        <button className="dir-key dir-down" type="button" onClick={() => appendValue("D")} aria-label="Down">
+          <ArrowDown aria-hidden="true" />
+        </button>
+        <button className="pad-utility dir-clear" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기">
+          <RotateCcw aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  if (puzzle.kind === "code") {
+    return (
+      <div className="puzzle-pad code-pad" aria-label="Numeric lock controls">
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
+          <button type="button" key={digit} onClick={() => appendValue(digit)} aria-label={`Digit ${digit}`}>
+            {digit}
+          </button>
+        ))}
+        <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기">
+          <Delete aria-hidden="true" />
+        </button>
+        <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기">
+          <RotateCcw aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
+
+  const choicesByKind: Partial<Record<PuzzleKind, string[]>> = {
+    memory: ["1", "2", "3"],
+    symbol: ["STAR", "MOON", "LOVE"],
+    device: ["SCAN", "OPEN", "ON"],
+    final: ["YES", "NO"],
+  };
+  const choices = choicesByKind[puzzle.kind] ?? [];
+
+  return (
+    <div className="puzzle-pad choice-pad" aria-label="Puzzle choice controls">
+      {choices.map((choice) => (
+        <button
+          className={`choice-key${answer === choice ? " is-active" : ""}`}
+          type="button"
+          key={choice}
+          onClick={() => setPreset(choice)}
+          aria-pressed={answer === choice}
+        >
+          {choice}
+        </button>
+      ))}
+      <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기">
+        <Delete aria-hidden="true" />
+      </button>
+      <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기">
+        <RotateCcw aria-hidden="true" />
+      </button>
     </div>
   );
 }

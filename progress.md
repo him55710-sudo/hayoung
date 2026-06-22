@@ -15,6 +15,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added a camera-attached Hayoung first-person hands/flashlight/heart-key rig with movement sway, unlock reaction, and mobile-safe beam hiding.
 - Added a stronger final-room memory corridor with placeholder chronological photo frames, cloud stepping stones, a luminous heaven gate, centered room-transition spawn, and reduced finale bloom clipping.
 - Added lock-device modal previews for numeric, direction, symbol, and final locks.
+- Added tactile puzzle input pads: numeric keypad, direction pad, memory/symbol/final choice chips, sanitized answer input, and corrected direction preview layout.
 - Added unlock feedback: ring/bolt/gear/door animation plus screen flash.
 - Added richer procedural room geometry: planks, ceiling beams, desk, lockbox, photo wall, cafe table, rain/cracks, city window, cloud path, light beams, particles.
 - Upgraded the central lock device into a more tactile control console with direction pads, dial rings, a heart padlock, scanner line, status lights, magnifying-glass prop, diary ribbon, and wood front panels.
@@ -33,7 +34,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run build` passes.
 - `npm run verify:game` passes locally.
 - `npm audit --omit=dev` passes with 0 vulnerabilities.
-- Latest visual QA screenshots inspected: `output/playwright/500-final-room-memory-corridor-centered.png`, `output/playwright/500-fpv-hands-desktop-tuned.png`, and `output/playwright/500-fpv-hands-mobile-clean.png` (ignored artifacts).
+- Latest visual QA screenshots inspected: `output/playwright/500-puzzle-pad-desktop.png`, `output/playwright/500-puzzle-pad-mobile.png`, and `output/playwright/500-direction-pad-desktop-fixed.png` (ignored artifacts).
 - Unreal Python toolset compiles with `python -m py_compile`.
 
 ## Known Limitations
