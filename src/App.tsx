@@ -321,6 +321,7 @@ function App() {
   const [unlockTick, setUnlockTick] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [nearInteractable, setNearInteractable] = useState(false);
 
   const currentRoom = rooms[roomIndex];
   const solvedSet = useMemo(() => new Set(solvedIds), [solvedIds]);
@@ -340,6 +341,9 @@ function App() {
 
   const handleNearObject = useCallback((label: string) => {
     setMessage((current) => (current === label ? current : label));
+  }, []);
+  const handleInteractFocusChange = useCallback((active: boolean) => {
+    setNearInteractable((current) => (current === active ? current : active));
   }, []);
 
   useRoomAmbience(phase, roomIndex, audioEnabled);
@@ -404,6 +408,8 @@ function App() {
         cameraMode: "first-person",
         embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
         characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
+        interactableInRange: nearInteractable,
+        interactionFocus: "distance-reactive reticle, floor glyph, lock halo, and focus light around the active puzzle console",
         unlockDetail: "animated latch lift, sliding bolts, glowing door seam, hinges, handle, and unlock sparks",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
@@ -419,6 +425,7 @@ function App() {
     hintCount,
     hintsLeft,
     message,
+    nearInteractable,
     phase,
     roomIndex,
     solvedIds.length,
@@ -549,7 +556,7 @@ function App() {
       )}
 
       {(phase === "game" || phase === "ending") && (
-        <section className={`game-screen${unlocking ? " is-unlocking" : ""}`} aria-label="500일 1인칭 3D 방탈출">
+        <section className={`game-screen${unlocking ? " is-unlocking" : ""}${nearInteractable ? " has-focus-target" : ""}`} aria-label="500일 1인칭 3D 방탈출">
           <AnniversaryScene
             roomIndex={roomIndex}
             phase={phase}
@@ -557,9 +564,10 @@ function App() {
             movement={movement}
             unlockTick={unlockTick}
             onNearObject={handleNearObject}
+            onInteractFocusChange={handleInteractFocusChange}
           />
 
-          <div className="center-reticle" aria-hidden="true" />
+          <div className={`center-reticle${nearInteractable ? " is-focused" : ""}`} aria-hidden="true" />
 
           <header className="hud top-hud">
             <div className="hud-cluster brand-chip">
@@ -630,7 +638,7 @@ function App() {
             </div>
           </footer>
 
-          <button className="interact-button" type="button" onClick={openNextPuzzle}>
+          <button className={`interact-button${nearInteractable ? " is-focused" : ""}`} type="button" onClick={openNextPuzzle}>
             {canAdvanceRoom && roomIndex < rooms.length - 1 ? <DoorOpen aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
             {availablePuzzle ? "E 조사하기" : roomIndex < rooms.length - 1 ? "다음 방" : "엔딩 보기"}
           </button>
@@ -959,6 +967,7 @@ type SceneProps = {
   movement: { forward: boolean; back: boolean; left: boolean; right: boolean };
   unlockTick: number;
   onNearObject: (label: string) => void;
+  onInteractFocusChange: (active: boolean) => void;
 };
 
 type FirstPersonRig = {
@@ -971,7 +980,7 @@ type FirstPersonRig = {
   light: THREE.SpotLight;
 };
 
-function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick, onNearObject }: SceneProps) {
+function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick, onNearObject, onInteractFocusChange }: SceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const movementRef = useRef(movement);
   const roomIndexRef = useRef(roomIndex);
@@ -1069,6 +1078,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     let lastUnlockTick = unlockTickRef.current;
     let unlockStartedAt = -99;
     let lastNearPing = 0;
+    let lastFocusState = false;
 
     const resize = () => {
       const width = mount.clientWidth;
@@ -1151,9 +1161,19 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       const unlockProgress = THREE.MathUtils.clamp((elapsedTime - unlockStartedAt) / 1.2, 0, 1);
       animateFirstPersonRig(firstPersonRig, elapsedTime, velocity.lengthSq() > 0, unlockProgress, solvedRef.current);
 
+      const puzzlePoint = new THREE.Vector3(targetX, 1.0, -1.35);
+      const distance = puzzlePoint.distanceTo(player.position);
+      const focusStrength = THREE.MathUtils.clamp(1 - (distance - 1.15) / 2.35, 0, 1);
+      const nextFocusState = distance < 3.1;
+      if (nextFocusState !== lastFocusState) {
+        onInteractFocusChange(nextFocusState);
+        lastFocusState = nextFocusState;
+      }
+
       roomGroups.forEach((group, index) => {
         const visible = Math.abs(index - roomIndexRef.current) <= 1;
         group.visible = visible;
+        group.userData.focusStrength = index === roomIndexRef.current ? focusStrength : 0;
         group.position.y = THREE.MathUtils.lerp(group.position.y, index === roomIndexRef.current ? 0 : -0.55, 0.055);
         animateRoom(group, elapsedTime, index === roomIndexRef.current ? unlockProgress : 0, solvedRef.current, phaseRef.current);
       });
@@ -1162,8 +1182,6 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
         particle.position.y += Math.sin(elapsedTime * 0.7 + index) * 0.0009;
       });
 
-      const puzzlePoint = new THREE.Vector3(targetX, 1.0, -1.35);
-      const distance = puzzlePoint.distanceTo(player.position);
       if (distance < 3.1 && elapsedTime - lastNearPing > 2.5) {
         onNearObject("잠금 장치 내부에서 금속 핀이 움직이는 소리가 납니다.");
         lastNearPing = elapsedTime;
@@ -1194,12 +1212,13 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("mousemove", onMouseMove);
+      onInteractFocusChange(false);
       composer.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
       window.advanceTime = undefined;
     };
-  }, [onNearObject]);
+  }, [onInteractFocusChange, onNearObject]);
 
   return <div className="three-mount" ref={mountRef} data-testid="three-scene" />;
 }
@@ -1545,6 +1564,99 @@ function addPuzzleDesk(group: THREE.Group, room: Room, accentMaterial: THREE.Mat
   const lamp = new THREE.PointLight(room.palette[2], 1.25, 4.2);
   lamp.position.set(2.05, 1.6, -0.52);
   group.add(lamp);
+
+  addInteractionFocus(group, room);
+}
+
+function addInteractionFocus(group: THREE.Group, room: Room) {
+  const haloMaterial = mat(room.palette[2], {
+    roughness: 0.18,
+    metalness: 0.12,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.42,
+    transparent: true,
+    opacity: 0.08,
+  });
+  haloMaterial.depthWrite = false;
+  haloMaterial.side = THREE.DoubleSide;
+
+  const floorMaterial = mat(room.palette[1], {
+    roughness: 0.28,
+    metalness: 0.08,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.7,
+    transparent: true,
+    opacity: 0.18,
+  });
+  floorMaterial.depthWrite = false;
+
+  const beamMaterial = mat(0xfff0bd, {
+    roughness: 0.42,
+    metalness: 0.02,
+    emissive: 0xffd98b,
+    emissiveIntensity: 0.18,
+    transparent: true,
+    opacity: 0.024,
+  });
+  beamMaterial.depthWrite = false;
+  beamMaterial.side = THREE.DoubleSide;
+
+  const consoleHalo = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.01, 10, 72), haloMaterial.clone());
+  consoleHalo.position.set(0.02, 1.43, -0.145);
+  consoleHalo.userData.interactHalo = true;
+  consoleHalo.userData.focusResponsive = true;
+  consoleHalo.userData.baseOpacity = 0.035;
+  group.add(consoleHalo);
+
+  const innerHalo = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.007, 8, 56), haloMaterial.clone());
+  innerHalo.position.set(0.02, 1.43, -0.138);
+  innerHalo.rotation.z = Math.PI / 4;
+  innerHalo.userData.interactHalo = true;
+  innerHalo.userData.focusResponsive = true;
+  innerHalo.userData.baseOpacity = 0.03;
+  group.add(innerHalo);
+
+  const floorGlyph = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.014, 8, 96), floorMaterial.clone());
+  floorGlyph.position.set(0.02, 0.16, -0.7);
+  floorGlyph.rotation.x = Math.PI / 2;
+  floorGlyph.scale.z = 0.42;
+  floorGlyph.userData.focusFloor = true;
+  floorGlyph.userData.focusResponsive = true;
+  floorGlyph.userData.baseOpacity = 0.035;
+  group.add(floorGlyph);
+
+  const innerFloorGlyph = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.008, 8, 64), floorMaterial.clone());
+  innerFloorGlyph.position.set(0.02, 0.165, -0.7);
+  innerFloorGlyph.rotation.x = Math.PI / 2;
+  innerFloorGlyph.scale.z = 0.48;
+  innerFloorGlyph.userData.focusFloor = true;
+  innerFloorGlyph.userData.focusResponsive = true;
+  innerFloorGlyph.userData.baseOpacity = 0.025;
+  group.add(innerFloorGlyph);
+
+  const focusBeam = new THREE.Mesh(new THREE.ConeGeometry(0.36, 2.55, 36, 1, true), beamMaterial);
+  focusBeam.position.set(0.02, 2.62, -0.68);
+  focusBeam.userData.focusBeam = true;
+  focusBeam.userData.focusResponsive = true;
+  focusBeam.userData.baseOpacity = 0.018;
+  group.add(focusBeam);
+
+  for (let i = 0; i < 4; i += 1) {
+    const pip = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0), haloMaterial.clone());
+    const angle = i * (Math.PI / 2) + Math.PI / 4;
+    pip.position.set(Math.cos(angle) * 0.9 + 0.02, 1.47 + (i % 2) * 0.12, -0.18 + Math.sin(angle) * 0.08);
+    pip.userData.focusPip = true;
+    pip.userData.focusResponsive = true;
+    pip.userData.pipSeed = i;
+    pip.userData.baseY = pip.position.y;
+    group.add(pip);
+  }
+
+  const focusLight = new THREE.PointLight(room.palette[2], 0.25, 4.4);
+  focusLight.position.set(0.02, 1.6, -0.32);
+  focusLight.userData.focusLight = true;
+  group.add(focusLight);
+  group.userData.focusLight = focusLight;
 }
 
 function addDoorAssembly(group: THREE.Group, room: Room, accentMaterial: THREE.Material, glowMaterial: THREE.Material) {
@@ -2203,6 +2315,8 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
   const consoleLatch = group.userData.consoleLatch as THREE.Mesh | undefined;
   const consoleShackle = group.userData.consoleShackle as THREE.Mesh | undefined;
   const consoleLockBody = group.userData.consoleLockBody as THREE.Mesh | undefined;
+  const focusStrength = (group.userData.focusStrength as number | undefined) ?? 0;
+  const focusLight = group.userData.focusLight as THREE.PointLight | undefined;
 
   if (door) {
     door.rotation.y = -0.38 * eased;
@@ -2257,16 +2371,55 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
   if (keyLight) {
     keyLight.intensity = 2.1 + Math.sin(elapsedTime * 2.4) * 0.24 + unlockProgress * 1.6 + (phase === "ending" ? 1.1 : 0);
   }
+  if (focusLight) {
+    focusLight.intensity = 0.22 + focusStrength * 0.95 + unlockProgress * 0.85;
+  }
 
   group.traverse((object) => {
     if (object instanceof THREE.Mesh && object.userData.orb) {
       object.position.y = 1.18 + Math.sin(elapsedTime * 1.8) * 0.045;
     }
     if (object instanceof THREE.Mesh && object.userData.interactHalo) {
-      const pulse = 1 + Math.sin(elapsedTime * 2.4 + object.id) * 0.028 + unlockProgress * 0.1;
+      const pulse = 1 + Math.sin(elapsedTime * 2.4 + object.id) * 0.028 + unlockProgress * 0.1 + focusStrength * 0.13;
       object.scale.setScalar(pulse);
       const material = object.material as THREE.MeshStandardMaterial;
-      material.opacity = 0.42 + Math.sin(elapsedTime * 1.8 + object.id) * 0.14 + unlockProgress * 0.2;
+      const baseOpacity = (object.userData.baseOpacity as number | undefined) ?? 0.28;
+      material.opacity = baseOpacity + Math.sin(elapsedTime * 1.8 + object.id) * 0.02 + unlockProgress * 0.12 + focusStrength * 0.18;
+      material.emissiveIntensity = 0.24 + focusStrength * 0.44 + unlockProgress * 0.3;
+    }
+    if (object instanceof THREE.Mesh && object.userData.focusFloor) {
+      if (typeof object.userData.baseScaleX !== "number") {
+        object.userData.baseScaleX = object.scale.x;
+        object.userData.baseScaleY = object.scale.y;
+        object.userData.baseScaleZ = object.scale.z;
+      }
+      const material = object.material as THREE.MeshStandardMaterial;
+      const breath = Math.sin(elapsedTime * 1.9 + object.id) * 0.025;
+      const baseX = object.userData.baseScaleX as number;
+      const baseY = object.userData.baseScaleY as number;
+      const baseZ = object.userData.baseScaleZ as number;
+      object.rotation.z = elapsedTime * 0.18 + focusStrength * 0.65;
+      object.scale.set(baseX * (1 + breath + focusStrength * 0.16), baseY * (1 + breath + focusStrength * 0.16), baseZ);
+      material.opacity = ((object.userData.baseOpacity as number | undefined) ?? 0.03) + focusStrength * 0.18 + unlockProgress * 0.08;
+      material.emissiveIntensity = 0.28 + focusStrength * 0.58 + unlockProgress * 0.3;
+    }
+    if (object instanceof THREE.Mesh && object.userData.focusBeam) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const scale = 1 + focusStrength * 0.05 + Math.sin(elapsedTime * 1.1) * 0.008;
+      object.scale.set(scale, 1 + focusStrength * 0.04, scale);
+      material.opacity = ((object.userData.baseOpacity as number | undefined) ?? 0.018) + focusStrength * 0.035 + unlockProgress * 0.035;
+      material.emissiveIntensity = 0.18 + focusStrength * 0.26 + unlockProgress * 0.18;
+    }
+    if (object instanceof THREE.Mesh && object.userData.focusPip) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const seed = (object.userData.pipSeed as number | undefined) ?? object.id;
+      const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;
+      object.position.y = baseY + Math.sin(elapsedTime * 2.2 + seed) * 0.035 + focusStrength * 0.045;
+      object.rotation.y = elapsedTime * (0.7 + seed * 0.05);
+      object.rotation.z = elapsedTime * (0.5 + seed * 0.04);
+      object.scale.setScalar(0.92 + Math.sin(elapsedTime * 2 + seed) * 0.08 + focusStrength * 0.34 + unlockProgress * 0.18);
+      material.opacity = 0.18 + focusStrength * 0.52 + unlockProgress * 0.18;
+      material.emissiveIntensity = 0.45 + focusStrength * 1.1 + unlockProgress * 0.5;
     }
     if (object instanceof THREE.Mesh && object.userData.scanLine) {
       const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;

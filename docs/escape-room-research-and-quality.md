@@ -20,6 +20,7 @@
 - Puzzle input: modal locks now use tactile numeric pads, direction pads, and choice chips while keeping the keyboard input for accessibility and automation.
 - Hint system: 3 uses, escalating real-world penalties.
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
+- Interaction focus: the active puzzle console has distance-reactive reticle/button styling plus a restrained in-world floor glyph, lock halo, and focus light.
 - Unlock feedback: correct answers trigger latch lift, door seam glow, sliding bolts, hinge/handle motion, gear/dial motion, unlock sparks, and a screen flash.
 - Performance: procedural geometry, cached procedural material textures, shared simple materials, pixel ratio capped, bloom strength kept moderate.
 
@@ -59,6 +60,7 @@ npm audit --omit=dev
 - runaway button actually moves
 - app enters first-person game mode
 - first-person embodied state is exposed through `render_game_to_text`
+- interaction focus metadata is exposed through `render_game_to_text`
 - all 10 placeholder puzzles still solve after room-transition spawn reset
 - WebGL canvas is not blank on desktop and mobile
 - all 10 placeholder puzzles can be solved
