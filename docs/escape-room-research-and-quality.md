@@ -1,0 +1,74 @@
+# Escape Room Research And Quality Harness
+
+## What This Project Should Learn From Korean Escape Rooms
+
+- Korean escape-room cafes commonly divide rooms into lock-heavy rooms and device/sensor-heavy rooms. For a first personal web version, keep a visible lock/device mix so the player can understand what kind of answer each clue wants.
+- Beginner-friendly rooms benefit from a linear or lightly chained flow. Each solved object should make the next object feel newly relevant instead of leaving the player to brute-force every prop.
+- Use clue links that are visible in the room world: color, physical position, lighting, sound, material, shape, or repeated symbol. Avoid random puzzles that do not belong to the room story.
+- Keep each puzzle's answer self-validating. If the answer is correct, the lock should visibly move, a bolt should slide, the next clue should light up, and the room should give a small success moment.
+- A room should have a clue map before final puzzle writing. For this project, the current dependency chain is `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10`.
+
+## Current Game Decisions
+
+- Camera: first-person, eye-height camera with optional pointer-lock mouse look.
+- Puzzle count: 10 total, 2 per room.
+- Puzzle forms: numeric lock, direction lock, memory/photo choice, symbol lock, final confirmation.
+- Hint system: 3 uses, escalating real-world penalties.
+- Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
+- Unlock feedback: correct answers trigger door/ring/bolt/dial animation and a screen flash.
+- Performance: procedural geometry, shared simple materials, pixel ratio capped, bloom strength kept moderate.
+
+## Open-Source Usage
+
+Already used:
+
+- React and Vite for the app shell.
+- Three.js for WebGL rendering.
+- Three.js postprocessing `EffectComposer`, `RenderPass`, and `UnrealBloomPass`.
+- Lucide React for HUD icons.
+- Playwright for the verification harness.
+
+Good future candidates:
+
+- `@react-three/fiber` and `@react-three/drei` if the scene outgrows direct Three.js lifecycle management.
+- `three-mesh-bvh` if collision, raycasting, or high-poly GLB room assets become heavy.
+- `howler` if real music loops replace the current procedural ambience.
+- `@dimforge/rapier3d-compat` if the game needs physics-driven drawers, objects, or puzzle props.
+- Draco-compressed GLB assets and KTX2/Basis textures for high-quality rooms without huge network downloads.
+
+## Quality Harness
+
+Run these before deploy:
+
+```powershell
+npm run build
+npm run verify:game
+npm audit --omit=dev
+```
+
+`npm run verify:game` checks:
+
+- intro copy appears
+- runaway button actually moves
+- app enters first-person game mode
+- WebGL canvas is not blank on desktop and mobile
+- all 10 placeholder puzzles can be solved
+- ending state is reached
+
+For deployed verification:
+
+```powershell
+$env:GAME_URL="https://hyunsu-hayoung-400.vercel.app"; npm run verify:game
+```
+
+## References Used
+
+- Korean room-escape lock overview: https://brunch.co.kr/@dnsplove/19
+- Korean room-escape device/lock ratio note: https://realitat32.tistory.com/6
+- Korean room-escape cafe wiki on common locks/devices: https://escroom.fandom.com/ko/wiki/자물쇠_및_일반적인_장치의_종류
+- The Codex escape-room design rules: https://thecodex.ca/13-rules-for-escape-room-puzzle-design/
+- Big Escape Rooms guide on clue maps and flow: https://www.bigescaperooms.com/design-an-escape-room-game/
+- Red Door guide on setting, clue discovery, and gameflow: https://reddoorescape.com/blog/blog-the-process-of-designing-an-escape-room/
+- LazyCodex / Oh My OpenAgent repository: https://github.com/code-yeongyu/oh-my-openagent
+- Three.js postprocessing docs: https://threejs.org/docs/#manual/en/introduction/How-to-use-post-processing
+- Three.js UnrealBloomPass docs: https://threejs.org/docs/#examples/en/postprocessing/UnrealBloomPass

@@ -1,19 +1,19 @@
-# 400일의 방: 3D Escape UX Draft
+# 400일의 방: 1인칭 3D Escape UX Draft
 
 ## Core Experience
 
-임현수와 정하영의 400일 기념 웹사이트는 웹페이지가 아니라 풀스크린 3D 방탈출 게임처럼 시작한다. 첫 화면에서 사용자는 질문을 받고, `네` 버튼은 잠시 도망가다가 6초 뒤 클릭 가능해진다. 이후 하영이 캐릭터가 5개의 테마 방을 차례로 지나며 총 10개의 문제를 푼다.
+이 프로젝트는 일반 웹페이지가 아니라 풀스크린 1인칭 3D 방탈출 게임처럼 시작한다. 사용자는 첫 화면에서 질문을 받고, `네` 버튼은 잠시 도망가다가 6초 뒤 클릭 가능해진다. 이후 플레이어는 하영이의 시점으로 5개의 테마 방을 차례로 지나며 총 10개의 문제를 푼다.
 
 ## Entry Interaction
 
 - Copy: `임현수와의 400일을 함께하실 준비가 되셨나요?`
-- Desktop: 커서가 다가가면 `네` 버튼이 위치를 바꾼다.
+- Desktop: 커서가 가까워지면 `네` 버튼 위치가 바뀐다.
 - Mobile: 터치가 닿으면 버튼이 미끄러지듯 이동한다.
-- 6초 뒤 버튼은 원위치로 돌아오고 클릭 가능해진다.
+- 6초 후 버튼은 제자리로 돌아오고 클릭 가능해진다.
 
 ## Game Structure
 
-총 5개 방, 방당 2문제, 총 10문제.
+총 5개 방, 방마다 2문제, 총 10문제.
 
 1. `1-100일`: 풋풋하고 밝은 시작의 방
 2. `101-200일`: 조금 성숙하고 밝아진 방
@@ -21,15 +21,41 @@
 4. `301-399일`: 지치고 다사다난하지만 서로 좋은 방
 5. `400일`: 구름길, 섬광, 시간순 사진, 편지 엔딩
 
+## Puzzle Dependency
+
+현재 초안은 한국 방탈출 카페의 연속형 문제 흐름을 따라 선형 의존 구조로 잡았다.
+
+```text
+1 첫 자물쇠
+ -> 2 첫 사진 프레임
+ -> 3 카페 방향 패널
+ -> 4 약속의 별
+ -> 5 비 오는 날의 금고
+ -> 6 깨진 소리 방향
+ -> 7 지친 밤의 선택
+ -> 8 열린 창문의 신호
+ -> 9 400일 하늘문
+ -> 10 편지의 마지막 문장
+```
+
+## Puzzle Types
+
+- 숫자 자물쇠: 4자리 날짜/순서 코드
+- 방향 자물쇠: 위, 아래, 왼쪽, 오른쪽 순서
+- 상징 장치: 별, 달, 빛, 사진 등 반복 상징
+- 기억 단서: 실제 사진이나 에피소드 기반 선택
+- 장치형 문제: 물체를 올리거나 순서를 맞추면 빛/소리로 반응하는 구조
+
 ## HUD
 
 - Top-left: `400일의 방`
 - Top-center: `Room 1/5`, `Puzzle 0/10`, `Hints 3`
-- Top-right: 힌트, 전체화면, 처음부터
+- Top-right: 힌트, 배경음, 전체화면, 처음부터
+- Center: 작은 1인칭 레티클
 - Left: 현재 방 제목/기간/감정 설명
 - Bottom: 10칸 인벤토리
 - Bottom-right: `E 조사하기` 또는 `다음 방`
-- Mobile: 하단 좌측 방향 버튼, 우측 상호작용 버튼
+- Mobile: 하단 좌측 이동 패드, 우측 상호작용 버튼
 
 ## Hint Penalties
 
@@ -41,7 +67,7 @@
 
 ## Placeholder Puzzle Answers
 
-정답과 상세 문제는 추후 사용자가 제공한다. 현재 초안의 임시 정답은 코드에 데이터로 분리되어 있다.
+정답과 세부 문제는 추후 사용자가 제공한다. 현재 초안의 임시 정답:
 
 - 1번: `0100`
 - 2번: `1`
@@ -54,19 +80,30 @@
 - 9번: `0400`
 - 10번: `YES`
 
+## Audio Direction
+
+- 1번 방: 따뜻한 아침 피아노 패드
+- 2번 방: 카페 느낌의 밝은 마림바/패드
+- 3번 방: 비 오는 저음 스트링
+- 4번 방: 밤 도시와 심장 박동 같은 패드
+- 5번 방: 천국 느낌의 반짝이는 코러스
+
+현재는 절차형 Web Audio로 구현했고, 추후 실제 오픈소스/직접 제작 루프 파일을 넣을 수 있다.
+
 ## Visual Direction
 
-- Fullscreen Three.js canvas.
-- Steam game polish with Roblox-readable proportions.
-- No small embedded game frame; the whole viewport is the game.
-- Each room has distinct lighting and color mood.
-- Final room uses bright heavenly lighting, cloud path, and letter overlay.
+- 전체 화면이 곧 게임 화면이다.
+- 작은 미니게임 프레임은 금지한다.
+- 1인칭 시점으로 방 안의 자물쇠, 장치, 사진, 빛을 직접 보는 느낌을 만든다.
+- Roblox처럼 읽기 쉬운 비율은 유지하되, 조명/재질/밀도는 Steam 인디게임에 가깝게 올린다.
+- 최종 방은 사진 프레임과 구름길, 강한 섬광, 편지 오버레이가 핵심이다.
 
 ## Next Art Pass
 
-When real photos arrive:
+실제 사진을 받으면:
 
-- Replace placeholder frames with chronological couple photos.
-- Build final 400-day cloud corridor around those photos.
-- Add a higher fidelity character model or GLB asset.
-- Add postprocessing bloom and better material textures.
+- 시간순 사진 프레임에 실제 이미지를 넣는다.
+- 400일 구름길을 사진 복도 중심으로 재구성한다.
+- GLB 캐릭터 손/손전등/방 소품을 추가한다.
+- Draco/KTX2 압축을 적용해 고퀄리티 에셋을 넣어도 로딩과 FPS를 관리한다.
+

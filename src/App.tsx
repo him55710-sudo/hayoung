@@ -13,13 +13,18 @@ import {
   LockKeyhole,
   RotateCcw,
   Sparkles,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
 type Phase = "intro" | "game" | "ending";
-type PuzzleKind = "code" | "direction" | "symbol" | "memory" | "final";
+type PuzzleKind = "code" | "direction" | "symbol" | "memory" | "device" | "final";
 
 type Room = {
   id: number;
@@ -27,8 +32,14 @@ type Room = {
   title: string;
   subtitle: string;
   mood: string;
-  palette: [number, number, number];
+  palette: [number, number, number, number];
   accent: string;
+  ambience: {
+    label: string;
+    base: number;
+    harmony: number;
+    pulse: number;
+  };
 };
 
 type Puzzle = {
@@ -39,53 +50,67 @@ type Puzzle = {
   prompt: string;
   answer: string;
   reward: string;
+  requires?: number[];
+  chainNote: string;
 };
+
+declare global {
+  interface Window {
+    advanceTime?: (ms?: number) => void;
+    render_game_to_text?: () => string;
+  }
+}
 
 const rooms: Room[] = [
   {
     id: 1,
-    days: "1-100",
+    days: "1-100일",
     title: "풋풋한 시작의 방",
     subtitle: "처음이라 더 환했고, 작은 말에도 설렜던 시간",
     mood: "밝은 햇살, 다이어리, 첫 사진, 작은 자물쇠",
-    palette: [0xffc36f, 0xff6f7c, 0x70c9ff],
+    palette: [0xffc36f, 0xff6f7c, 0x8fd7ff, 0x2a1c15],
     accent: "#ffcf7c",
+    ambience: { label: "warm morning piano pad", base: 261.63, harmony: 329.63, pulse: 0.52 },
   },
   {
     id: 2,
-    days: "101-200",
+    days: "101-200일",
     title: "조금 더 가까워진 방",
     subtitle: "익숙해졌지만 더 소중해진 약속들",
-    mood: "카페 조명, 두 개의 의자, 방향키 패널",
-    palette: [0xffa75f, 0x6ee7b7, 0x8dc8ff],
+    mood: "카페 조명, 두 개의 의자, 방향 패널, 초록빛 단서",
+    palette: [0xffa75f, 0x6ee7b7, 0x8dc8ff, 0x17251f],
     accent: "#7ee1bd",
+    ambience: { label: "soft cafe marimba loop", base: 293.66, harmony: 392.0, pulse: 0.62 },
   },
   {
     id: 3,
-    days: "201-300",
+    days: "201-300일",
     title: "고난과 화해의 방",
     subtitle: "많이 싸웠지만 끝내 다시 손을 잡았던 날들",
     mood: "비, 갈라진 유리, 번개, 이어 붙인 사진",
-    palette: [0x4f6d9a, 0xff7a72, 0xd6d9ff],
+    palette: [0x405b86, 0xff7a72, 0xc8d4ff, 0x101622],
     accent: "#91a8ff",
+    ambience: { label: "rainy low strings", base: 196.0, harmony: 246.94, pulse: 0.35 },
   },
   {
     id: 4,
-    days: "301-399",
+    days: "301-399일",
     title: "다사다난한 밤의 방",
     subtitle: "각자의 문제로 지쳤지만 서로를 놓지 않았던 시간",
-    mood: "밤 도시, 흐린 창문, 따뜻한 실내 불빛",
-    palette: [0x1e4057, 0xffa36c, 0xffd6ad],
+    mood: "밤 도시, 열린 창문, 흔들리는 불빛, 오래 버틴 마음",
+    palette: [0x20384d, 0xffa36c, 0xffd6ad, 0x090d14],
     accent: "#ffb172",
+    ambience: { label: "night city heartbeat pad", base: 174.61, harmony: 261.63, pulse: 0.44 },
   },
   {
     id: 5,
-    days: "400",
+    days: "400일",
     title: "400일의 문",
     subtitle: "구름 위 사진 길을 지나 섬광 속 편지로",
     mood: "하늘, 구름길, 시간순 사진 프레임, 천국 같은 빛",
-    palette: [0xf8fbff, 0xffd87a, 0x92c7ff],
+    palette: [0xf8fbff, 0xffd87a, 0x92c7ff, 0xdfefff],
     accent: "#f9dc8c",
+    ambience: { label: "celestial choir shimmer", base: 329.63, harmony: 493.88, pulse: 0.72 },
   },
 ];
 
@@ -95,90 +120,109 @@ const puzzles: Puzzle[] = [
     roomId: 1,
     kind: "code",
     title: "첫 자물쇠",
-    prompt: "다이어리에 적힌 첫 날짜의 숫자를 입력하는 자리입니다. 정답은 나중에 바꿀 수 있어요.",
+    prompt: "다이어리의 첫 페이지와 사진 프레임의 숫자를 연결해 네 자리 코드를 만든다는 구조입니다.",
     answer: "0100",
     reward: "첫 설렘 열쇠",
+    chainNote: "이 열쇠가 2번 사진 장치의 전원을 켭니다.",
   },
   {
     id: 2,
     roomId: 1,
     kind: "memory",
-    title: "처음 웃은 사진",
-    prompt: "사진 프레임 3개 중 가장 먼저 밝아지는 프레임의 번호를 고르는 문제입니다.",
+    title: "첫 사진 프레임",
+    prompt: "방 안의 사진 후보 중 가장 먼저 빛나는 프레임을 고르는 기억형 문제입니다.",
     answer: "1",
     reward: "밝은 사진 조각",
+    requires: [1],
+    chainNote: "사진 조각 뒷면의 색이 2번째 방 방향 패널의 시작 색입니다.",
   },
   {
     id: 3,
     roomId: 2,
     kind: "direction",
-    title: "카페 방향키",
-    prompt: "바닥에 빛나는 방향 순서를 입력하세요.",
+    title: "카페 방향 패널",
+    prompt: "테이블 위 컵받침, 의자 방향, 벽 조명 순서를 합쳐 방향 자물쇠를 푸는 구조입니다.",
     answer: "URDL",
     reward: "초록 방향 토큰",
+    requires: [2],
+    chainNote: "방향 토큰을 약속 시계에 끼워 4번 문제를 엽니다.",
   },
   {
     id: 4,
     roomId: 2,
     kind: "symbol",
-    title: "약속의 심볼",
-    prompt: "컵, 별, 하트, 달 심볼 순서 문제입니다.",
+    title: "약속의 별",
+    prompt: "두 사람이 자주 했던 말과 별 모양 장식을 매칭하는 상징 문제입니다.",
     answer: "STAR",
     reward: "약속 배지",
+    requires: [3],
+    chainNote: "배지의 금속 무늬가 3번째 방의 갈라진 유리 패턴과 이어집니다.",
   },
   {
     id: 5,
     roomId: 3,
     kind: "code",
     title: "비 오는 날의 금고",
-    prompt: "싸운 뒤 다시 만난 날을 암호로 쓰는 문제입니다.",
+    prompt: "싸운 날, 다시 만난 날, 화해 메시지의 순서를 숫자로 바꾸는 코드 문제입니다.",
     answer: "0300",
     reward: "화해의 조각",
+    requires: [4],
+    chainNote: "조각을 맞추면 깨진 소리 장치의 방향 힌트가 들립니다.",
   },
   {
     id: 6,
     roomId: 3,
     kind: "direction",
-    title: "깨진 유리 방향",
-    prompt: "갈라진 유리 조각이 가리키는 방향을 순서대로 입력하세요.",
+    title: "깨진 소리 방향",
+    prompt: "비와 번개 소리가 들리는 순서대로 방향 패널을 누르는 장치형 문제입니다.",
     answer: "LURD",
     reward: "이어 붙인 리본",
+    requires: [5],
+    chainNote: "리본이 4번째 방 창문 장치의 손잡이가 됩니다.",
   },
   {
     id: 7,
     roomId: 4,
     kind: "memory",
     title: "지친 밤의 선택",
-    prompt: "힘들었던 날에도 서로에게 보낸 말 중 가장 따뜻한 말을 고르는 문제입니다.",
+    prompt: "힘들었던 날 서로에게 보낸 말 중 가장 오래 남은 선택지를 고르는 기억형 문제입니다.",
     answer: "2",
     reward: "밤 도시 티켓",
+    requires: [6],
+    chainNote: "티켓 번호가 달빛 신호 장치의 첫 번째 좌표입니다.",
   },
   {
     id: 8,
     roomId: 4,
     kind: "symbol",
-    title: "흐린 창문의 신호",
-    prompt: "창문에 맺힌 불빛 심볼을 순서대로 맞추세요.",
+    title: "열린 창문의 신호",
+    prompt: "창밖 네온, 달, 방 안 촛불의 순서를 조합해 마지막 방의 문양을 만듭니다.",
     answer: "MOON",
     reward: "달빛 실마리",
+    requires: [7],
+    chainNote: "달빛 실마리가 400일 하늘문에 들어가는 마지막 장치입니다.",
   },
   {
     id: 9,
     roomId: 5,
     kind: "code",
     title: "400일 하늘문",
-    prompt: "마지막 문에 새겨진 숫자를 입력하세요.",
+    prompt: "사진 길의 순서와 하늘문에 새겨진 숫자를 연결하는 최종 코드 문제입니다.",
     answer: "0400",
     reward: "하늘문 열쇠",
+    requires: [8],
+    chainNote: "하늘문 열쇠가 편지 장치를 열어 마지막 확인을 보여줍니다.",
   },
   {
     id: 10,
     roomId: 5,
     kind: "final",
     title: "편지의 마지막 문장",
-    prompt: "400일부터 더 잘 만나자는 마음을 담은 최종 확인입니다.",
+    prompt: "400일부터 더 다정하게 같이 걷자는 마음을 담은 최종 확인입니다.",
     answer: "YES",
     reward: "400일 엔딩 편지",
+    requires: [9],
+    chainNote: "모든 방의 단서가 끝나고 엔딩 편지가 열립니다.",
   },
 ];
 
@@ -193,21 +237,34 @@ function App() {
   const [solvedIds, setSolvedIds] = useState<number[]>([]);
   const [activePuzzleId, setActivePuzzleId] = useState<number | null>(null);
   const [answer, setAnswer] = useState("");
-  const [message, setMessage] = useState("WASD로 움직이고 E로 조사하세요. 모바일은 화면 버튼을 사용하면 됩니다.");
+  const [message, setMessage] = useState("빛나는 장치가 조용히 반응하고 있어요.");
   const [hintCount, setHintCount] = useState(0);
   const [movement, setMovement] = useState({ forward: false, back: false, left: false, right: false });
+  const [unlockTick, setUnlockTick] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
 
   const currentRoom = rooms[roomIndex];
   const solvedSet = useMemo(() => new Set(solvedIds), [solvedIds]);
   const currentRoomPuzzles = puzzles.filter((puzzle) => puzzle.roomId === currentRoom.id);
-  const nextPuzzle = currentRoomPuzzles.find((puzzle) => !solvedSet.has(puzzle.id));
+  const availablePuzzle = currentRoomPuzzles.find((puzzle) => {
+    if (solvedSet.has(puzzle.id)) {
+      return false;
+    }
+    return (puzzle.requires ?? []).every((id) => solvedSet.has(id));
+  });
+  const blockedPuzzle = currentRoomPuzzles.find((puzzle) => !solvedSet.has(puzzle.id));
+  const nextPuzzle = availablePuzzle ?? blockedPuzzle;
   const activePuzzle = puzzles.find((puzzle) => puzzle.id === activePuzzleId) ?? null;
   const hintsLeft = Math.max(0, 3 - hintCount);
   const inventory = puzzles.filter((puzzle) => solvedSet.has(puzzle.id)).map((puzzle) => puzzle.reward);
   const canAdvanceRoom = currentRoomPuzzles.every((puzzle) => solvedSet.has(puzzle.id));
+
   const handleNearObject = useCallback((label: string) => {
     setMessage((current) => (current === label ? current : label));
   }, []);
+
+  useRoomAmbience(phase, roomIndex, audioEnabled);
 
   useEffect(() => {
     if (phase !== "intro") {
@@ -254,7 +311,6 @@ function App() {
   });
 
   useEffect(() => {
-    window.advanceTime = () => undefined;
     window.render_game_to_text = () =>
       JSON.stringify({
         phase,
@@ -264,11 +320,34 @@ function App() {
         totalPuzzles: puzzles.length,
         hintsLeft,
         penalties: hintPenalties.slice(0, hintCount),
-        nextPuzzle: nextPuzzle?.title ?? "room clear",
+        nextPuzzle: availablePuzzle?.title ?? (canAdvanceRoom ? "room clear" : blockedPuzzle?.title ?? "none"),
+        nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
+        cameraMode: "first-person",
+        ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
-        coordinateSystem: "Three.js scene uses x/z floor plane; player moves through five themed rooms.",
+        coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
       });
-  }, [currentRoom.title, hintCount, hintsLeft, message, nextPuzzle?.title, phase, roomIndex, solvedIds.length]);
+  }, [
+    availablePuzzle,
+    audioEnabled,
+    blockedPuzzle,
+    canAdvanceRoom,
+    currentRoom.ambience.label,
+    currentRoom.title,
+    hintCount,
+    hintsLeft,
+    message,
+    phase,
+    roomIndex,
+    solvedIds.length,
+    solvedSet,
+  ]);
+
+  const triggerUnlock = () => {
+    setUnlockTick((value) => value + 1);
+    setUnlocking(true);
+    window.setTimeout(() => setUnlocking(false), 880);
+  };
 
   const evadeButton = () => {
     if (introUnlocked) {
@@ -276,8 +355,8 @@ function App() {
     }
     const direction = Math.random() > 0.5 ? 1 : -1;
     setButtonOffset({
-      x: direction * (90 + Math.random() * 120),
-      y: (Math.random() - 0.5) * 90,
+      x: direction * (90 + Math.random() * 130),
+      y: (Math.random() - 0.5) * 95,
     });
   };
 
@@ -287,23 +366,30 @@ function App() {
       return;
     }
     setPhase("game");
-    setMessage("하영이가 첫 번째 방에 들어왔어요. 빛나는 장치를 조사해 첫 문제를 열어보세요.");
+    setAudioEnabled(true);
+    setMessage("하영이가 첫 번째 방에 들어왔어요. 중앙의 잠금 장치가 첫 단서를 기다립니다.");
   };
 
   function openNextPuzzle() {
     if (phase !== "game") {
       return;
     }
-    if (nextPuzzle) {
-      setActivePuzzleId(nextPuzzle.id);
+    if (availablePuzzle) {
+      setActivePuzzleId(availablePuzzle.id);
       setAnswer("");
-      setMessage(`${nextPuzzle.title}을 열었습니다.`);
+      setMessage(`${availablePuzzle.title} 장치가 열렸습니다. ${availablePuzzle.chainNote}`);
+      return;
+    }
+    if (blockedPuzzle) {
+      const missing = blockedPuzzle.requires?.filter((id) => !solvedSet.has(id)).join(", ") || "앞 단서";
+      setMessage(`${blockedPuzzle.title}은 아직 잠겨 있어요. 먼저 ${missing}번 단서를 이어야 합니다.`);
       return;
     }
     if (roomIndex < rooms.length - 1) {
       const nextRoom = rooms[roomIndex + 1];
       setRoomIndex((value) => value + 1);
-      setMessage(`${nextRoom.title}으로 이동했습니다. 분위기가 달라졌어요.`);
+      triggerUnlock();
+      setMessage(`${nextRoom.title}으로 문이 열렸습니다. 공기와 음악이 달라졌어요.`);
       return;
     }
     setPhase("ending");
@@ -314,16 +400,17 @@ function App() {
       return;
     }
     if (answer.trim().toUpperCase() !== activePuzzle.answer) {
-      setMessage("아직 맞지 않아요. 지금은 초안이라 정답은 패널 안 예시를 참고해도 됩니다.");
+      setMessage("아직 맞지 않아요. 단서의 순서와 장치의 형태를 다시 맞춰보세요.");
       return;
     }
     setSolvedIds((ids) => (ids.includes(activePuzzle.id) ? ids : [...ids, activePuzzle.id]));
-    setMessage(`${activePuzzle.reward} 획득! 다음 기억으로 이어집니다.`);
+    setMessage(`${activePuzzle.reward} 획득! ${activePuzzle.chainNote}`);
     setActivePuzzleId(null);
     setAnswer("");
+    triggerUnlock();
 
     if (activePuzzle.id === 10) {
-      window.setTimeout(() => setPhase("ending"), 400);
+      window.setTimeout(() => setPhase("ending"), 520);
     }
   }
 
@@ -334,7 +421,7 @@ function App() {
     }
     const penalty = hintPenalties[hintCount];
     setHintCount((count) => count + 1);
-    setMessage(`힌트 사용! 벌칙: ${penalty}. 다음 문제 정답 형식은 ${nextPuzzle?.kind ?? "final"}입니다.`);
+    setMessage(`힌트 사용! 벌칙: ${penalty}. 지금 문제는 ${availablePuzzle?.kind ?? "마지막"} 장치입니다.`);
   }
 
   function toggleFullscreen() {
@@ -356,7 +443,7 @@ function App() {
           <div className="intro-copy">
             <p className="couple-mark">임현수 × 정하영</p>
             <h1>임현수와의 400일을 함께하실 준비가 되셨나요?</h1>
-            <p>버튼은 조금 부끄러워서 도망갑니다. 잠깐만 기다리면 마음을 열어요.</p>
+            <p>버튼은 잠시 망설이다가 마음이 열리면 멈춰요.</p>
             <button
               className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
               style={{ translate: `${buttonOffset.x}px ${buttonOffset.y}px` }}
@@ -378,14 +465,17 @@ function App() {
       )}
 
       {(phase === "game" || phase === "ending") && (
-        <section className="game-screen" aria-label="400일 3D 방탈출">
+        <section className={`game-screen${unlocking ? " is-unlocking" : ""}`} aria-label="400일 1인칭 3D 방탈출">
           <AnniversaryScene
             roomIndex={roomIndex}
             phase={phase}
             solvedCount={solvedIds.length}
             movement={movement}
+            unlockTick={unlockTick}
             onNearObject={handleNearObject}
           />
+
+          <div className="center-reticle" aria-hidden="true" />
 
           <header className="hud top-hud">
             <div className="hud-cluster brand-chip">
@@ -398,20 +488,23 @@ function App() {
               <span>Hints {hintsLeft}</span>
             </div>
             <div className="hud-cluster icon-actions">
-              <button type="button" onClick={useHint} title="힌트 사용">
+              <button type="button" onClick={useHint} title="힌트 사용" aria-label="힌트 사용">
                 <HelpCircle aria-hidden="true" />
               </button>
-              <button type="button" onClick={toggleFullscreen} title="전체화면">
+              <button type="button" onClick={() => setAudioEnabled((value) => !value)} title="배경음 전환" aria-label="배경음 전환">
+                {audioEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
+              </button>
+              <button type="button" onClick={toggleFullscreen} title="전체화면" aria-label="전체화면">
                 <Expand aria-hidden="true" />
               </button>
-              <button type="button" onClick={() => window.location.reload()} title="처음부터">
+              <button type="button" onClick={() => window.location.reload()} title="처음부터" aria-label="처음부터">
                 <RotateCcw aria-hidden="true" />
               </button>
             </div>
           </header>
 
           <aside className="objective-panel">
-            <span>{currentRoom.days}일</span>
+            <span>{currentRoom.days}</span>
             <h2>{currentRoom.title}</h2>
             <p>{currentRoom.subtitle}</p>
             <small>{currentRoom.mood}</small>
@@ -452,7 +545,7 @@ function App() {
 
           <button className="interact-button" type="button" onClick={openNextPuzzle}>
             {canAdvanceRoom && roomIndex < rooms.length - 1 ? <DoorOpen aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
-            {nextPuzzle ? "E 조사하기" : roomIndex < rooms.length - 1 ? "다음 방" : "엔딩 보기"}
+            {availablePuzzle ? "E 조사하기" : roomIndex < rooms.length - 1 ? "다음 방" : "엔딩 보기"}
           </button>
 
           <div className="mobile-pad" aria-label="모바일 이동 패드">
@@ -485,9 +578,13 @@ function App() {
                 <button className="close-button" type="button" onClick={() => setActivePuzzleId(null)}>
                   <X aria-hidden="true" />
                 </button>
-                <span>문제 {activePuzzle.id}/10 · {kindLabel(activePuzzle.kind)}</span>
+                <span>
+                  문제 {activePuzzle.id}/10 · {kindLabel(activePuzzle.kind)}
+                </span>
                 <h2>{activePuzzle.title}</h2>
                 <p>{activePuzzle.prompt}</p>
+                <LockPreview kind={activePuzzle.kind} answer={activePuzzle.answer} />
+                <p className="chain-note">{activePuzzle.chainNote}</p>
                 <div className="answer-row">
                   <input
                     value={answer}
@@ -509,8 +606,8 @@ function App() {
               <span>400일의 문이 열렸어</span>
               <h2>하영아, 400일부터는 더 다정하게 같이 걷자.</h2>
               <p>
-                지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로
-                돌아왔어. 앞으로의 방은 혼자 푸는 문제가 아니라, 둘이 같이 만드는 추억이면 좋겠어.
+                지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로 돌아왔어. 앞으로의 방은 혼자 푸는 문제가 아니라,
+                둘이 같이 만드는 추억이면 좋겠어.
               </p>
             </div>
           )}
@@ -520,14 +617,121 @@ function App() {
   );
 }
 
+function LockPreview({ kind, answer }: { kind: PuzzleKind; answer: string }) {
+  if (kind === "direction") {
+    return (
+      <div className="lock-preview direction-preview" aria-hidden="true">
+        <ArrowUp />
+        <ArrowLeft />
+        <span>{answer}</span>
+        <ArrowRight />
+        <ArrowDown />
+      </div>
+    );
+  }
+
+  if (kind === "symbol" || kind === "final") {
+    return (
+      <div className="lock-preview symbol-preview" aria-hidden="true">
+        {answer.split("").map((letter) => (
+          <b key={letter}>{letter}</b>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="lock-preview code-preview" aria-hidden="true">
+      {answer.split("").map((digit, index) => (
+        <b key={`${digit}-${index}`}>{digit}</b>
+      ))}
+    </div>
+  );
+}
+
 function kindLabel(kind: PuzzleKind) {
   return {
-    code: "자물쇠",
-    direction: "방향키",
-    symbol: "심볼",
-    memory: "추억",
+    code: "숫자 자물쇠",
+    direction: "방향 자물쇠",
+    symbol: "상징 장치",
+    memory: "기억 단서",
+    device: "센서 장치",
     final: "마지막 문",
   }[kind];
+}
+
+function useRoomAmbience(phase: Phase, roomIndex: number, enabled: boolean) {
+  const audioRef = useRef<{
+    context: AudioContext;
+    master: GainNode;
+    oscA: OscillatorNode;
+    oscB: OscillatorNode;
+    lfo: OscillatorNode;
+    lfoGain: GainNode;
+  } | null>(null);
+
+  useEffect(() => {
+    if (phase !== "game" || !enabled) {
+      audioRef.current?.master.gain.setTargetAtTime(0, audioRef.current.context.currentTime, 0.12);
+      return;
+    }
+
+    if (!audioRef.current) {
+      const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtor) {
+        return;
+      }
+      const context = new AudioCtor();
+      const master = context.createGain();
+      const oscA = context.createOscillator();
+      const oscB = context.createOscillator();
+      const lfo = context.createOscillator();
+      const lfoGain = context.createGain();
+      const filter = context.createBiquadFilter();
+
+      oscA.type = "sine";
+      oscB.type = "triangle";
+      lfo.type = "sine";
+      filter.type = "lowpass";
+      filter.frequency.value = 900;
+      lfoGain.gain.value = 0.012;
+      master.gain.value = 0;
+
+      lfo.connect(lfoGain);
+      lfoGain.connect(master.gain);
+      oscA.connect(filter);
+      oscB.connect(filter);
+      filter.connect(master);
+      master.connect(context.destination);
+
+      oscA.start();
+      oscB.start();
+      lfo.start();
+      audioRef.current = { context, master, oscA, oscB, lfo, lfoGain };
+    }
+
+    const audio = audioRef.current;
+    void audio.context.resume();
+    const now = audio.context.currentTime;
+    const ambience = rooms[roomIndex].ambience;
+    audio.oscA.frequency.setTargetAtTime(ambience.base, now, 0.35);
+    audio.oscB.frequency.setTargetAtTime(ambience.harmony, now, 0.35);
+    audio.lfo.frequency.setTargetAtTime(ambience.pulse, now, 0.35);
+    audio.master.gain.setTargetAtTime(0.035, now, 0.18);
+  }, [enabled, phase, roomIndex]);
+
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (!audio) {
+        return;
+      }
+      audio.oscA.stop();
+      audio.oscB.stop();
+      audio.lfo.stop();
+      void audio.context.close();
+    };
+  }, []);
 }
 
 type SceneProps = {
@@ -535,15 +739,17 @@ type SceneProps = {
   phase: Phase;
   solvedCount: number;
   movement: { forward: boolean; back: boolean; left: boolean; right: boolean };
+  unlockTick: number;
   onNearObject: (label: string) => void;
 };
 
-function AnniversaryScene({ roomIndex, phase, solvedCount, movement, onNearObject }: SceneProps) {
+function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick, onNearObject }: SceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const movementRef = useRef(movement);
   const roomIndexRef = useRef(roomIndex);
   const phaseRef = useRef(phase);
   const solvedRef = useRef(solvedCount);
+  const unlockTickRef = useRef(unlockTick);
 
   useEffect(() => {
     movementRef.current = movement;
@@ -562,16 +768,20 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, onNearObjec
   }, [solvedCount]);
 
   useEffect(() => {
+    unlockTickRef.current = unlockTick;
+  }, [unlockTick]);
+
+  useEffect(() => {
     if (!mountRef.current) {
       return;
     }
 
     const mount = mountRef.current;
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x120f12, 0.016);
+    scene.fog = new THREE.FogExp2(0x120f12, 0.018);
 
-    const camera = new THREE.PerspectiveCamera(58, mount.clientWidth / mount.clientHeight, 0.1, 260);
-    camera.position.set(0, 4.8, 8.2);
+    const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.08, 260);
+    camera.position.set(0, 1.65, 2.4);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -579,112 +789,168 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, onNearObjec
       powerPreference: "high-performance",
       preserveDrawingBuffer: true,
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.65));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.18;
+    renderer.toneMappingExposure = 0.92;
     mount.appendChild(renderer.domElement);
+
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(mount.clientWidth, mount.clientHeight), 0.18, 0.42, 0.42);
+    composer.addPass(renderPass);
+    composer.addPass(bloomPass);
 
     const root = new THREE.Group();
     scene.add(root);
 
-    const ambient = new THREE.HemisphereLight(0xfff1d2, 0x25314d, 1.5);
+    const ambient = new THREE.HemisphereLight(0xfff1d2, 0x1e2a44, 0.92);
     scene.add(ambient);
 
-    const sun = new THREE.DirectionalLight(0xffd79a, 3.8);
+    const sun = new THREE.DirectionalLight(0xffd79a, 2.45);
     sun.position.set(-5, 9, 6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 30;
     scene.add(sun);
-
-    const fill = new THREE.PointLight(0x7bc7ff, 2.2, 60);
-    fill.position.set(6, 5, 4);
-    scene.add(fill);
-
-    const player = makeGirlCharacter();
-    player.position.set(0, 0.05, 2.3);
-    scene.add(player);
-
-    const reticleLight = new THREE.PointLight(0xffffff, 1.2, 7);
-    scene.add(reticleLight);
 
     const roomGroups = rooms.map((room, index) => createRoom(room, index));
     roomGroups.forEach((group) => root.add(group));
 
-    const clouds = createCloudPath();
-    clouds.visible = false;
-    root.add(clouds);
+    const dust = createDustField();
+    scene.add(dust);
 
+    const player = {
+      position: new THREE.Vector3(0, 1.65, 2.45),
+      yaw: 0,
+      pitch: -0.06,
+    };
+    let bob = 0;
     let lastFrameTime = performance.now();
     let elapsedTime = 0;
     let animation = 0;
-    const playerVelocity = new THREE.Vector3();
+    let lastUnlockTick = unlockTickRef.current;
+    let unlockStartedAt = -99;
+    let lastNearPing = 0;
 
     const resize = () => {
-      camera.aspect = mount.clientWidth / mount.clientHeight;
+      const width = mount.clientWidth;
+      const height = mount.clientHeight;
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(mount.clientWidth, mount.clientHeight);
+      renderer.setSize(width, height);
+      composer.setSize(width, height);
+      bloomPass.setSize(width, height);
     };
+
+    const onPointerDown = () => {
+      renderer.domElement.requestPointerLock?.();
+    };
+
+    const onMouseMove = (event: MouseEvent) => {
+      if (document.pointerLockElement !== renderer.domElement) {
+        return;
+      }
+      player.yaw -= event.movementX * 0.0022;
+      player.pitch = THREE.MathUtils.clamp(player.pitch - event.movementY * 0.0018, -0.78, 0.62);
+    };
+
+    renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("mousemove", onMouseMove);
+
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(mount);
+
+    const step = (delta: number) => {
+      elapsedTime += delta;
+      const activeRoom = rooms[roomIndexRef.current];
+      const targetX = roomIndexRef.current * 24;
+      const move = movementRef.current;
+      const speed = 4.4 * delta;
+      const forward = new THREE.Vector3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+      const right = new THREE.Vector3(Math.cos(player.yaw), 0, Math.sin(player.yaw));
+      const velocity = new THREE.Vector3();
+
+      if (move.forward) velocity.add(forward);
+      if (move.back) velocity.sub(forward);
+      if (move.right) velocity.add(right);
+      if (move.left) velocity.sub(right);
+      if (velocity.lengthSq() > 0) {
+        velocity.normalize().multiplyScalar(speed);
+        bob += delta * 9;
+      } else {
+        bob += delta * 2.2;
+      }
+
+      player.position.x = THREE.MathUtils.clamp(player.position.x + velocity.x, targetX - 5.95, targetX + 5.95);
+      player.position.z = THREE.MathUtils.clamp(player.position.z + velocity.z, -3.35, 3.85);
+      player.position.y = 1.66 + Math.sin(bob) * (velocity.lengthSq() > 0 ? 0.035 : 0.012);
+
+      camera.position.copy(player.position);
+      camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
+
+      const targetBackground = new THREE.Color(activeRoom.palette[0]).lerp(new THREE.Color(activeRoom.palette[3]), roomIndexRef.current === 4 ? 0.08 : 0.5);
+      scene.background = targetBackground;
+      scene.fog!.color.copy(targetBackground.clone().lerp(new THREE.Color(0x08090e), 0.45));
+      bloomPass.strength = roomIndexRef.current === 4 || phaseRef.current === "ending" ? 0.34 : 0.18;
+
+      if (unlockTickRef.current !== lastUnlockTick) {
+        lastUnlockTick = unlockTickRef.current;
+        unlockStartedAt = elapsedTime;
+      }
+      const unlockProgress = THREE.MathUtils.clamp((elapsedTime - unlockStartedAt) / 1.2, 0, 1);
+
+      roomGroups.forEach((group, index) => {
+        const visible = Math.abs(index - roomIndexRef.current) <= 1;
+        group.visible = visible;
+        group.position.y = THREE.MathUtils.lerp(group.position.y, index === roomIndexRef.current ? 0 : -0.55, 0.055);
+        animateRoom(group, elapsedTime, index === roomIndexRef.current ? unlockProgress : 0, solvedRef.current, phaseRef.current);
+      });
+
+      dust.children.forEach((particle, index) => {
+        particle.position.y += Math.sin(elapsedTime * 0.7 + index) * 0.0009;
+      });
+
+      const puzzlePoint = new THREE.Vector3(targetX, 1.0, -1.35);
+      const distance = puzzlePoint.distanceTo(player.position);
+      if (distance < 3.1 && elapsedTime - lastNearPing > 2.5) {
+        onNearObject("잠금 장치 내부에서 금속 핀이 움직이는 소리가 납니다.");
+        lastNearPing = elapsedTime;
+      }
+
+      composer.render();
+    };
 
     const animate = () => {
       animation = requestAnimationFrame(animate);
       const now = performance.now();
       const delta = Math.min((now - lastFrameTime) / 1000, 0.033);
       lastFrameTime = now;
-      elapsedTime += delta;
-      const activeRoom = rooms[roomIndexRef.current];
-      const targetX = roomIndexRef.current * 22;
-      const move = movementRef.current;
-      const speed = 5.2 * delta;
-
-      playerVelocity.set(0, 0, 0);
-      if (move.forward) playerVelocity.z -= speed;
-      if (move.back) playerVelocity.z += speed;
-      if (move.left) playerVelocity.x -= speed;
-      if (move.right) playerVelocity.x += speed;
-
-      player.position.x = THREE.MathUtils.clamp(player.position.x + playerVelocity.x, targetX - 6.2, targetX + 6.2);
-      player.position.z = THREE.MathUtils.clamp(player.position.z + playerVelocity.z, -3.2, 3.7);
-      player.position.y = 0.05 + Math.sin(elapsedTime * 5.8) * (playerVelocity.length() > 0 ? 0.045 : 0.018);
-
-      const targetCamera = new THREE.Vector3(player.position.x + 0.15, 4.9, player.position.z + 7.5);
-      camera.position.lerp(targetCamera, 0.055);
-      camera.lookAt(player.position.x, 1.45, player.position.z - 2.2);
-
-      roomGroups.forEach((group, index) => {
-        const visible = Math.abs(index - roomIndexRef.current) <= 1;
-        group.visible = visible;
-        group.position.y = THREE.MathUtils.lerp(group.position.y, index === roomIndexRef.current ? 0 : -0.6, 0.05);
-      });
-
-      clouds.visible = phaseRef.current === "ending" || roomIndexRef.current === 4;
-      clouds.children.forEach((cloud, index) => {
-        cloud.position.y = 0.15 + Math.sin(elapsedTime * 1.3 + index) * 0.08;
-      });
-
-      reticleLight.position.set(player.position.x, 2.2, player.position.z - 2.5);
-      reticleLight.color.setHex(activeRoom.palette[1]);
-      scene.background = new THREE.Color(activeRoom.palette[0]).lerp(new THREE.Color(0x101018), roomIndexRef.current === 4 ? 0.18 : 0.58);
-
-      const nearPuzzle = Math.abs(player.position.z - 0.2) < 1.2;
-      if (nearPuzzle && Math.floor(elapsedTime) % 5 === 0) {
-        onNearObject("빛나는 장치 근처입니다. E 또는 조사하기 버튼으로 문제를 열 수 있어요.");
-      }
-
-      renderer.render(scene, camera);
+      step(delta);
     };
+
+    window.advanceTime = (ms = 16.67) => {
+      const steps = Math.max(1, Math.round(ms / 16.67));
+      for (let i = 0; i < steps; i += 1) {
+        step(1 / 60);
+      }
+    };
+
     animate();
 
     return () => {
       cancelAnimationFrame(animation);
       resizeObserver.disconnect();
+      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("mousemove", onMouseMove);
+      composer.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
+      window.advanceTime = undefined;
     };
   }, [onNearObject]);
 
@@ -693,162 +959,441 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, onNearObjec
 
 function createRoom(room: Room, index: number) {
   const group = new THREE.Group();
-  group.position.x = index * 22;
+  group.position.x = index * 24;
 
-  const floorMaterial = new THREE.MeshStandardMaterial({
-    color: room.palette[0],
-    roughness: 0.58,
-    metalness: 0.08,
-  });
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(room.palette[0]).lerp(new THREE.Color(0x1a1720), 0.38),
-    roughness: 0.7,
-    metalness: 0.03,
-  });
-  const accentMaterial = new THREE.MeshStandardMaterial({
-    color: room.palette[1],
-    emissive: room.palette[1],
-    emissiveIntensity: 0.28,
-    roughness: 0.28,
-  });
+  const floorMaterial = mat(room.palette[0], { roughness: 0.72, metalness: 0.04 });
+  const wallMaterial = mat(new THREE.Color(room.palette[0]).lerp(new THREE.Color(room.palette[3]), 0.48).getHex(), { roughness: 0.86 });
+  const trimMaterial = mat(0x2d211b, { roughness: 0.52, metalness: 0.04 });
+  const accentMaterial = mat(room.palette[1], { roughness: 0.28, metalness: 0.18, emissive: room.palette[1], emissiveIntensity: 0.16 });
+  const glowMaterial = mat(room.palette[2], { roughness: 0.18, metalness: 0.12, emissive: room.palette[2], emissiveIntensity: 0.46 });
 
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(14, 0.35, 9), floorMaterial);
-  floor.position.y = -0.18;
+  addRoomShell(group, floorMaterial, wallMaterial, trimMaterial, index);
+  addPhotoWall(group, room, index);
+  addPuzzleDesk(group, room, accentMaterial, glowMaterial);
+  addDoorAssembly(group, room, accentMaterial, glowMaterial);
+  addRoomSpecifics(group, room, index);
+
+  const keyLight = new THREE.PointLight(room.palette[1], index === 4 ? 3.6 : 2.15, 13);
+  keyLight.position.set(-3.7, 3.15, -1.6);
+  group.add(keyLight);
+  group.userData.keyLight = keyLight;
+
+  const portalLight = new THREE.PointLight(room.palette[2], index === 4 ? 4.2 : 2.1, 10);
+  portalLight.position.set(4.85, 2.3, -4.05);
+  group.add(portalLight);
+
+  return group;
+}
+
+function addRoomShell(group: THREE.Group, floorMaterial: THREE.Material, wallMaterial: THREE.Material, trimMaterial: THREE.Material, index: number) {
+  const floor = box(14, 0.28, 9.4, floorMaterial, 0, -0.14, 0);
   floor.receiveShadow = true;
   group.add(floor);
 
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(14, 5, 0.3), wallMaterial);
-  backWall.position.set(0, 2.3, -4.6);
-  backWall.castShadow = true;
-  backWall.receiveShadow = true;
-  group.add(backWall);
-
-  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 9), wallMaterial);
-  leftWall.position.set(-7.1, 2.3, 0);
-  leftWall.receiveShadow = true;
-  group.add(leftWall);
-
-  const rightWall = leftWall.clone();
-  rightWall.position.x = 7.1;
-  group.add(rightWall);
-
-  const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.1, 0.24), accentMaterial);
-  door.position.set(4.8, 1.5, -4.42);
-  door.castShadow = true;
-  group.add(door);
-
-  const device = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1, 0.7), accentMaterial);
-  device.position.set(0, 0.65, -1.35);
-  device.castShadow = true;
-  group.add(device);
-
-  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 1.1, 24), accentMaterial);
-  pedestal.position.set(-3.2, 0.55, -1);
-  pedestal.castShadow = true;
-  group.add(pedestal);
-
-  for (let i = 0; i < 6; i += 1) {
-    const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(0.86, 0.62, 0.08),
-      new THREE.MeshStandardMaterial({
-        color: i % 2 === 0 ? room.palette[2] : 0xfff0d4,
-        roughness: 0.5,
-        emissive: i % 2 === 0 ? room.palette[2] : 0x000000,
-        emissiveIntensity: i % 2 === 0 ? 0.1 : 0,
-      }),
-    );
-    frame.position.set(-5.6 + i * 1.35, 2.3 + Math.sin(i) * 0.4, -4.25);
-    frame.castShadow = true;
-    group.add(frame);
+  for (let i = 0; i < 14; i += 1) {
+    const plank = box(0.9, 0.035, 8.8, trimMaterial, -6.2 + i * 0.95, 0.035, 0);
+    plank.material = mat(i % 2 ? 0x765234 : 0x916944, { roughness: 0.78 });
+    plank.receiveShadow = true;
+    group.add(plank);
   }
 
-  const portalRing = new THREE.Mesh(
-    new THREE.TorusGeometry(1.35, 0.06, 12, 52),
-    new THREE.MeshStandardMaterial({
-      color: room.palette[2],
-      emissive: room.palette[2],
-      emissiveIntensity: 1.6,
-      roughness: 0.2,
-    }),
-  );
-  portalRing.position.set(4.8, 2.05, -4.25);
-  portalRing.rotation.x = Math.PI / 2;
-  group.add(portalRing);
+  const backWall = box(14.4, 5.4, 0.32, wallMaterial, 0, 2.55, -4.72);
+  const leftWall = box(0.32, 5.4, 9.4, wallMaterial, -7.2, 2.55, 0);
+  const rightWall = box(0.32, 5.4, 9.4, wallMaterial, 7.2, 2.55, 0);
+  const ceiling = box(14.4, 0.22, 9.4, mat(0x151318, { roughness: 0.82 }), 0, 5.18, 0);
+  [backWall, leftWall, rightWall, ceiling].forEach((mesh) => {
+    mesh.receiveShadow = true;
+    mesh.castShadow = true;
+    group.add(mesh);
+  });
 
-  const lamp = new THREE.PointLight(room.palette[1], 3.8, 12);
-  lamp.position.set(-3.2, 3.2, -0.8);
+  for (let i = 0; i < 6; i += 1) {
+    const beam = box(0.16, 0.22, 9.15, trimMaterial, -6.2 + i * 2.48, 5.0, 0);
+    beam.castShadow = true;
+    group.add(beam);
+  }
+
+  const rug = box(4.8, 0.045, 2.2, mat(index === 2 ? 0x243557 : 0x4f2f2d, { roughness: 0.92 }), -1.4, 0.09, 1.25);
+  rug.receiveShadow = true;
+  group.add(rug);
+}
+
+function addPhotoWall(group: THREE.Group, room: Room, index: number) {
+  const frameMaterial = mat(index === 4 ? 0xe9d18d : 0x6f4e32, { roughness: 0.46, metalness: 0.12 });
+  const photoMaterial = mat(room.palette[2], { roughness: 0.5, emissive: room.palette[2], emissiveIntensity: index === 4 ? 0.35 : 0.08 });
+  const count = index === 4 ? 14 : 9;
+  for (let i = 0; i < count; i += 1) {
+    const width = 0.55 + ((i * 37) % 4) * 0.13;
+    const height = 0.42 + ((i * 19) % 3) * 0.14;
+    const x = -5.8 + (i % 7) * 1.55 + (index === 4 ? 0.35 : 0);
+    const y = 2.05 + Math.floor(i / 7) * 0.82 + Math.sin(i * 1.7) * 0.1;
+    const z = -4.49;
+    const frame = box(width + 0.16, height + 0.16, 0.08, frameMaterial, x, y, z);
+    const photo = box(width, height, 0.09, photoMaterial, x, y, z + 0.045);
+    frame.castShadow = true;
+    photo.castShadow = true;
+    group.add(frame, photo);
+  }
+}
+
+function addPuzzleDesk(group: THREE.Group, room: Room, accentMaterial: THREE.Material, glowMaterial: THREE.Material) {
+  const wood = mat(0x5a3824, { roughness: 0.52, metalness: 0.03 });
+  const metal = mat(0x463d37, { roughness: 0.32, metalness: 0.72 });
+  const paper = mat(0xffedd1, { roughness: 0.82 });
+
+  const desk = box(5.6, 0.34, 1.65, wood, -0.7, 0.74, -0.55);
+  const deskBack = box(5.8, 0.38, 0.2, wood, -0.7, 1.0, -1.42);
+  desk.castShadow = true;
+  desk.receiveShadow = true;
+  group.add(desk, deskBack);
+  [-2.9, 1.45].forEach((x) => {
+    const legA = box(0.25, 1.1, 0.25, wood, x, 0.15, -1.15);
+    const legB = box(0.25, 1.1, 0.25, wood, x, 0.15, 0.0);
+    group.add(legA, legB);
+  });
+
+  const lockBox = box(1.8, 1.1, 0.88, accentMaterial, 0.08, 1.48, -0.82);
+  lockBox.castShadow = true;
+  lockBox.userData.pulse = true;
+  group.add(lockBox);
+  group.userData.lockBox = lockBox;
+
+  const panel = box(1.52, 0.62, 0.08, metal, 0.08, 1.47, -0.34);
+  group.add(panel);
+
+  const padPositions = [
+    [0, 0.18],
+    [-0.22, 0],
+    [0.22, 0],
+    [0, -0.18],
+  ];
+  padPositions.forEach(([x, y]) => {
+    const pad = box(0.16, 0.12, 0.05, glowMaterial, -0.34 + x, 1.48 + y, -0.27);
+    pad.userData.glow = true;
+    group.add(pad);
+  });
+
+  for (let i = 0; i < 4; i += 1) {
+    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.12, 24), metal);
+    dial.position.set(0.34 + i * 0.19, 1.48, -0.27);
+    dial.rotation.x = Math.PI / 2;
+    dial.castShadow = true;
+    dial.userData.dial = true;
+    group.add(dial);
+  }
+
+  const diary = box(1.35, 0.08, 0.9, paper, -2.25, 1.01, -0.55);
+  diary.rotation.y = -0.22;
+  diary.castShadow = true;
+  group.add(diary);
+
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.25, 24, 18), glowMaterial);
+  orb.position.set(2.05, 1.18, -0.52);
+  orb.castShadow = true;
+  orb.userData.orb = true;
+  group.add(orb);
+
+  const orbBase = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.12, 28), metal);
+  orbBase.position.set(2.05, 1.02, -0.52);
+  group.add(orbBase);
+
+  const lamp = new THREE.PointLight(room.palette[2], 2.3, 5);
+  lamp.position.set(2.05, 1.6, -0.52);
   group.add(lamp);
+}
 
-  if (index === 2 || index === 3) {
-    const rainMaterial = new THREE.MeshStandardMaterial({ color: 0xa7c5ff, emissive: 0x5c88ff, emissiveIntensity: 0.4 });
-    for (let i = 0; i < 30; i += 1) {
-      const drop = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.7, 0.025), rainMaterial);
-      drop.position.set(-6 + Math.random() * 12, 1 + Math.random() * 4, -4.1 + Math.random() * 0.2);
-      group.add(drop);
-    }
+function addDoorAssembly(group: THREE.Group, room: Room, accentMaterial: THREE.Material, glowMaterial: THREE.Material) {
+  const doorMaterial = mat(new THREE.Color(room.palette[1]).lerp(new THREE.Color(0x2d221b), 0.2).getHex(), {
+    roughness: 0.42,
+    metalness: 0.18,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.12,
+  });
+  const metal = mat(0x3f3936, { roughness: 0.28, metalness: 0.8 });
+  const door = box(2.2, 3.25, 0.26, doorMaterial, 4.95, 1.66, -4.45);
+  door.castShadow = true;
+  group.add(door);
+  group.userData.door = door;
+
+  const frame = box(2.62, 3.55, 0.12, mat(0x2a211f, { roughness: 0.55, metalness: 0.1 }), 4.95, 1.72, -4.61);
+  group.add(frame);
+
+  const bolts: THREE.Mesh[] = [];
+  [-0.52, 0.52].forEach((x) => {
+    const bolt = box(0.78, 0.12, 0.12, metal, 4.95 + x, 2.25, -4.22);
+    bolt.userData.baseX = bolt.position.x;
+    bolts.push(bolt);
+    group.add(bolt);
+  });
+  group.userData.bolts = bolts;
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.055, 12, 60), glowMaterial);
+  ring.position.set(4.95, 2.15, -4.22);
+  ring.rotation.x = Math.PI / 2;
+  ring.userData.ring = true;
+  group.add(ring);
+  group.userData.ring = ring;
+
+  const gears: THREE.Mesh[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const gear = new THREE.Mesh(new THREE.TorusGeometry(0.22 + i * 0.06, 0.025, 8, 26), metal);
+    gear.position.set(4.35 + i * 0.28, 1.15, -4.22);
+    gear.rotation.x = Math.PI / 2;
+    gear.userData.gear = true;
+    gears.push(gear);
+    group.add(gear);
+  }
+  group.userData.gears = gears;
+}
+
+function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
+  if (index === 0) {
+    addCurtainWindow(group, room, -5.45, 2.55, -4.35);
+    addVines(group, room, -4.2, 3.7, -4.38, 18);
+    addHeartParticles(group, room, 18);
+  }
+
+  if (index === 1) {
+    addCafeTable(group, room);
+    addPendantLights(group, room, 3);
+  }
+
+  if (index === 2) {
+    addCracks(group, room);
+    addRainStreaks(group, room, 38);
+  }
+
+  if (index === 3) {
+    addCityWindow(group, room);
+    addPaperTrail(group, 22);
   }
 
   if (index === 4) {
-    const glow = new THREE.PointLight(0xffffff, 8, 20);
-    glow.position.set(0, 5, -2);
-    group.add(glow);
+    addHeavenPath(group, room);
+    addLightBeams(group, room);
   }
-
-  return group;
 }
 
-function createCloudPath() {
-  const group = new THREE.Group();
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.82,
-    transparent: true,
-    opacity: 0.88,
+function addCurtainWindow(group: THREE.Group, room: Room, x: number, y: number, z: number) {
+  const glass = mat(0xfff8dc, { roughness: 0.12, metalness: 0.02, emissive: 0xffddaa, emissiveIntensity: 0.18, transparent: true, opacity: 0.58 });
+  const windowPanel = box(1.55, 1.9, 0.08, glass, x, y, z);
+  const curtain = box(0.18, 2.25, 0.06, mat(0xffd3c9, { roughness: 0.88, transparent: true, opacity: 0.75 }), x - 0.92, y, z + 0.08);
+  const curtain2 = curtain.clone();
+  curtain2.position.x = x + 0.92;
+  group.add(windowPanel, curtain, curtain2);
+  const light = new THREE.PointLight(room.palette[0], 1.55, 7);
+  light.position.set(x, y + 0.25, z + 0.9);
+  group.add(light);
+}
+
+function addVines(group: THREE.Group, room: Room, x: number, y: number, z: number, count: number) {
+  const stemMat = mat(0x38573a, { roughness: 0.8 });
+  const leafMat = mat(room.palette[2], { roughness: 0.78 });
+  for (let i = 0; i < count; i += 1) {
+    const stem = box(0.035, 0.55, 0.035, stemMat, x + Math.sin(i) * 0.35, y - i * 0.11, z);
+    stem.rotation.z = Math.sin(i * 1.4) * 0.45;
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 6), leafMat);
+    leaf.scale.set(1.4, 0.45, 0.8);
+    leaf.position.set(stem.position.x + 0.08, stem.position.y - 0.12, z + 0.04);
+    group.add(stem, leaf);
+  }
+}
+
+function addHeartParticles(group: THREE.Group, room: Room, count: number) {
+  const material = mat(room.palette[1], { roughness: 0.4, emissive: room.palette[1], emissiveIntensity: 0.45 });
+  for (let i = 0; i < count; i += 1) {
+    const heart = box(0.08, 0.08, 0.025, material, -5 + ((i * 41) % 95) / 10, 1.1 + ((i * 17) % 28) / 10, -3.7 + Math.sin(i) * 0.3);
+    heart.rotation.z = Math.PI / 4;
+    heart.userData.float = true;
+    group.add(heart);
+  }
+}
+
+function addCafeTable(group: THREE.Group, room: Room) {
+  const tableMat = mat(0x5e432f, { roughness: 0.58 });
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.12, 36), tableMat);
+  top.position.set(-3.7, 0.78, 1.0);
+  top.castShadow = true;
+  group.add(top);
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.2, 18), tableMat);
+  leg.position.set(-3.7, 0.2, 1.0);
+  group.add(leg);
+  [-0.38, 0.38].forEach((x) => {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.26, 20), mat(room.palette[2], { roughness: 0.32, metalness: 0.04 }));
+    cup.position.set(-3.7 + x, 0.97, 1.0);
+    cup.castShadow = true;
+    group.add(cup);
   });
-  for (let i = 0; i < 18; i += 1) {
-    const cloud = new THREE.Mesh(new THREE.SphereGeometry(0.55 + Math.random() * 0.45, 18, 12), material);
-    cloud.position.set(88 + (Math.random() - 0.5) * 8, 0.1 + Math.random() * 0.4, -3 + i * 0.42);
-    cloud.scale.set(1.7, 0.36, 0.9);
+}
+
+function addPendantLights(group: THREE.Group, room: Room, count: number) {
+  for (let i = 0; i < count; i += 1) {
+    const x = -2 + i * 2;
+    const cord = box(0.025, 1.3, 0.025, mat(0x171717, { roughness: 0.5 }), x, 4.35, -0.2);
+    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.52, 0.35, 24), mat(room.palette[1], { roughness: 0.44, emissive: room.palette[1], emissiveIntensity: 0.25 }));
+    shade.position.set(x, 3.55, -0.2);
+    const light = new THREE.PointLight(room.palette[1], 1.3, 5);
+    light.position.set(x, 3.38, -0.2);
+    group.add(cord, shade, light);
+  }
+}
+
+function addCracks(group: THREE.Group, room: Room) {
+  const crackMat = mat(0x101014, { roughness: 0.9, emissive: room.palette[2], emissiveIntensity: 0.12 });
+  for (let i = 0; i < 16; i += 1) {
+    const crack = box(0.035, 0.9 + (i % 4) * 0.18, 0.035, crackMat, -5.8 + i * 0.72, 2.9 + Math.sin(i) * 0.7, -4.26);
+    crack.rotation.z = Math.sin(i * 2.3) * 0.9;
+    group.add(crack);
+  }
+}
+
+function addRainStreaks(group: THREE.Group, room: Room, count: number) {
+  const rainMaterial = mat(room.palette[2], { roughness: 0.4, emissive: 0x5c88ff, emissiveIntensity: 0.48, transparent: true, opacity: 0.7 });
+  for (let i = 0; i < count; i += 1) {
+    const drop = box(0.018, 0.65 + (i % 5) * 0.08, 0.018, rainMaterial, -6.6 + ((i * 31) % 130) / 10, 1.1 + ((i * 13) % 38) / 10, -4.12);
+    drop.rotation.z = -0.18;
+    group.add(drop);
+  }
+}
+
+function addCityWindow(group: THREE.Group, room: Room) {
+  const glass = mat(0x101827, { roughness: 0.16, metalness: 0.2, emissive: 0x172846, emissiveIntensity: 0.4 });
+  const panel = box(2.6, 1.65, 0.08, glass, -4.95, 2.75, -4.35);
+  group.add(panel);
+  for (let i = 0; i < 14; i += 1) {
+    const light = box(0.08, 0.18, 0.04, mat(i % 2 ? room.palette[1] : room.palette[2], { emissive: i % 2 ? room.palette[1] : room.palette[2], emissiveIntensity: 1.1 }), -6.0 + (i % 7) * 0.34, 2.35 + Math.floor(i / 7) * 0.55, -4.27);
+    group.add(light);
+  }
+}
+
+function addPaperTrail(group: THREE.Group, count: number) {
+  const paper = mat(0xf3e1c2, { roughness: 0.9 });
+  for (let i = 0; i < count; i += 1) {
+    const sheet = box(0.38, 0.02, 0.28, paper, -5.4 + ((i * 29) % 104) / 10, 0.12, -3.2 + ((i * 43) % 66) / 10);
+    sheet.rotation.y = Math.sin(i) * 1.4;
+    sheet.rotation.z = Math.cos(i * 1.7) * 0.2;
+    group.add(sheet);
+  }
+}
+
+function addHeavenPath(group: THREE.Group, room: Room) {
+  const cloudMat = mat(0xffffff, { roughness: 0.82, transparent: true, opacity: 0.9 });
+  for (let i = 0; i < 28; i += 1) {
+    const cloud = new THREE.Mesh(new THREE.SphereGeometry(0.55 + ((i * 17) % 9) / 30, 18, 12), cloudMat);
+    cloud.position.set(-5.8 + ((i * 23) % 116) / 10, 0.16 + Math.sin(i) * 0.08, -3.45 + i * 0.23);
+    cloud.scale.set(1.8, 0.34, 0.86);
+    cloud.userData.cloud = true;
     group.add(cloud);
   }
+  addCurtainWindow(group, room, 0, 3.0, -4.34);
+}
+
+function addLightBeams(group: THREE.Group, room: Room) {
+  const beamMat = mat(room.palette[1], { emissive: room.palette[1], emissiveIntensity: 0.55, transparent: true, opacity: 0.18, roughness: 1 });
+  for (let i = 0; i < 5; i += 1) {
+    const beam = box(0.32, 4.8, 0.025, beamMat, -4 + i * 2.0, 2.5, -2.0 + Math.sin(i) * 0.8);
+    beam.rotation.z = -0.22 + i * 0.08;
+    beam.rotation.y = 0.18;
+    group.add(beam);
+  }
+}
+
+function createDustField() {
+  const group = new THREE.Group();
+  const material = mat(0xfff1cf, { roughness: 0.5, emissive: 0xffdca5, emissiveIntensity: 0.45, transparent: true, opacity: 0.55 });
+  for (let i = 0; i < 160; i += 1) {
+    const particle = new THREE.Mesh(new THREE.SphereGeometry(0.012 + (i % 5) * 0.003, 6, 4), material);
+    particle.position.set(-8 + ((i * 97) % 160) / 10, 0.8 + ((i * 53) % 42) / 10, -4.2 + ((i * 31) % 84) / 10);
+    particle.position.x += Math.floor(i / 32) * 24;
+    group.add(particle);
+  }
   return group;
 }
 
-function makeGirlCharacter() {
-  const group = new THREE.Group();
-  const dress = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.42, 1.0, 8, 18),
-    new THREE.MeshStandardMaterial({ color: 0xff7d8e, roughness: 0.48, metalness: 0.02 }),
-  );
-  dress.position.y = 0.95;
-  dress.castShadow = true;
-  group.add(dress);
+function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: number, solvedCount: number, phase: Phase) {
+  const eased = easeOutCubic(unlockProgress);
+  const door = group.userData.door as THREE.Mesh | undefined;
+  const ring = group.userData.ring as THREE.Mesh | undefined;
+  const lockBox = group.userData.lockBox as THREE.Mesh | undefined;
+  const bolts = group.userData.bolts as THREE.Mesh[] | undefined;
+  const gears = group.userData.gears as THREE.Mesh[] | undefined;
+  const keyLight = group.userData.keyLight as THREE.PointLight | undefined;
 
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.34, 24, 18),
-    new THREE.MeshStandardMaterial({ color: 0xffd7bd, roughness: 0.5 }),
-  );
-  head.position.y = 1.78;
-  head.castShadow = true;
-  group.add(head);
+  if (door) {
+    door.rotation.y = -0.16 * eased;
+    door.position.z = -4.45 + eased * 0.08;
+  }
+  if (ring) {
+    ring.rotation.z = elapsedTime * 0.55 + eased * Math.PI * 2;
+    ring.scale.setScalar(1 + Math.sin(elapsedTime * 2.2) * 0.018 + eased * 0.08);
+  }
+  if (lockBox) {
+    lockBox.scale.set(1 + eased * 0.035, 1 + Math.sin(elapsedTime * 2.1) * 0.01, 1 + eased * 0.025);
+  }
+  bolts?.forEach((bolt, index) => {
+    const baseX = bolt.userData.baseX as number;
+    bolt.position.x = baseX + (index === 0 ? -0.42 : 0.42) * eased;
+  });
+  gears?.forEach((gear, index) => {
+    gear.rotation.z += 0.012 + unlockProgress * (0.06 + index * 0.01);
+  });
+  if (keyLight) {
+    keyLight.intensity = 2.1 + Math.sin(elapsedTime * 2.4) * 0.24 + unlockProgress * 1.6 + (phase === "ending" ? 1.1 : 0);
+  }
 
-  const hair = new THREE.Mesh(
-    new THREE.SphereGeometry(0.38, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.74),
-    new THREE.MeshStandardMaterial({ color: 0x2b1715, roughness: 0.72 }),
-  );
-  hair.position.set(0, 1.86, -0.03);
-  hair.castShadow = true;
-  group.add(hair);
+  group.traverse((object) => {
+    if (object instanceof THREE.Mesh && object.userData.orb) {
+      object.position.y = 1.18 + Math.sin(elapsedTime * 1.8) * 0.045;
+    }
+    if (object instanceof THREE.Mesh && object.userData.float) {
+      object.position.y += Math.sin(elapsedTime + object.id) * 0.0008;
+    }
+    if (object instanceof THREE.Mesh && object.userData.cloud) {
+      object.position.y += Math.sin(elapsedTime * 1.1 + object.id) * 0.0012;
+    }
+    if (object instanceof THREE.Mesh && object.userData.dial) {
+      object.rotation.z = elapsedTime * 0.3 + solvedCount * 0.08;
+    }
+  });
+}
 
-  const halo = new THREE.Mesh(
-    new THREE.TorusGeometry(0.58, 0.018, 8, 42),
-    new THREE.MeshStandardMaterial({ color: 0xfff2a8, emissive: 0xffd978, emissiveIntensity: 1.1 }),
-  );
-  halo.position.y = 2.16;
-  halo.rotation.x = Math.PI / 2;
-  group.add(halo);
+function box(width: number, height: number, depth: number, material: THREE.Material, x: number, y: number, z: number) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
 
-  return group;
+function mat(
+  color: number,
+  options: {
+    roughness?: number;
+    metalness?: number;
+    emissive?: number;
+    emissiveIntensity?: number;
+    transparent?: boolean;
+    opacity?: number;
+  } = {},
+) {
+  const materialOptions: THREE.MeshStandardMaterialParameters = {
+    color,
+    roughness: options.roughness ?? 0.55,
+    metalness: options.metalness ?? 0.06,
+    emissive: options.emissive ?? 0x000000,
+    emissiveIntensity: options.emissiveIntensity ?? 0,
+  };
+  if (typeof options.transparent === "boolean") {
+    materialOptions.transparent = options.transparent;
+  }
+  if (typeof options.opacity === "number") {
+    materialOptions.opacity = options.opacity;
+  }
+  return new THREE.MeshStandardMaterial(materialOptions);
+}
+
+function easeOutCubic(value: number) {
+  return 1 - Math.pow(1 - value, 3);
 }
 
 export default App;
