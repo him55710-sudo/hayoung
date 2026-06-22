@@ -68,6 +68,7 @@ type ProceduralTextureKind = "wood" | "plaster" | "fabric" | "paper" | "metal";
 
 const proceduralTextureCache = new Map<string, THREE.CanvasTexture>();
 const memoryTextureCache = new Map<string, THREE.Texture>();
+const cinematicTextureCache = new Map<string, THREE.CanvasTexture>();
 const memoryTextureLoader = new THREE.TextureLoader();
 
 const graphicsQualitySettings: Record<
@@ -78,11 +79,12 @@ const graphicsQualitySettings: Record<
     bloomMultiplier: number;
     shadows: boolean;
     dust: boolean;
+    atmosphere: boolean;
   }
 > = {
-  cinematic: { label: "시네마틱", renderScale: 1.65, bloomMultiplier: 1, shadows: true, dust: true },
-  balanced: { label: "균형", renderScale: 1.25, bloomMultiplier: 0.78, shadows: true, dust: true },
-  performance: { label: "부드럽게", renderScale: 0.95, bloomMultiplier: 0.48, shadows: false, dust: false },
+  cinematic: { label: "시네마틱", renderScale: 1.65, bloomMultiplier: 1, shadows: true, dust: true, atmosphere: true },
+  balanced: { label: "균형", renderScale: 1.25, bloomMultiplier: 0.78, shadows: true, dust: true, atmosphere: true },
+  performance: { label: "부드럽게", renderScale: 0.95, bloomMultiplier: 0.48, shadows: false, dust: false, atmosphere: false },
 };
 
 const graphicsQualityCycle: GraphicsQuality[] = ["cinematic", "balanced", "performance"];
@@ -433,6 +435,9 @@ function App() {
         graphicsQualityLabel: graphicsQualitySetting.label,
         renderScaleCap: graphicsQualitySetting.renderScale,
         performanceMode: graphicsQuality === "performance",
+        cinematicAtmosphere: graphicsQualitySetting.atmosphere
+          ? "volumetric light shafts, floor reflections, room-specific rain/city/heaven light layers"
+          : "reduced in performance mode",
         cameraMode: "first-person",
         embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
         characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
@@ -451,6 +456,7 @@ function App() {
     currentRoom.ambience.label,
     currentRoom.title,
     graphicsQuality,
+    graphicsQualitySetting.atmosphere,
     graphicsQualitySetting.label,
     graphicsQualitySetting.renderScale,
     hintCount,
@@ -1155,6 +1161,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     let lastFocusState = false;
     let activePixelRatio = 0;
     let activeShadowMode: boolean | null = null;
+    let activeAtmosphereMode: boolean | null = null;
 
     const applyGraphicsQuality = (forceSize = false) => {
       const setting = graphicsQualitySettings[graphicsQualityRef.current];
@@ -1177,6 +1184,16 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       }
 
       dust.visible = setting.dust;
+      if (activeAtmosphereMode !== setting.atmosphere) {
+        roomGroups.forEach((group) => {
+          group.traverse((object) => {
+            if (object.userData.cinematicAtmosphere) {
+              object.visible = setting.atmosphere;
+            }
+          });
+        });
+        activeAtmosphereMode = setting.atmosphere;
+      }
       return setting;
     };
 
@@ -1344,6 +1361,7 @@ function createRoom(room: Room, index: number) {
   addPuzzleDesk(group, room, accentMaterial, glowMaterial);
   addDoorAssembly(group, room, accentMaterial, glowMaterial);
   addRoomSpecifics(group, room, index);
+  addCinematicAtmosphere(group, room, index);
 
   const keyLight = new THREE.PointLight(room.palette[1], index === 4 ? 3.6 : 2.15, 13);
   keyLight.position.set(-3.7, 3.15, -1.6);
@@ -1355,6 +1373,164 @@ function createRoom(room: Room, index: number) {
   group.add(portalLight);
 
   return group;
+}
+
+type CinematicTextureKind = "shaft" | "reflection" | "streak";
+
+function cinematicMaterial(color: number, opacity: number, textureKind: CinematicTextureKind = "shaft") {
+  return new THREE.MeshBasicMaterial({
+    color,
+    map: createCinematicTexture(textureKind),
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
+function createCinematicTexture(kind: CinematicTextureKind) {
+  const cached = cinematicTextureCache.get(kind);
+  if (cached) {
+    return cached;
+  }
+
+  const width = 128;
+  const height = kind === "reflection" ? 64 : 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Cinematic texture context unavailable.");
+  }
+  const image = ctx.createImageData(width, height);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const nx = x / (width - 1);
+      const ny = y / (height - 1);
+      const center = 1 - Math.abs(nx - 0.5) * 2;
+      const vertical = kind === "reflection" ? 1 - Math.abs(ny - 0.5) * 2 : Math.sin(ny * Math.PI);
+      const streak = kind === "streak" ? Math.pow(center, 8) * (0.65 + Math.sin(ny * Math.PI * 8) * 0.18) : Math.pow(Math.max(0, center), 1.8);
+      const alpha = Math.max(0, Math.min(1, (kind === "streak" ? streak : streak * Math.pow(Math.max(0, vertical), 1.15))));
+      const offset = (y * width + x) * 4;
+      image.data[offset] = 255;
+      image.data[offset + 1] = 255;
+      image.data[offset + 2] = 255;
+      image.data[offset + 3] = Math.round(alpha * 255);
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  cinematicTextureCache.set(kind, texture);
+  return texture;
+}
+
+function scenePlane(
+  width: number,
+  height: number,
+  material: THREE.Material,
+  x: number,
+  y: number,
+  z: number,
+  rotation: THREE.Euler | [number, number, number] = new THREE.Euler(),
+) {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  mesh.position.set(x, y, z);
+  if (Array.isArray(rotation)) {
+    mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+  } else {
+    mesh.rotation.copy(rotation);
+  }
+  return mesh;
+}
+
+function addCinematicAtmosphere(group: THREE.Group, room: Room, index: number) {
+  const warm = new THREE.Color(room.palette[1]);
+  const cool = new THREE.Color(room.palette[2]);
+  const warmHex = warm.getHex();
+  const coolHex = cool.getHex();
+
+  for (let i = 0; i < 4; i += 1) {
+    const material = cinematicMaterial(i % 2 ? coolHex : warmHex, index === 4 ? 0.062 : 0.04);
+    const shaft = scenePlane(0.58 + i * 0.1, 4.5, material, -4.1 + i * 2.35, 2.72, -1.6 + i * 0.28, [
+      -0.08 + i * 0.025,
+      -0.26 + i * 0.14,
+      0.08 - i * 0.035,
+    ]);
+    shaft.userData.cinematicAtmosphere = true;
+    shaft.userData.lightShaft = true;
+    shaft.userData.baseOpacity = material.opacity;
+    shaft.userData.shaftSeed = i + index * 7;
+    group.add(shaft);
+  }
+
+  for (let i = 0; i < 4; i += 1) {
+    const material = cinematicMaterial(i % 2 ? coolHex : warmHex, 0.032, "reflection");
+    const reflection = scenePlane(1.6 + i * 0.36, 0.22, material, -3.6 + i * 2.25, 0.118, 1.28 + i * 0.2, [-Math.PI / 2, 0, 0.08 - i * 0.04]);
+    reflection.userData.cinematicAtmosphere = true;
+    reflection.userData.floorReflection = true;
+    reflection.userData.baseOpacity = material.opacity;
+    reflection.userData.reflectionSeed = i + index * 5;
+    group.add(reflection);
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    const slatMaterial = cinematicMaterial(i % 2 ? warmHex : coolHex, 0.018 + i * 0.004, "streak");
+    const slat = scenePlane(0.08, 2.6, slatMaterial, -5.7 + i * 2.85, 2.75, -4.18, [0, 0, 0]);
+    slat.userData.cinematicAtmosphere = true;
+    slat.userData.lightShaft = true;
+    slat.userData.baseOpacity = slatMaterial.opacity;
+    slat.userData.shaftSeed = 20 + i + index * 4;
+    group.add(slat);
+  }
+
+  if (index === 2) {
+    const rainMat = cinematicMaterial(0x9ebcff, 0.065, "streak");
+    for (let i = 0; i < 10; i += 1) {
+      const rain = scenePlane(0.035, 1.65, rainMat.clone(), -6 + i * 1.28, 2.45 + Math.sin(i) * 0.16, -3.92, [0, 0, -0.24]);
+      rain.userData.cinematicAtmosphere = true;
+      rain.userData.cinematicRain = true;
+      rain.userData.baseY = rain.position.y;
+      rain.userData.baseOpacity = 0.1;
+      rain.userData.rainSeed = i;
+      group.add(rain);
+    }
+  }
+
+  if (index === 3) {
+    for (let i = 0; i < 7; i += 1) {
+      const neonMat = cinematicMaterial(i % 2 ? warmHex : coolHex, 0.052, "reflection");
+      const neon = scenePlane(0.88, 0.035, neonMat, -5.65 + i * 1.85, 2.15 + (i % 3) * 0.36, -4.06, [0, 0, 0]);
+      neon.userData.cinematicAtmosphere = true;
+      neon.userData.floorReflection = true;
+      neon.userData.baseOpacity = neonMat.opacity;
+      neon.userData.reflectionSeed = 50 + i;
+      group.add(neon);
+    }
+  }
+
+  if (index === 4) {
+    for (let i = 0; i < 6; i += 1) {
+      const gateRayMat = cinematicMaterial(i % 2 ? 0xfff2bd : 0xbddcff, 0.055);
+      const ray = scenePlane(0.32 + i * 0.055, 5.2, gateRayMat, -1.8 + i * 0.72, 2.75, -3.62 + i * 0.05, [
+        -0.1,
+        -0.4 + i * 0.16,
+        -0.08 + i * 0.035,
+      ]);
+      ray.userData.cinematicAtmosphere = true;
+      ray.userData.lightShaft = true;
+      ray.userData.baseOpacity = gateRayMat.opacity;
+      ray.userData.shaftSeed = 80 + i;
+      group.add(ray);
+    }
+  }
 }
 
 function addRoomShell(
@@ -2521,6 +2697,29 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
       object.scale.setScalar(0.92 + Math.sin(elapsedTime * 2 + seed) * 0.08 + focusStrength * 0.34 + unlockProgress * 0.18);
       material.opacity = 0.18 + focusStrength * 0.52 + unlockProgress * 0.18;
       material.emissiveIntensity = 0.45 + focusStrength * 1.1 + unlockProgress * 0.5;
+    }
+    if (object instanceof THREE.Mesh && object.userData.lightShaft) {
+      const material = object.material as THREE.MeshBasicMaterial;
+      const seed = (object.userData.shaftSeed as number | undefined) ?? object.id;
+      const baseOpacity = (object.userData.baseOpacity as number | undefined) ?? 0.08;
+      const shimmer = Math.sin(elapsedTime * 0.72 + seed) * 0.018;
+      material.opacity = baseOpacity + shimmer + unlockProgress * 0.035 + focusStrength * 0.018;
+      object.rotation.z += Math.sin(elapsedTime * 0.35 + seed) * 0.00025;
+      object.scale.x = 1 + Math.sin(elapsedTime * 0.58 + seed) * 0.025;
+    }
+    if (object instanceof THREE.Mesh && object.userData.floorReflection) {
+      const material = object.material as THREE.MeshBasicMaterial;
+      const seed = (object.userData.reflectionSeed as number | undefined) ?? object.id;
+      const baseOpacity = (object.userData.baseOpacity as number | undefined) ?? 0.05;
+      material.opacity = baseOpacity + Math.sin(elapsedTime * 1.1 + seed) * 0.016 + unlockProgress * 0.025;
+      object.scale.x = 1 + Math.sin(elapsedTime * 0.9 + seed) * 0.035;
+    }
+    if (object instanceof THREE.Mesh && object.userData.cinematicRain) {
+      const material = object.material as THREE.MeshBasicMaterial;
+      const seed = (object.userData.rainSeed as number | undefined) ?? object.id;
+      const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;
+      object.position.y = baseY - ((elapsedTime * 0.42 + seed * 0.17) % 0.72);
+      material.opacity = ((object.userData.baseOpacity as number | undefined) ?? 0.1) + Math.sin(elapsedTime * 2.1 + seed) * 0.025;
     }
     if (object instanceof THREE.Mesh && object.userData.scanLine) {
       const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;

@@ -22,6 +22,7 @@
 - Hint system: 3 uses, escalating real-world penalties.
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
 - Graphics quality: top-right HUD cycles cinematic, balanced, and performance modes. The modes cap render pixel ratio and tune bloom, shadows, and dust so high-end machines keep the richer image while weaker devices can lower GPU cost.
+- Cinematic atmosphere: each room now has soft alpha-textured light shafts, floor reflection ribbons, and room-specific rain, night-city, or heaven-gate light layers. Performance mode disables this atmosphere layer.
 - Interaction focus: the active puzzle console has distance-reactive reticle/button styling plus a restrained in-world floor glyph, lock halo, and focus light.
 - Unlock feedback: correct answers trigger latch lift, door seam glow, sliding bolts, hinge/handle motion, gear/dial motion, unlock sparks, and a screen flash.
 - Performance: procedural geometry, cached procedural material textures, shared simple materials, pixel ratio capped by graphics mode, bloom strength kept moderate.
@@ -65,6 +66,7 @@ npm audit --omit=dev
 - interaction focus metadata is exposed through `render_game_to_text`
 - graphics quality metadata is exposed through `render_game_to_text`
 - graphics quality cycling lowers the canvas render buffer in performance mode
+- cinematic atmosphere metadata is exposed through `render_game_to_text`
 - room-clear overlays appear after every non-final room's second solved puzzle
 - all 10 placeholder puzzles still solve after room-transition spawn reset
 - WebGL canvas is not blank on desktop and mobile
