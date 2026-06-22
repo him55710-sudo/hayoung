@@ -402,7 +402,8 @@ function App() {
         nextPuzzle: availablePuzzle?.title ?? (canAdvanceRoom ? "room clear" : blockedPuzzle?.title ?? "none"),
         nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
         cameraMode: "first-person",
-        embodiedView: "Hayoung first-person hands with flashlight and heart key",
+        embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
+        characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
         unlockDetail: "animated latch lift, sliding bolts, glowing door seam, hinges, handle, and unlock sparks",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
@@ -614,8 +615,11 @@ function App() {
 
           <footer className="inventory-dock">
             <div className="dock-title">
+              <span className="player-avatar" aria-hidden="true">
+                <span />
+              </span>
+              <span className="player-name">하영</span>
               <Backpack aria-hidden="true" />
-              Inventory
             </div>
             <div className="item-slots">
               {Array.from({ length: 10 }).map((_, index) => (
@@ -1651,6 +1655,8 @@ function addDoorAssembly(group: THREE.Group, room: Room, accentMaterial: THREE.M
 }
 
 function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
+  addThemedClueCluster(group, room, index);
+
   if (index === 0) {
     addCurtainWindow(group, room, -5.45, 2.55, -4.35);
     addVines(group, room, -4.2, 3.7, -4.38, 18);
@@ -1677,6 +1683,101 @@ function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
     addFinalMemoryCorridor(group, room);
     addLightBeams(group, room);
   }
+}
+
+function addThemedClueCluster(group: THREE.Group, room: Room, index: number) {
+  const wood = mat(0x5a3827, { roughness: 0.62, metalness: 0.04, texture: "wood", textureRepeat: [1.2, 0.8], textureSeed: 940 + index });
+  const accent = mat(room.palette[1], { roughness: 0.36, metalness: 0.16, emissive: room.palette[1], emissiveIntensity: 0.18 });
+  const glow = mat(room.palette[2], { roughness: 0.24, metalness: 0.08, emissive: room.palette[2], emissiveIntensity: 0.36 });
+  const paper = mat(0xffedcf, { roughness: 0.82, texture: "paper", textureSeed: 950 + index });
+  const shadow = mat(room.palette[3], { roughness: 0.78, metalness: 0.02, emissive: room.palette[3], emissiveIntensity: 0.04 });
+
+  const shelf = box(2.55, 0.08, 0.42, wood, -3.85, 1.2, 2.42);
+  shelf.rotation.y = 0.08;
+  group.add(shelf);
+
+  if (index === 0) {
+    const diary = box(0.76, 0.1, 0.5, paper, -4.55, 1.34, 2.42);
+    const ribbon = box(0.68, 0.025, 0.055, accent, -4.55, 1.41, 2.42);
+    const firstPhoto = box(0.48, 0.34, 0.05, glow, -3.78, 1.48, 2.35);
+    firstPhoto.rotation.x = -0.18;
+    firstPhoto.userData.statusLight = true;
+    for (let i = 0; i < 4; i += 1) {
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), i % 2 ? accent : glow);
+      bead.position.set(-3.2 + i * 0.16, 1.36 + Math.sin(i) * 0.035, 2.48);
+      bead.userData.statusLight = true;
+      group.add(bead);
+    }
+    group.add(diary, ribbon, firstPhoto);
+    return;
+  }
+
+  if (index === 1) {
+    [-0.28, 0.28].forEach((offset, i) => {
+      const chair = box(0.28, 0.34, 0.16, accent, -4.18 + offset, 1.39, 2.4);
+      const back = box(0.28, 0.32, 0.045, accent, -4.18 + offset, 1.58, 2.28);
+      back.rotation.x = -0.12;
+      group.add(chair, back);
+      for (let s = 0; s < 2; s += 1) {
+        const steam = box(0.025, 0.26, 0.025, glow, -4.18 + offset + s * 0.06, 1.76 + s * 0.04, 2.43);
+        steam.rotation.z = (i ? -1 : 1) * (0.22 + s * 0.16);
+        steam.userData.statusLight = true;
+        group.add(steam);
+      }
+    });
+    const promiseBand = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.018, 8, 42), glow);
+    promiseBand.position.set(-3.36, 1.42, 2.4);
+    promiseBand.rotation.x = Math.PI / 2;
+    promiseBand.userData.statusLight = true;
+    group.add(promiseBand);
+    return;
+  }
+
+  if (index === 2) {
+    const heartA = box(0.28, 0.28, 0.055, accent, -4.32, 1.46, 2.42);
+    const heartB = box(0.28, 0.28, 0.055, accent, -4.03, 1.4, 2.42);
+    heartA.rotation.z = Math.PI / 4;
+    heartB.rotation.z = Math.PI / 4;
+    heartA.userData.statusLight = true;
+    heartB.userData.statusLight = true;
+    group.add(heartA, heartB);
+    for (let i = 0; i < 7; i += 1) {
+      const rain = box(0.018, 0.42, 0.018, glow, -3.6 + i * 0.16, 1.34 + (i % 3) * 0.12, 2.46);
+      rain.rotation.z = -0.24;
+      rain.userData.statusLight = true;
+      group.add(rain);
+    }
+    const repairThread = box(0.86, 0.026, 0.026, paper, -4.18, 1.68, 2.49);
+    repairThread.rotation.z = 0.18;
+    group.add(repairThread);
+    return;
+  }
+
+  if (index === 3) {
+    for (let i = 0; i < 6; i += 1) {
+      const note = box(0.36, 0.025, 0.26, i % 2 ? paper : shadow, -4.68 + i * 0.32, 1.32 + Math.sin(i) * 0.04, 2.42 + Math.cos(i) * 0.04);
+      note.rotation.y = Math.sin(i) * 0.7;
+      note.rotation.z = Math.cos(i * 1.4) * 0.18;
+      group.add(note);
+    }
+    const bridge = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.02, 8, 44, Math.PI), glow);
+    bridge.position.set(-3.6, 1.48, 2.42);
+    bridge.rotation.set(0, 0, Math.PI);
+    bridge.userData.statusLight = true;
+    group.add(bridge);
+    return;
+  }
+
+  const compassBase = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.065, 40), accent);
+  compassBase.position.set(-4.2, 1.36, 2.42);
+  compassBase.rotation.x = Math.PI / 2;
+  const compassNeedle = box(0.72, 0.04, 0.04, glow, -4.2, 1.39, 2.36);
+  compassNeedle.rotation.z = -0.42;
+  compassNeedle.userData.statusLight = true;
+  const futureRibbon = box(1.0, 0.04, 0.04, paper, -3.32, 1.54, 2.42);
+  futureRibbon.rotation.z = 0.2;
+  futureRibbon.userData.statusLight = true;
+  group.add(compassBase, compassNeedle, futureRibbon);
 }
 
 function addCurtainWindow(group: THREE.Group, room: Room, x: number, y: number, z: number) {
@@ -1907,6 +2008,40 @@ function createFirstPersonRig(): FirstPersonRig {
   const darkMetal = mat(0x20242c, { roughness: 0.28, metalness: 0.78, texture: "metal", textureSeed: 702 });
   const brass = mat(0xd8ab66, { roughness: 0.35, metalness: 0.74, emissive: 0xf7be6d, emissiveIntensity: 0.08, texture: "metal", textureSeed: 703 });
   const glow = mat(0xffedbd, { roughness: 0.16, metalness: 0.12, emissive: 0xffe7a8, emissiveIntensity: 0.8 });
+  const hairMat = mat(0x241716, { roughness: 0.72, metalness: 0.02, texture: "fabric", textureRepeat: [1.8, 1.2], textureSeed: 704 });
+  const skirtMat = mat(0x31213a, { roughness: 0.8, metalness: 0.02, emissive: 0x211526, emissiveIntensity: 0.05, texture: "fabric", textureRepeat: [1.2, 1.2], textureSeed: 705 });
+  const nameTagMat = mat(0xfff3cf, { roughness: 0.36, metalness: 0.18, emissive: 0xffd28c, emissiveIntensity: 0.18 });
+
+  for (let i = 0; i < 5; i += 1) {
+    const strand = new THREE.Mesh(new THREE.CapsuleGeometry(0.018 + i * 0.002, 0.28 + i * 0.018, 5, 8), hairMat);
+    strand.position.set(-0.46 + i * 0.09, -0.48 + Math.sin(i) * 0.025, -0.42 - i * 0.018);
+    strand.rotation.set(0.3 + i * 0.035, -0.16 + i * 0.08, -0.18 + i * 0.12);
+    strand.userData.hairStrand = true;
+    strand.userData.baseX = strand.position.x;
+    strand.userData.baseY = strand.position.y;
+    strand.userData.baseZ = strand.position.z;
+    strand.userData.baseRotationZ = strand.rotation.z;
+    strand.userData.seed = i;
+    group.add(strand);
+  }
+
+  const skirtHem = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.72, 0.22, 5, 1, true), skirtMat);
+  skirtHem.position.set(0, -0.64, -0.22);
+  skirtHem.rotation.set(0.14, 0, Math.PI / 5);
+  skirtHem.scale.set(1, 0.55, 0.7);
+  skirtHem.userData.skirtHem = true;
+  group.add(skirtHem);
+
+  const nameCharm = new THREE.Group();
+  nameCharm.position.set(0.02, -0.47, -0.62);
+  nameCharm.rotation.set(0.08, 0.04, -0.03);
+  nameCharm.userData.nameCharm = true;
+  const charmPlate = box(0.31, 0.095, 0.022, nameTagMat, 0, 0, 0);
+  const charmLeft = box(0.035, 0.052, 0.025, brass, -0.062, 0, 0.02);
+  const charmRight = box(0.035, 0.052, 0.025, brass, 0.062, 0, 0.02);
+  const charmCenter = box(0.022, 0.07, 0.025, glow, 0, 0, 0.024);
+  nameCharm.add(charmPlate, charmLeft, charmRight, charmCenter);
+  group.add(nameCharm);
 
   const leftForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.105, 0.58, 18), sleeve);
   leftForearm.position.set(-0.36, -0.24, -0.28);
@@ -2029,6 +2164,30 @@ function animateFirstPersonRig(rig: FirstPersonRig, elapsedTime: number, moving:
   rig.key.rotation.z = -0.3 + Math.sin(elapsedTime * 1.8) * 0.08;
   rig.key.position.y = -0.14 + Math.sin(elapsedTime * 2.1) * 0.018 + unlockKick * 0.035;
   rig.key.scale.setScalar(1 + solvedCount * 0.006 + unlockKick * 0.08);
+
+  rig.group.traverse((object) => {
+    if (object instanceof THREE.Mesh && object.userData.hairStrand) {
+      const seed = (object.userData.seed as number | undefined) ?? object.id;
+      const baseX = (object.userData.baseX as number | undefined) ?? object.position.x;
+      const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;
+      const baseZ = (object.userData.baseZ as number | undefined) ?? object.position.z;
+      const baseRotationZ = (object.userData.baseRotationZ as number | undefined) ?? object.rotation.z;
+      object.position.x = baseX + Math.sin(elapsedTime * 2.1 + seed) * 0.006 + sway * 0.004;
+      object.position.y = baseY + Math.cos(elapsedTime * 1.7 + seed) * 0.006 + unlockKick * 0.012;
+      object.position.z = baseZ + Math.sin(elapsedTime * 1.3 + seed) * 0.004;
+      object.rotation.z = baseRotationZ + Math.sin(elapsedTime * 2 + seed) * 0.022 + sway * 0.012;
+    }
+    if (object instanceof THREE.Mesh && object.userData.skirtHem) {
+      object.rotation.y = Math.sin(elapsedTime * 1.6) * 0.025 + sway * 0.012;
+      object.scale.y = 0.55 + lift * 0.012 + unlockKick * 0.02;
+    }
+  });
+
+  const charm = rig.group.children.find((child) => child.userData.nameCharm);
+  if (charm) {
+    charm.rotation.z = -0.03 + Math.sin(elapsedTime * 2.2) * 0.035 + unlockKick * 0.06;
+    charm.position.y = -0.47 + lift * 0.01 + unlockKick * 0.018;
+  }
 }
 
 function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: number, solvedCount: number, phase: Phase) {

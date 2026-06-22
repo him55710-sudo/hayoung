@@ -11,7 +11,8 @@
 ## Current Game Decisions
 
 - Camera: first-person, eye-height camera with optional pointer-lock mouse look.
-- Embodiment: desktop first-person hands, flashlight, and heart-key rig; mobile hides the beam and keeps controls clear.
+- Embodiment: desktop first-person hands, flashlight, heart-key, hair strands, skirt silhouette, and H/Y name charm; mobile keeps the avatar cue small and hides the flashlight beam to protect controls.
+- Room clue props: each room now has a readable clue shelf, including diary/photo, cafe chairs/ring, broken-heart/rain, notes/bridge, and compass/future-ribbon clusters.
 - Final room: centered spawn, photo corridor, cloud stepping stones, and luminous gate to make the finale read immediately after room transition.
 - Memory assets: six replaceable files in `public/memories` feed both the HTML ending timeline and final-room Three.js photo frames.
 - Puzzle count: 10 total, 2 per room.

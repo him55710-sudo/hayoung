@@ -13,6 +13,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added procedural per-room Web Audio ambience.
 - Added first-person camera, pointer-lock mouse look, desktop/mobile movement, and a center reticle.
 - Added a camera-attached Hayoung first-person hands/flashlight/heart-key rig with movement sway, unlock reaction, and mobile-safe beam hiding.
+- Added stronger Hayoung identity cues: animated hair strands, skirt silhouette, H/Y name charm, and a compact player avatar chip in the inventory HUD.
 - Added a stronger final-room memory corridor with placeholder chronological photo frames, cloud stepping stones, a luminous heaven gate, centered room-transition spawn, and reduced finale bloom clipping.
 - Added six replaceable memory image slots under `public/memories` and connected them to both the ending timeline and final-room 3D photo frames.
 - Added lock-device modal previews for numeric, direction, symbol, and final locks.
@@ -20,6 +21,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Upgraded unlock motion detail with latch/shackle lift, door seam glow, hinge/handle motion, sliding bolts, faster gears, and unlock sparks.
 - Added unlock feedback: ring/bolt/gear/door animation plus screen flash.
 - Added richer procedural room geometry: planks, ceiling beams, desk, lockbox, photo wall, cafe table, rain/cracks, city window, cloud path, light beams, particles.
+- Added room-specific clue prop clusters for diary/photo, cafe promise, rain repair, note bridge, and future compass themes.
 - Upgraded the central lock device into a more tactile control console with direction pads, dial rings, a heart padlock, scanner line, status lights, magnifying-glass prop, diary ribbon, and wood front panels.
 - Added cached procedural wood/plaster/fabric/paper/metal textures plus wall panels, baseboards, crown molding, cable detail, and floor light rails.
 - Converted the playable anniversary copy, final room, final lock answer, docs, and Unreal project scaffold from 400-day to 500-day framing while preserving the existing Vercel project URL.
@@ -36,7 +38,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run build` passes.
 - `npm run verify:game` passes locally.
 - `npm audit --omit=dev` passes with 0 vulnerabilities.
-- Latest visual QA screenshots inspected: `output/playwright/500-ending-memory-timeline-polished.png`, `output/playwright/500-memory-slots-corridor.png`, and `output/playwright/500-unlock-motion-detail.png` (ignored artifacts).
+- Latest visual QA screenshots inspected: `output/playwright/500-player-chip-desktop.png`, `output/playwright/500-player-chip-mobile.png`, `output/playwright/500-ending-memory-timeline-polished.png`, `output/playwright/500-memory-slots-corridor.png`, and `output/playwright/500-unlock-motion-detail.png` (ignored artifacts).
 - Unreal Python toolset compiles with `python -m py_compile`.
 
 ## Known Limitations

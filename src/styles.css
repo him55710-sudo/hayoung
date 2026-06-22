@@ -432,11 +432,41 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
   color: #ffdf9a;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
   font-weight: 800;
+}
+
+.player-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 229, 184, 0.3);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 55%, #ffc6aa 0 28%, transparent 29%),
+    radial-gradient(circle at 50% 38%, #2a1716 0 38%, transparent 39%),
+    linear-gradient(145deg, rgba(255, 111, 124, 0.72), rgba(255, 223, 154, 0.46));
+  box-shadow: 0 0 18px rgba(255, 125, 142, 0.22);
+  flex: 0 0 auto;
+}
+
+.player-avatar span {
+  width: 13px;
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 0 0 10px 10px;
+  background: rgba(49, 33, 58, 0.8);
+}
+
+.player-name {
+  color: #fff8ec;
+  font-weight: 950;
+  letter-spacing: 0;
 }
 
 .item-slots {
@@ -1011,8 +1041,12 @@ button {
   }
 
   .dock-title svg {
-    width: 18px;
-    height: 18px;
+    display: none;
+  }
+
+  .player-avatar {
+    width: 26px;
+    height: 26px;
   }
 
   .item-slots {
