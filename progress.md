@@ -12,6 +12,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added 3 hint penalties: banana milk, 설빙, real escape room.
 - Added procedural per-room Web Audio ambience.
 - Added first-person camera, pointer-lock mouse look, desktop/mobile movement, and a center reticle.
+- Added a camera-attached Hayoung first-person hands/flashlight/heart-key rig with movement sway, unlock reaction, and mobile-safe beam hiding.
 - Added lock-device modal previews for numeric, direction, symbol, and final locks.
 - Added unlock feedback: ring/bolt/gear/door animation plus screen flash.
 - Added richer procedural room geometry: planks, ceiling beams, desk, lockbox, photo wall, cafe table, rain/cracks, city window, cloud path, light beams, particles.
@@ -31,7 +32,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run build` passes.
 - `npm run verify:game` passes locally.
 - `npm audit --omit=dev` passes with 0 vulnerabilities.
-- Latest visual QA screenshots inspected: `output/playwright/500-intro-cinematic-latest.png`, `output/playwright/500-fpv-detail-latest.png`, and `output/playwright/500-fpv-mobile-detail-latest.png` (ignored artifacts).
+- Latest visual QA screenshots inspected: `output/playwright/500-fpv-hands-desktop-tuned.png` and `output/playwright/500-fpv-hands-mobile-clean.png` (ignored artifacts).
 - Unreal Python toolset compiles with `python -m py_compile`.
 
 ## Known Limitations

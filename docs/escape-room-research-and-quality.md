@@ -11,6 +11,7 @@
 ## Current Game Decisions
 
 - Camera: first-person, eye-height camera with optional pointer-lock mouse look.
+- Embodiment: desktop first-person hands, flashlight, and heart-key rig; mobile hides the beam and keeps controls clear.
 - Puzzle count: 10 total, 2 per room.
 - Puzzle forms: numeric lock, direction lock, memory/photo choice, symbol lock, final confirmation.
 - Hint system: 3 uses, escalating real-world penalties.
@@ -26,6 +27,7 @@ Already used:
 - Three.js for WebGL rendering.
 - Three.js postprocessing `EffectComposer`, `RenderPass`, and `UnrealBloomPass`.
 - Three.js `CanvasTexture` for lightweight wood, plaster, fabric, paper, and metal surface detail.
+- Three.js primitive geometry for the current first-person hands, flashlight, heart-key, and beam placeholder before GLB assets arrive.
 - Lucide React for HUD icons.
 - Playwright for the verification harness.
 
@@ -52,6 +54,7 @@ npm audit --omit=dev
 - intro copy appears
 - runaway button actually moves
 - app enters first-person game mode
+- first-person embodied state is exposed through `render_game_to_text`
 - WebGL canvas is not blank on desktop and mobile
 - all 10 placeholder puzzles can be solved
 - ending state is reached

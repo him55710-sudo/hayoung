@@ -327,6 +327,7 @@ function App() {
         nextPuzzle: availablePuzzle?.title ?? (canAdvanceRoom ? "room clear" : blockedPuzzle?.title ?? "none"),
         nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
         cameraMode: "first-person",
+        embodiedView: "Hayoung first-person hands with flashlight and heart key",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -763,6 +764,16 @@ type SceneProps = {
   onNearObject: (label: string) => void;
 };
 
+type FirstPersonRig = {
+  group: THREE.Group;
+  leftHand: THREE.Mesh;
+  rightHand: THREE.Mesh;
+  flashlight: THREE.Group;
+  beam: THREE.Mesh;
+  key: THREE.Group;
+  light: THREE.SpotLight;
+};
+
 function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick, onNearObject }: SceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const movementRef = useRef(movement);
@@ -802,6 +813,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
 
     const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.08, 260);
     camera.position.set(0, 1.65, 3.25);
+    scene.add(camera);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -844,6 +856,9 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     const dust = createDustField();
     scene.add(dust);
 
+    const firstPersonRig = createFirstPersonRig();
+    camera.add(firstPersonRig.group);
+
     const player = {
       position: new THREE.Vector3(0, 1.65, 3.25),
       yaw: 0,
@@ -860,6 +875,11 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     const resize = () => {
       const width = mount.clientWidth;
       const height = mount.clientHeight;
+      const narrowView = width < 700 || width / height < 0.72;
+      firstPersonRig.group.userData.baseY = narrowView ? -1.04 : -0.78;
+      firstPersonRig.group.userData.baseZ = narrowView ? -1.2 : -1.05;
+      firstPersonRig.group.userData.baseScale = narrowView ? 0.34 : 0.58;
+      firstPersonRig.beam.visible = !narrowView;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
@@ -884,6 +904,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
 
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(mount);
+    resize();
 
     const step = (delta: number) => {
       elapsedTime += delta;
@@ -923,6 +944,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
         unlockStartedAt = elapsedTime;
       }
       const unlockProgress = THREE.MathUtils.clamp((elapsedTime - unlockStartedAt) / 1.2, 0, 1);
+      animateFirstPersonRig(firstPersonRig, elapsedTime, velocity.lengthSq() > 0, unlockProgress, solvedRef.current);
 
       roomGroups.forEach((group, index) => {
         const visible = Math.abs(index - roomIndexRef.current) <= 1;
@@ -1494,6 +1516,145 @@ function createDustField() {
     group.add(particle);
   }
   return group;
+}
+
+function createFirstPersonRig(): FirstPersonRig {
+  const group = new THREE.Group();
+  group.name = "Hayoung_FirstPerson_Rig";
+  group.position.set(0, -0.78, -1.05);
+  group.scale.setScalar(0.58);
+  group.userData.baseY = -0.78;
+  group.userData.baseZ = -1.05;
+  group.userData.baseScale = 0.58;
+
+  const skin = mat(0xffc7a8, { roughness: 0.76, metalness: 0.02 });
+  const sleeve = mat(0xf17088, { roughness: 0.86, texture: "fabric", textureRepeat: [1.4, 1.4], textureSeed: 701 });
+  const cuff = mat(0xffe0b5, { roughness: 0.62, metalness: 0.05 });
+  const darkMetal = mat(0x20242c, { roughness: 0.28, metalness: 0.78, texture: "metal", textureSeed: 702 });
+  const brass = mat(0xd8ab66, { roughness: 0.35, metalness: 0.74, emissive: 0xf7be6d, emissiveIntensity: 0.08, texture: "metal", textureSeed: 703 });
+  const glow = mat(0xffedbd, { roughness: 0.16, metalness: 0.12, emissive: 0xffe7a8, emissiveIntensity: 0.8 });
+
+  const leftForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.105, 0.58, 18), sleeve);
+  leftForearm.position.set(-0.36, -0.24, -0.28);
+  leftForearm.rotation.set(0.34, 0.16, -0.68);
+  const rightForearm = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.11, 0.62, 18), sleeve);
+  rightForearm.position.set(0.37, -0.25, -0.3);
+  rightForearm.rotation.set(0.3, -0.1, 0.62);
+
+  const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), skin);
+  leftHand.scale.set(1.26, 0.72, 0.78);
+  leftHand.position.set(-0.25, -0.17, -0.55);
+  leftHand.rotation.set(0.1, 0.14, -0.24);
+  const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 12), skin);
+  rightHand.scale.set(1.18, 0.74, 0.82);
+  rightHand.position.set(0.28, -0.18, -0.55);
+  rightHand.rotation.set(0.1, -0.08, 0.18);
+
+  [-0.08, -0.025, 0.03].forEach((offset, index) => {
+    const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.022, 0.11, 4, 8), skin);
+    finger.position.set(-0.24 + offset, -0.18 - index * 0.003, -0.68);
+    finger.rotation.set(1.04, 0.02, -0.12 + index * 0.1);
+    group.add(finger);
+  });
+
+  const leftCuff = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.012, 8, 24), cuff);
+  leftCuff.position.set(-0.34, -0.2, -0.42);
+  leftCuff.rotation.set(0.28, 0.22, 0.9);
+  const rightCuff = leftCuff.clone();
+  rightCuff.position.set(0.35, -0.2, -0.43);
+  rightCuff.rotation.set(0.28, -0.2, -0.9);
+
+  const flashlight = new THREE.Group();
+  flashlight.position.set(0.26, -0.19, -0.58);
+  flashlight.rotation.set(0.02, -0.08, -0.06);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.094, 0.58, 28), darkMetal);
+  barrel.rotation.x = Math.PI / 2;
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.34, 20), darkMetal);
+  grip.position.set(0.02, -0.11, 0.02);
+  grip.rotation.z = -0.18;
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.105, 0.045, 28), glow);
+  lens.position.set(0, 0, -0.32);
+  lens.rotation.x = Math.PI / 2;
+  flashlight.add(barrel, grip, lens);
+
+  const beamMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffe8b3,
+    transparent: true,
+    opacity: 0.05,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.55, 32, 1, true), beamMaterial);
+  beam.position.set(0.26, -0.2, -1.5);
+  beam.rotation.x = -Math.PI / 2;
+  beam.userData.flashlightBeam = true;
+
+  const light = new THREE.SpotLight(0xffe0aa, 0.62, 7.2, 0.4, 0.72, 1.1);
+  light.position.set(0.26, -0.18, -0.86);
+  light.target.position.set(0.02, -0.12, -3.0);
+  light.castShadow = false;
+
+  const key = new THREE.Group();
+  key.position.set(-0.28, -0.14, -0.62);
+  key.rotation.set(0.2, 0.22, -0.3);
+  const keyRing = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.012, 10, 34), brass);
+  keyRing.rotation.y = Math.PI / 2;
+  const keyStem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.26, 12), brass);
+  keyStem.position.set(0.13, 0, 0);
+  keyStem.rotation.z = Math.PI / 2;
+  const keyToothA = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.03, 0.018), brass);
+  keyToothA.position.set(0.27, -0.022, 0);
+  const keyToothB = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.052, 0.018), brass);
+  keyToothB.position.set(0.31, 0.026, 0);
+  const heartLeft = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 8), glow);
+  heartLeft.position.set(-0.03, 0.048, 0.012);
+  const heartRight = heartLeft.clone();
+  heartRight.position.x = 0.015;
+  const heartTip = new THREE.Mesh(new THREE.ConeGeometry(0.044, 0.062, 18), glow);
+  heartTip.position.set(-0.008, 0.008, 0.012);
+  heartTip.rotation.z = Math.PI;
+  key.add(keyRing, keyStem, keyToothA, keyToothB, heartLeft, heartRight, heartTip);
+
+  group.add(leftForearm, rightForearm, leftHand, rightHand, leftCuff, rightCuff, flashlight, beam, light, light.target, key);
+
+  return { group, leftHand, rightHand, flashlight, beam, key, light };
+}
+
+function animateFirstPersonRig(rig: FirstPersonRig, elapsedTime: number, moving: boolean, unlockProgress: number, solvedCount: number) {
+  const walkRate = moving ? 8.2 : 1.8;
+  const sway = Math.sin(elapsedTime * walkRate);
+  const lift = Math.cos(elapsedTime * walkRate * 0.5);
+  const unlockKick = easeOutCubic(unlockProgress);
+  const baseY = (rig.group.userData.baseY as number | undefined) ?? -0.78;
+  const baseZ = (rig.group.userData.baseZ as number | undefined) ?? -1.05;
+  const baseScale = (rig.group.userData.baseScale as number | undefined) ?? 0.58;
+
+  rig.group.position.set(
+    sway * (moving ? 0.018 : 0.006),
+    baseY + lift * (moving ? 0.02 : 0.007) + unlockKick * 0.014,
+    baseZ + Math.sin(elapsedTime * 1.1) * 0.008,
+  );
+  rig.group.scale.setScalar(baseScale + unlockKick * 0.025);
+  rig.group.rotation.set(
+    -0.025 + lift * 0.008,
+    sway * (moving ? 0.025 : 0.01),
+    sway * (moving ? 0.028 : 0.012) + unlockKick * 0.035,
+  );
+
+  rig.leftHand.rotation.z = -0.2 + sway * 0.04 - unlockKick * 0.08;
+  rig.rightHand.rotation.z = 0.18 - sway * 0.035 + unlockKick * 0.05;
+  rig.flashlight.rotation.y = -0.08 + sway * 0.018;
+  rig.flashlight.rotation.x = 0.02 + lift * 0.012;
+
+  const beamMaterial = rig.beam.material as THREE.MeshBasicMaterial;
+  beamMaterial.opacity = 0.035 + Math.sin(elapsedTime * 3.4) * 0.012 + unlockKick * 0.045;
+  rig.light.intensity = 0.52 + Math.sin(elapsedTime * 2.6) * 0.06 + unlockKick * 0.55;
+
+  rig.key.rotation.y = 0.22 + Math.sin(elapsedTime * 2.4) * 0.16 + solvedCount * 0.02;
+  rig.key.rotation.z = -0.3 + Math.sin(elapsedTime * 1.8) * 0.08;
+  rig.key.position.y = -0.14 + Math.sin(elapsedTime * 2.1) * 0.018 + unlockKick * 0.035;
+  rig.key.scale.setScalar(1 + solvedCount * 0.006 + unlockKick * 0.08);
 }
 
 function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: number, solvedCount: number, phase: Phase) {
