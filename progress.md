@@ -62,6 +62,10 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Upgraded the ending into a cleaner heavenly finale with vow stats, halo/aura layers, a cloud-step memory rail, numbered memory cards, and a replay action.
 - Added ending-only HUD suppression so the final letter is not visually competing with game chrome.
 - Extended `scripts/verify-game.mjs` to assert the heavenly ending metadata, wait for ending HUD chrome to fade out, and save desktop/mobile finale screenshots.
+- Used Lazyweb design-improve references for immersive game splash/quest UI patterns, then upgraded the first impression with a cinematic prologue intro stage and denser first-room prologue set dressing.
+- Added first-room prologue arches, photo garland, string bulbs, and a floor light path, then tuned them after screenshot review so the camera is not blocked by the new geometry.
+- Added `.lazyweb/design-improve/prologue-splash-2026-06-23/report.html` with current screenshots and the reference patterns behind this pass.
+- Extended `scripts/verify-game.mjs` to assert prologue set-dressing metadata.
 
 ## Current QA
 
@@ -90,6 +94,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run verify:game` passed after the mobile-control pass; it now checks 10 desktop puzzle solves, ending, graphics quality, mobile canvas pixels, mobile-control metadata, look-pad rotation, and touch movement.
 - Latest heavenly finale screenshots inspected: `output/playwright/500-ending-heavenly-finale-clean.png` and `output/playwright/500-ending-heavenly-finale-mobile-hudless.png`.
 - `npm run verify:game` passed after the heavenly-finale pass; it now checks 10 desktop puzzle solves, ending metadata, ending HUD suppression, graphics quality, mobile canvas pixels, mobile-control metadata, look-pad rotation, and touch movement.
+- Latest prologue screenshots inspected: `output/playwright/500-intro-cinematic-prologue.png`, `output/playwright/500-intro-cinematic-prologue-mobile.png`, and `output/playwright/500-room1-prologue-stage-tuned.png`.
+- `npm run verify:game` passed after the prologue pass; it asserts prologue set-dressing metadata in addition to the existing full puzzle, graphics, ending, and mobile-control checks.
+- `develop-web-game` Playwright client ran successfully again for the updated prologue capture at `output/web-game-prologue-stage/shot-0.png`.
 - Windows Computer Use detected a UAC consent window titled `Epic Games Launcher이(가) 사용자 권한을 요청하고 있습니다.` The installer cannot continue until the user manually approves that Windows security prompt.
 
 ## Known Limitations

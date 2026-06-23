@@ -577,6 +577,7 @@ function App() {
         escapeVista: "rear-door escape vista uses themed silhouettes, breadcrumb floor lights, and room-specific portal dressing",
         mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
         endingExperience: "heavenly finale with vow stats, cloud-step memory timeline, photo placeholders, and replay action",
+        prologueSetDressing: "cinematic intro splash plus first-room prologue arches, photo garland, and floor light path",
         mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
@@ -754,9 +755,23 @@ function App() {
       {phase === "intro" && (
         <section className="intro-screen">
           <div className="intro-backdrop" />
+          <div className="intro-stage" aria-hidden="true">
+            <span className="intro-door-slit" />
+            <span className="intro-floor-path" />
+            <span className="intro-photo-strip intro-photo-strip-a" />
+            <span className="intro-photo-strip intro-photo-strip-b" />
+            <span className="intro-sidewall intro-sidewall-left" />
+            <span className="intro-sidewall intro-sidewall-right" />
+          </div>
           <div className="intro-copy">
             <p className="couple-mark">임현수 × 정하영</p>
             <h1>임현수와의 500일을 함께하실 준비가 되셨나요?</h1>
+            <div className="intro-mission-strip" aria-label="게임 구성">
+              <span>5개의 방</span>
+              <span>10개의 잠금</span>
+              <span>힌트 3번</span>
+              <span>500일 엔딩</span>
+            </div>
             <p>버튼은 잠시 망설이다가 마음이 열리면 멈춰요.</p>
             <button
               className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
@@ -2592,6 +2607,7 @@ function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
     addCurtainWindow(group, room, -5.45, 2.55, -4.35);
     addVines(group, room, -4.2, 3.7, -4.38, 18);
     addHeartParticles(group, room, 18);
+    addPrologueMemoryStage(group, room);
   }
 
   if (index === 1) {
@@ -2826,6 +2842,107 @@ function addHeartParticles(group: THREE.Group, room: Room, count: number) {
     heart.userData.float = true;
     group.add(heart);
   }
+}
+
+function addPrologueMemoryStage(group: THREE.Group, room: Room) {
+  const warmWood = mat(0x7a4f32, {
+    roughness: 0.58,
+    metalness: 0.06,
+    emissive: 0x2a170d,
+    emissiveIntensity: 0.05,
+    texture: "wood",
+    textureRepeat: [1.2, 2.4],
+    textureSeed: 1310,
+  });
+  const brass = mat(0xf0b86d, {
+    roughness: 0.34,
+    metalness: 0.54,
+    emissive: 0xffb86d,
+    emissiveIntensity: 0.12,
+    texture: "metal",
+    textureSeed: 1311,
+  });
+  const photoPaper = mat(0xffecd5, {
+    roughness: 0.82,
+    emissive: 0xffd7a0,
+    emissiveIntensity: 0.08,
+    texture: "paper",
+    textureSeed: 1312,
+  });
+  const ribbon = mat(room.palette[1], {
+    roughness: 0.66,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.22,
+    transparent: true,
+    opacity: 0.86,
+  });
+  const glow = mat(room.palette[2], {
+    roughness: 0.28,
+    metalness: 0.08,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.7,
+    transparent: true,
+    opacity: 0.62,
+  });
+
+  for (let i = 0; i < 4; i += 1) {
+    const z = -3.15 + i * 1.28;
+    const scale = 1 - i * 0.06;
+    const leftPost = box(0.09, 2.7 * scale, 0.11, warmWood, -5.9 + i * 0.42, 2.14, z);
+    const rightPost = box(0.09, 2.7 * scale, 0.11, warmWood, 5.9 - i * 0.42, 2.14, z);
+    const lintel = box(11.4 - i * 0.84, 0.09, 0.11, warmWood, 0, 3.54 - i * 0.08, z);
+    [leftPost, rightPost, lintel].forEach((part) => {
+      part.castShadow = true;
+      part.userData.prologueSetDressing = true;
+      group.add(part);
+    });
+  }
+
+  for (let i = 0; i < 12; i += 1) {
+    const t = i / 11;
+    const x = -4.8 + t * 9.6;
+    const y = 3.02 + Math.sin(t * Math.PI) * 0.28;
+    const hanger = box(0.035, 0.42 + (i % 3) * 0.08, 0.035, brass, x, y - 0.2, -3.62);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07 + (i % 2) * 0.015, 12, 8), glow.clone());
+    bulb.position.set(x, y - 0.46, -3.58);
+    bulb.userData.statusLight = true;
+    bulb.userData.prologueSetDressing = true;
+    hanger.userData.prologueSetDressing = true;
+    group.add(hanger, bulb);
+  }
+
+  for (let i = 0; i < 7; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const row = Math.floor(i / 2);
+    const x = side * (2.2 + row * 0.66);
+    const y = 1.72 + (i % 3) * 0.2;
+    const z = -2.85 + row * 0.62;
+    const frame = box(0.58, 0.72, 0.06, brass, x, y, z);
+    const photo = box(0.46, 0.58, 0.065, photoPaper, x, y, z + 0.04);
+    const tag = box(0.3, 0.035, 0.07, ribbon, x, y - 0.44, z + 0.06);
+    frame.rotation.y = side < 0 ? 0.42 : -0.42;
+    photo.rotation.copy(frame.rotation);
+    tag.rotation.copy(frame.rotation);
+    [frame, photo, tag].forEach((mesh) => {
+      mesh.castShadow = true;
+      mesh.userData.prologueSetDressing = true;
+      group.add(mesh);
+    });
+  }
+
+  for (let i = 0; i < 11; i += 1) {
+    const t = i / 10;
+    const step = new THREE.Mesh(new THREE.CylinderGeometry(0.16 + t * 0.05, 0.23 + t * 0.06, 0.026, 30), glow.clone());
+    step.position.set(-3.75 + t * 7.5, 0.16, 2.22 - t * 5.4);
+    step.scale.set(1.65 - t * 0.28, 1, 0.52 + t * 0.18);
+    step.rotation.y = -0.7 + Math.sin(i * 0.9) * 0.08;
+    step.userData.prologueSetDressing = true;
+    group.add(step);
+  }
+
+  const stageLight = new THREE.PointLight(room.palette[1], 1.25, 6.4);
+  stageLight.position.set(0, 2.9, -2.3);
+  group.add(stageLight);
 }
 
 function addCafeTable(group: THREE.Group, room: Room) {

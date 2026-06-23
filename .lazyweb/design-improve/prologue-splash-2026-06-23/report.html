@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Design Improvement: 500-day Prologue Splash</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f6f8fb;
+        color: #18202f;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.65;
+      }
+
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 48px 22px 72px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+      }
+
+      .callout {
+        border: 1px solid #bad7ff;
+        border-radius: 8px;
+        background: #eaf4ff;
+        padding: 18px;
+      }
+
+      figure {
+        margin: 24px 0;
+      }
+
+      img {
+        display: block;
+        width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 16px 40px rgba(24, 32, 47, 0.18);
+      }
+
+      figcaption,
+      li {
+        color: #465267;
+      }
+
+      code,
+      pre {
+        border-radius: 8px;
+        background: #101828;
+        color: #e6edf7;
+      }
+
+      pre {
+        overflow-x: auto;
+        padding: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Design Improvement: 500-day Prologue Splash</h1>
+      <section class="callout">
+        <strong>TL;DR</strong>
+        <p>
+          The next highest-impact improvement was the first impression: make the intro and first room feel like an
+          actual playable escape-game scene, not a decorative web card.
+        </p>
+      </section>
+
+      <h2>Current State After This Pass</h2>
+      <figure>
+        <img src="references/current-intro.png" alt="Updated cinematic intro screen" />
+        <figcaption>Updated intro: full-screen escape corridor, door slit, photo strips, mission chips, and evasive button.</figcaption>
+      </figure>
+      <figure>
+        <img src="references/current-room1.png" alt="Updated first room prologue stage" />
+        <figcaption>Updated room 1: extra prologue arches, photo garland, string lights, and floor light path.</figcaption>
+      </figure>
+
+      <h2>Lazyweb Reference Patterns Used</h2>
+      <ul>
+        <li>
+          Fast Travel Games: immersive VR studio welcome screen with a full-scene background and minimal overlaid text.
+        </li>
+        <li>
+          Bigscreen VR: strong first-viewport immersion using a scene transition instead of a plain panel.
+        </li>
+        <li>
+          Sundial quest guide: clear quest framing and persistent progress affordances for game-like flows.
+        </li>
+        <li>
+          Rooms.xyz challenge result: use modal/confirmation states sparingly so the background still carries the world.
+        </li>
+      </ul>
+
+      <h2>Implemented Ideas</h2>
+      <h3>1. Make The Intro A Stage</h3>
+      <p>
+        Added a full-screen corridor, light slit, floor path, and angled memory strips behind the title so the first
+        screen feels like a door into the escape game.
+      </p>
+      <pre><code>[door light]
+   title + mission chips
+        [heart start]
+    perspective floor path</code></pre>
+
+      <h3>2. Give Room 1 Depth Cues</h3>
+      <p>
+        Added non-blocking arches, photo garlands, bulbs, and light steps so the first room has foreground, middle, and
+        background layers without requiring heavy external 3D assets.
+      </p>
+
+      <h3>3. Keep The HUD Useful But Secondary</h3>
+      <p>
+        The existing objective HUD stays, but the room itself now has more readable visual interest so the UI is not
+        carrying all the game feel.
+      </p>
+
+      <h2>Next Design Risks</h2>
+      <ul>
+        <li>Room 1 is denser now; imported GLB props should replace some procedural blocks later.</li>
+        <li>The intro is more cinematic, but real couple photos will make it feel less generic.</li>
+        <li>Performance remains acceptable in this pass, but imported assets should use Draco/KTX2 compression.</li>
+      </ul>
+    </main>
+  </body>
+</html>
