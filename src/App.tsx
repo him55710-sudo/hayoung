@@ -31,6 +31,7 @@ type GraphicsQuality = "cinematic" | "balanced" | "performance";
 type MovementState = { forward: boolean; back: boolean; left: boolean; right: boolean };
 type LookInput = { yawDelta: number; pitchDelta: number; active: boolean; tick: number };
 type TouchControlState = MovementState & { yawDelta: number; pitchDelta: number; lookActive: boolean; tick: number };
+type HintPenalty = { id: string; label: string; shortLabel: string; detail: string; tone: string };
 
 type Room = {
   id: number;
@@ -430,7 +431,29 @@ const puzzles: Puzzle[] = [
   },
 ];
 
-const hintPenalties = ["현수한테 바나나우유 사주기", "현수한테 설빙 사주기", "현수랑 방탈출 하러가기"];
+const hintPenalties: HintPenalty[] = [
+  {
+    id: "banana",
+    label: "현수한테 바나나우유 사주기",
+    shortLabel: "바나나우유",
+    detail: "첫 힌트 영수증",
+    tone: "banana",
+  },
+  {
+    id: "bingsu",
+    label: "현수한테 설빙 사주기",
+    shortLabel: "설빙",
+    detail: "두 번째 힌트 계약",
+    tone: "bingsu",
+  },
+  {
+    id: "escape",
+    label: "현수랑 방탈출 하러가기",
+    shortLabel: "방탈출 데이트",
+    detail: "최종 벌칙 예약권",
+    tone: "escape",
+  },
+];
 
 function normalizePuzzleAnswer(puzzle: Puzzle, value: string) {
   const compact = value.toUpperCase().replace(/\s+/g, "");
@@ -485,6 +508,7 @@ function App() {
   const nextPuzzle = availablePuzzle ?? blockedPuzzle;
   const activePuzzle = puzzles.find((puzzle) => puzzle.id === activePuzzleId) ?? null;
   const hintsLeft = Math.max(0, 3 - hintCount);
+  const activeHintPenalty = hintPenalties[hintCount - 1] ?? null;
   const inventory = puzzles.filter((puzzle) => solvedSet.has(puzzle.id)).map((puzzle) => puzzle.reward);
   const canAdvanceRoom = currentRoomPuzzles.every((puzzle) => solvedSet.has(puzzle.id));
   const roomClearVisible = phase === "game" && canAdvanceRoom && roomIndex < rooms.length - 1 && !activePuzzle;
@@ -557,7 +581,10 @@ function App() {
         totalPuzzles: puzzles.length,
         memorySlots: memorySlots.length,
         hintsLeft,
-        penalties: hintPenalties.slice(0, hintCount),
+        penalties: hintPenalties.slice(0, hintCount).map((penalty) => penalty.label),
+        hintPenaltyUX: "three-step penalty contract ticket HUD with stamped hint receipts, active obligation highlight, and non-blocking status copy",
+        activeHintPenalty: activeHintPenalty?.label ?? null,
+        hintPenaltyStage: `${hintCount}/3`,
         nextPuzzle: availablePuzzle?.title ?? (canAdvanceRoom ? "room clear" : blockedPuzzle?.title ?? "none"),
         nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
         roomClearReady: roomClearVisible,
@@ -596,6 +623,7 @@ function App() {
       });
   }, [
     availablePuzzle,
+    activeHintPenalty,
     audioEnabled,
     blockedPuzzle,
     canAdvanceRoom,
@@ -719,12 +747,12 @@ function App() {
 
   function useHint() {
     if (hintCount >= 3) {
-      setMessage("힌트 3번을 모두 썼어요. 이제 하영이의 감으로 가야 합니다.");
+      setMessage("힌트 계약서가 모두 찍혔어요. 이제 남은 건 하영이의 추리력입니다.");
       return;
     }
     const penalty = hintPenalties[hintCount];
     setHintCount((count) => count + 1);
-    setMessage(`힌트 사용! 벌칙: ${penalty}. 지금 문제는 ${availablePuzzle?.kind ?? "마지막"} 장치입니다.`);
+    setMessage(`힌트 계약서 ${hintCount + 1}/3 발급: ${penalty.label}. 현재 장치는 ${availablePuzzle?.title ?? "마지막 문"}입니다.`);
   }
 
   function cycleGraphicsQuality() {
@@ -974,11 +1002,30 @@ function App() {
           )}
 
           {hintCount > 0 && (
-            <aside className="penalty-card">
-              <strong>힌트 벌칙</strong>
-              {hintPenalties.slice(0, hintCount).map((penalty) => (
-                <span key={penalty}>{penalty}</span>
-              ))}
+            <aside className={`penalty-card penalty-card--${activeHintPenalty?.tone ?? "banana"}`} aria-label="힌트 벌칙 계약서">
+              <div className="penalty-card-header">
+                <span>Hint Contract</span>
+                <b>{hintCount}/3</b>
+              </div>
+              <div className="penalty-current">
+                <span>{activeHintPenalty?.detail}</span>
+                <strong>{activeHintPenalty?.label}</strong>
+              </div>
+              <div className="penalty-ticket-list" aria-label="힌트 벌칙 단계">
+                {hintPenalties.map((penalty, index) => {
+                  const used = index < hintCount;
+                  const active = index === hintCount - 1;
+                  return (
+                    <span
+                      className={`penalty-ticket${used ? " is-used" : ""}${active ? " is-active" : ""}`}
+                      key={penalty.id}
+                    >
+                      <i>{index + 1}</i>
+                      <b>{penalty.shortLabel}</b>
+                    </span>
+                  );
+                })}
+              </div>
             </aside>
           )}
 

@@ -74,6 +74,10 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added `window.hayoungDebugHoldUnlock` as a QA-only capture hook so visual tests can hold the success state without slowing production gameplay.
 - Added `.lazyweb/design-improve/unlock-feedback-2026-06-23/report.html` with current unlock-feedback screenshots and reference rationale.
 - Extended `scripts/verify-game.mjs` to assert unlock-feedback metadata and verify every solved puzzle briefly exposes the `OPEN` success state before the modal closes.
+- Used Lazyweb references for quest rewards, achievement unlocks, and dark game status notifications, then upgraded the hint penalties from a text list into a three-step `Hint Contract` ticket HUD.
+- Added structured hint penalty data, active penalty state, stage metadata, desktop/mobile ticket styling, and non-overlapping mobile layering so the hint cost feels like an in-game contract.
+- Added `.lazyweb/design-improve/hint-penalty-2026-06-23/report.html` with current desktop/mobile hint-contract screenshots and reference rationale.
+- Extended `scripts/verify-game.mjs` to click the hint button on desktop and mobile, assert the contract ticket DOM/state, save hint-contract screenshots, and carry the used penalty through the ending state.
 
 ## Current QA
 
@@ -118,6 +122,12 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm audit --omit=dev` passed with 0 vulnerabilities after the unlock-feedback pass.
 - `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-unlock-feedback/shot-0.png`.
 - `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` still reports `EpicInstallerExists: True`, `UnrealEditor` absent, and elevated `msiexec.exe` PID `28632` waiting for the user-approved Epic Games Launcher installation.
+- Latest hint-contract screenshots inspected: `output/playwright/500-hint-penalty-ticket-desktop.png` and `output/playwright/500-hint-penalty-ticket-mobile.png`.
+- `npm run build` passed after the hint-contract pass.
+- `npm run verify:game` passed after the hint-contract pass; it now checks desktop/mobile hint contract state, full desktop puzzle completion, graphics modes, ending state, mobile canvas pixels, and mobile controls.
+- `npm audit --omit=dev` passed with 0 vulnerabilities after the hint-contract pass.
+- Mobile hint-contract layering was rechecked with Playwright DOM/computed styles: card at `x=8, y=246`, decorative stamp `z-index: 0`, ticket layer `z-index: 1`, active text `1바나나우유`.
+- `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-hint-penalty/shot-0.png`.
 
 ## Known Limitations
 

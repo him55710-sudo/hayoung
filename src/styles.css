@@ -1091,15 +1091,141 @@ button {
   right: 18px;
   top: 226px;
   display: grid;
-  gap: 7px;
-  width: 240px;
+  gap: 10px;
+  width: 286px;
   padding: 14px;
-  color: rgba(255, 248, 236, 0.82);
-  font-size: 13px;
+  overflow: hidden;
+  isolation: isolate;
+  color: rgba(255, 248, 236, 0.88);
+  font-size: 12px;
+  background:
+    linear-gradient(135deg, rgba(255, 125, 142, 0.13), transparent 42%),
+    radial-gradient(circle at 88% 8%, rgba(255, 223, 154, 0.22), transparent 5.5rem),
+    rgba(10, 12, 17, 0.7);
 }
 
-.penalty-card strong {
+.penalty-card::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px dashed rgba(255, 223, 154, 0.28);
+  border-radius: 6px;
+}
+
+.penalty-card::after {
+  content: "HINT";
+  position: absolute;
+  right: -12px;
+  bottom: 4px;
+  z-index: 0;
+  transform: rotate(-14deg);
+  pointer-events: none;
+  color: rgba(255, 125, 142, 0.18);
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.penalty-card-header,
+.penalty-current,
+.penalty-ticket-list {
+  position: relative;
+  z-index: 1;
+}
+
+.penalty-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 248, 236, 0.72);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.penalty-card-header b {
+  display: inline-grid;
+  width: 42px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(255, 223, 154, 0.34);
+  border-radius: 999px;
   color: #ffdf9a;
+  background: rgba(255, 223, 154, 0.08);
+}
+
+.penalty-current {
+  display: grid;
+  gap: 4px;
+  padding-right: 22px;
+}
+
+.penalty-current span {
+  color: rgba(255, 207, 215, 0.76);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.penalty-current strong {
+  color: #ffdf9a;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.penalty-ticket-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.penalty-ticket {
+  display: grid;
+  min-height: 48px;
+  gap: 3px;
+  place-items: center;
+  padding: 7px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 6px;
+  color: rgba(255, 248, 236, 0.46);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.penalty-ticket i {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.penalty-ticket b {
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.penalty-ticket.is-used {
+  border-color: rgba(255, 223, 154, 0.3);
+  color: rgba(255, 248, 236, 0.86);
+  background: rgba(255, 223, 154, 0.08);
+}
+
+.penalty-ticket.is-active {
+  border-color: rgba(255, 125, 142, 0.7);
+  color: #fff8ec;
+  box-shadow:
+    0 0 18px rgba(255, 125, 142, 0.22),
+    inset 0 0 16px rgba(255, 223, 154, 0.1);
 }
 
 .room-clear-layer {
@@ -2415,7 +2541,59 @@ button {
   }
 
   .penalty-card {
-    display: none;
+    top: 246px;
+    left: 8px;
+    right: auto;
+    width: min(248px, calc(100vw - 16px));
+    gap: 7px;
+    padding: 11px;
+  }
+
+  .penalty-card::before {
+    inset: 6px;
+  }
+
+  .penalty-card::after {
+    right: -8px;
+    bottom: 0;
+    font-size: 34px;
+  }
+
+  .penalty-card-header {
+    font-size: 9px;
+  }
+
+  .penalty-card-header b {
+    width: 36px;
+    height: 22px;
+  }
+
+  .penalty-current {
+    padding-right: 16px;
+  }
+
+  .penalty-current strong {
+    font-size: 12px;
+  }
+
+  .penalty-current span,
+  .penalty-ticket b {
+    font-size: 9px;
+  }
+
+  .penalty-ticket-list {
+    gap: 4px;
+  }
+
+  .penalty-ticket {
+    min-height: 38px;
+    padding: 5px 3px;
+  }
+
+  .penalty-ticket i {
+    width: 17px;
+    height: 17px;
+    font-size: 9px;
   }
 
   .room-clear-layer {

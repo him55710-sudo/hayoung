@@ -201,6 +201,46 @@ async function verifyGraphicsQuality(page, initialCanvas) {
   };
 }
 
+async function verifyHintPenaltyUX(page, label) {
+  const before = await gameState(page);
+  if (before.hintsLeft !== 3) {
+    throw new Error(`Expected 3 hints before using one: ${JSON.stringify(before)}`);
+  }
+
+  await clickSelector(page, ".icon-actions button[aria-label='힌트 사용']");
+  await page.waitForFunction(
+    () => {
+      const state = JSON.parse(window.render_game_to_text());
+      const card = document.querySelector(".penalty-card");
+      const activeTicket = document.querySelector(".penalty-ticket.is-active");
+      return Boolean(
+        card &&
+          activeTicket &&
+          state.hintsLeft === 2 &&
+          state.hintPenaltyStage === "1/3" &&
+          state.activeHintPenalty?.includes("바나나우유") &&
+          state.hintPenaltyUX?.includes("contract ticket") &&
+          card.querySelectorAll(".penalty-ticket").length === 3 &&
+          activeTicket.textContent?.includes("바나나우유") &&
+          getComputedStyle(card).display !== "none",
+      );
+    },
+    null,
+    { timeout: 5000 },
+  );
+
+  mkdirSync("output/playwright", { recursive: true });
+  await page.screenshot({ path: `output/playwright/500-hint-penalty-ticket-${label}.png`, fullPage: true });
+  const after = await gameState(page);
+  return {
+    beforeHintsLeft: before.hintsLeft,
+    afterHintsLeft: after.hintsLeft,
+    stage: after.hintPenaltyStage,
+    activePenalty: after.activeHintPenalty,
+    ux: after.hintPenaltyUX,
+  };
+}
+
 async function verifyMobileTouchControls(page) {
   await page.waitForFunction(() => window.hayoungCameraState && window.hayoungTouchControls, { timeout: 15000 });
   const before = await page.evaluate(() => ({
@@ -340,6 +380,7 @@ async function main() {
     if (!desktopState.lockConsoleUX?.includes("two-zone puzzle modal")) throw new Error(`Lock console UX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.unlockFeedbackUX?.includes("OPEN readout")) throw new Error(`Unlock feedback UX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
+    const hintCheck = await verifyHintPenaltyUX(desktop, "desktop");
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
     if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
@@ -386,6 +427,8 @@ async function main() {
     if (!mobileCanvas.found || mobileCanvas.varied < minCanvasVariation) throw new Error(`Mobile canvas looks blank: ${JSON.stringify(mobileCanvas)}`);
     log("mobile touch controls");
     const mobileControls = await verifyMobileTouchControls(mobile);
+    log("mobile hint penalty ux");
+    const mobileHintCheck = await verifyHintPenaltyUX(mobile, "mobile");
     log("mobile canvas ok");
     await mobile.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
 
@@ -393,11 +436,13 @@ async function main() {
       url,
       desktopState,
       desktopCanvas,
+      hintCheck,
       graphicsCheck,
       ending,
       mobileState,
       mobileCanvas,
       mobileControls,
+      mobileHintCheck,
     };
     mkdirSync("output/playwright", { recursive: true });
     writeFileSync("output/playwright/verify-result.json", JSON.stringify(result, null, 2));
