@@ -29,6 +29,7 @@
 - Interaction focus: the active puzzle console has distance-reactive reticle/button styling plus a restrained in-world floor glyph, lock halo, and focus light.
 - Unlock feedback: correct answers trigger latch lift, door seam glow, sliding bolts, hinge/handle motion, gear/dial motion, unlock sparks, and a screen flash.
 - Collision: room bounds now include a solid stop-zone around the central puzzle console so the player can approach it without walking through the device.
+- Lived-in set dressing: rooms include floor scuffs, footprints, clue tape, wall tags, shelf props, and room-specific residue so they read less like empty blockouts.
 - Performance: procedural geometry, cached procedural material textures, shared simple materials, pixel ratio capped by graphics mode, bloom strength kept moderate.
 
 ## Open-Source Usage
@@ -73,6 +74,7 @@ npm audit --omit=dev
 - cinematic atmosphere metadata is exposed through `render_game_to_text`
 - cinematic camera, screen post-FX, and central console collision metadata are exposed through `render_game_to_text`
 - calm HUD metadata is exposed through `render_game_to_text`
+- lived-in environment detail metadata is exposed through `render_game_to_text`
 - room-clear overlays appear after every non-final room's second solved puzzle
 - all 10 placeholder puzzles still solve after room-transition spawn reset
 - WebGL canvas is not blank on desktop and mobile

@@ -448,6 +448,7 @@ function App() {
         unlockDetail: "animated latch lift, sliding bolts, glowing door seam, hinges, handle, and unlock sparks",
         collisionModel: "room bounds plus solid central puzzle console stop-zone",
         hudBehavior: "calm HUD dims secondary panels while moving and restores clarity near interactables",
+        environmentDetail: "lived-in escape room wear: floor scuffs, clue tape, shelf props, wall tags, and room-specific residue",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -1391,6 +1392,7 @@ function createRoom(room: Room, index: number) {
   addPuzzleDesk(group, room, accentMaterial, glowMaterial);
   addDoorAssembly(group, room, accentMaterial, glowMaterial);
   addRoomSpecifics(group, room, index);
+  addLivedInEscapeRoomDetails(group, room, index);
   addCinematicAtmosphere(group, room, index);
 
   const keyLight = new THREE.PointLight(room.palette[1], index === 4 ? 3.6 : 2.15, 13);
@@ -2101,6 +2103,88 @@ function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
     addHeavenPath(group, room);
     addFinalMemoryCorridor(group, room);
     addLightBeams(group, room);
+  }
+}
+
+function addLivedInEscapeRoomDetails(group: THREE.Group, room: Room, index: number) {
+  const scuffMaterial = mat(0x15100e, { roughness: 0.92, transparent: true, opacity: index === 4 ? 0.18 : 0.34 });
+  const chalkMaterial = mat(room.palette[2], {
+    roughness: 0.72,
+    emissive: room.palette[2],
+    emissiveIntensity: index === 4 ? 0.32 : 0.13,
+    transparent: true,
+    opacity: index === 4 ? 0.42 : 0.3,
+  });
+  const tapeMaterial = mat(room.palette[1], {
+    roughness: 0.74,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.08,
+    transparent: true,
+    opacity: 0.74,
+  });
+  const paperMaterial = mat(0xffeed2, { roughness: 0.86, texture: "paper", textureSeed: 1160 + index });
+  const shelfMaterial = mat(0x4b3023, { roughness: 0.68, metalness: 0.04, texture: "wood", textureRepeat: [1.4, 0.7], textureSeed: 1170 + index });
+  const accentMaterial = mat(room.palette[1], { roughness: 0.42, metalness: 0.12, emissive: room.palette[1], emissiveIntensity: 0.18 });
+
+  for (let i = 0; i < 20; i += 1) {
+    const scratch = box(0.38 + (i % 5) * 0.15, 0.01, 0.025 + (i % 3) * 0.012, scuffMaterial, -6.1 + ((i * 43) % 122) / 10, 0.126, -3.05 + ((i * 29) % 66) / 10);
+    scratch.rotation.y = Math.sin(index * 1.7 + i * 0.91) * 1.45;
+    scratch.userData.livedInDetail = true;
+    group.add(scratch);
+  }
+
+  for (let i = 0; i < 9; i += 1) {
+    const footprint = new THREE.Mesh(new THREE.CircleGeometry(0.105 + (i % 2) * 0.025, 16), scuffMaterial.clone());
+    footprint.position.set(-3.4 + i * 0.72, 0.136, 2.05 - i * 0.28 + Math.sin(i) * 0.1);
+    footprint.scale.set(0.62, 1.0, 1);
+    footprint.rotation.set(-Math.PI / 2, 0, -0.34 + i * 0.08);
+    footprint.userData.livedInDetail = true;
+    group.add(footprint);
+  }
+
+  for (let i = 0; i < 8; i += 1) {
+    const mark = box(0.42 + (i % 3) * 0.18, 0.028, 0.026, chalkMaterial, -5.8 + i * 1.34, 1.62 + (i % 4) * 0.44, -4.205);
+    mark.rotation.z = -0.32 + Math.sin(i * 1.2) * 0.3;
+    mark.userData.livedInDetail = true;
+    group.add(mark);
+
+    const tape = box(0.22, 0.045, 0.028, tapeMaterial, mark.position.x - 0.22, mark.position.y + 0.12, -4.18);
+    tape.rotation.z = 0.18 + Math.sin(i) * 0.25;
+    tape.userData.livedInDetail = true;
+    group.add(tape);
+  }
+
+  [-5.62, 5.78].forEach((x, sideIndex) => {
+    const shelf = box(1.62, 0.08, 0.42, shelfMaterial, x, 1.48 + sideIndex * 0.55, -3.24 + sideIndex * 0.12);
+    shelf.rotation.y = sideIndex === 0 ? 0.48 : -0.48;
+    shelf.userData.livedInDetail = true;
+    group.add(shelf);
+
+    for (let i = 0; i < 4; i += 1) {
+      const prop = box(0.18 + (i % 2) * 0.08, 0.16 + (i % 3) * 0.08, 0.16, i % 2 ? paperMaterial : accentMaterial, x + (sideIndex === 0 ? 0.14 + i * 0.27 : -0.14 - i * 0.27), shelf.position.y + 0.15, shelf.position.z + 0.05);
+      prop.rotation.y = shelf.rotation.y + Math.sin(i) * 0.2;
+      prop.userData.livedInDetail = true;
+      prop.userData.statusLight = i === 3;
+      group.add(prop);
+    }
+  });
+
+  const residueMaterial = mat(index === 4 ? 0xfff5c7 : room.palette[2], {
+    roughness: 0.5,
+    emissive: index === 4 ? 0xffe4a5 : room.palette[2],
+    emissiveIntensity: index === 4 ? 0.38 : 0.18,
+    transparent: true,
+    opacity: index === 4 ? 0.52 : 0.38,
+  });
+
+  for (let i = 0; i < 12; i += 1) {
+    const shape = index === 2 ? new THREE.CylinderGeometry(0.12 + (i % 3) * 0.05, 0.16 + (i % 3) * 0.06, 0.012, 18) : new THREE.BoxGeometry(0.16 + (i % 4) * 0.08, 0.012, 0.06 + (i % 3) * 0.035);
+    const residue = new THREE.Mesh(shape, residueMaterial.clone());
+    residue.position.set(-5.25 + ((i * 47) % 105) / 10, 0.148, -2.8 + ((i * 31) % 58) / 10);
+    residue.rotation.y = Math.sin(i * 1.7 + index) * 1.7;
+    residue.userData.livedInDetail = true;
+    if (index === 4) residue.userData.statusLight = true;
+    group.add(residue);
   }
 }
 

@@ -46,6 +46,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added a cinematic camera/post-FX pass: subtle first-person camera roll, focus-distance FOV breathing, room/unlock-aware ACES exposure ramping, soft vignette, fine film grain, and scanline texture.
 - Added a solid central puzzle-console stop-zone so players can approach the lock device without walking through it.
 - Added calm HUD behavior: secondary panels dim during movement and restore near interactables/hover, keeping the lock device and room art visually dominant while walking.
+- Added lived-in room set dressing: floor scuffs, footprints, clue tape, wall tags, shelf props, and room-specific residue across the five rooms.
 
 ## Current QA
 
@@ -60,6 +61,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Latest cinematic atmosphere screenshots inspected: `output/playwright/500-cinematic-atmosphere-room1-soft.png`, `output/playwright/500-cinematic-atmosphere-room3-rain-soft.png`, `output/playwright/500-cinematic-atmosphere-room5-heaven-soft.png`, and `output/playwright/500-cinematic-atmosphere-mobile-soft.png`.
 - Latest post-FX/collision screenshots inspected: `output/playwright/500-postfx-collision-establishing.png`, `output/playwright/500-postfx-collision-focus-live.png`, and `output/playwright/500-postfx-mobile.png`.
 - Latest calm HUD screenshots inspected: `output/playwright/500-calm-hud-moving-desktop.png` and `output/playwright/500-calm-hud-moving-mobile.png`.
+- Latest lived-in detail screenshots inspected: `output/playwright/500-lived-in-details-room1-confirmed.png` and `output/playwright/500-lived-in-details-room5-confirmed.png`.
 - Windows Computer Use detected a UAC consent window titled `Epic Games Launcher이(가) 사용자 권한을 요청하고 있습니다.` The installer cannot continue until the user manually approves that Windows security prompt.
 
 ## Known Limitations
