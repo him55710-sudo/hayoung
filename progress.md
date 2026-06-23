@@ -50,6 +50,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added a cinematic room-transition veil for major room/ending transitions: viewport-level letterbox bars, a bright horizontal energy slit, particle-like sweep lines, and animation-end cleanup so the effect survives heavy Three.js frames without blocking puzzle input.
 - Split short puzzle unlock feedback from full room-transition VFX so ordinary lock solves stay responsive while room changes still feel cinematic.
 - Hardened `scripts/verify-game.mjs` again: canvas waits now use `attached`, desktop rendering is parked before mobile verification, close timeout logging no longer false-positives, and successful runs write `output/playwright/verify-result.json`.
+- Added a case-file objective HUD: current lock status, next clue title/detail, room solve meter, and compact mobile strip so the player always knows what to inspect next.
+- Added a lock-status rail inside puzzle modals showing the room date range, lock relationship, and answer progress.
+- Extended `scripts/verify-game.mjs` to assert objective tracker metadata.
 
 ## Current QA
 
@@ -66,6 +69,8 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Latest calm HUD screenshots inspected: `output/playwright/500-calm-hud-moving-desktop.png` and `output/playwright/500-calm-hud-moving-mobile.png`.
 - Latest lived-in detail screenshots inspected: `output/playwright/500-lived-in-details-room1-confirmed.png` and `output/playwright/500-lived-in-details-room5-confirmed.png`.
 - Latest transition VFX screenshot inspected: `output/playwright/500-transition-vfx-immediate.png`.
+- Latest case-file HUD screenshots inspected: `output/playwright/500-case-file-hud-desktop.png`, `output/playwright/500-case-file-puzzle-modal.png`, and `output/playwright/500-case-file-hud-mobile.png`.
+- `develop-web-game` Playwright client ran successfully for the intro fallback capture at `output/web-game-case-file/shot-0.png`; gameplay-specific coverage remains in `npm run verify:game`.
 - `npm run verify:game` passed after the transition split; it solved all 10 desktop puzzles, reached the ending, checked graphics quality modes, and verified mobile canvas pixels. Result file: `output/playwright/verify-result.json`.
 - Windows Computer Use detected a UAC consent window titled `Epic Games Launcher이(가) 사용자 권한을 요청하고 있습니다.` The installer cannot continue until the user manually approves that Windows security prompt.
 

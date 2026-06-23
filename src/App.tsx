@@ -452,6 +452,7 @@ function App() {
         hudBehavior: "calm HUD dims secondary panels while moving and restores clarity near interactables",
         environmentDetail: "lived-in escape room wear: floor scuffs, clue tape, shelf props, wall tags, and room-specific residue",
         transitionVfx: "cinematic room transition veil with letterbox bars, energy slit, and particle sparks",
+        objectiveTracker: "case-file HUD shows current lock status, next clue, room solve meter, and puzzle input progress",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -592,6 +593,27 @@ function App() {
   const roomProgress = `${roomIndex + 1}/${rooms.length}`;
   const puzzleProgress = `${solvedIds.length}/${puzzles.length}`;
   const playerIsMoving = movement.forward || movement.back || movement.left || movement.right;
+  const activeCasePuzzle = activePuzzle ?? availablePuzzle ?? blockedPuzzle;
+  const roomSolvedCount = currentRoomPuzzles.filter((puzzle) => solvedSet.has(puzzle.id)).length;
+  const caseStatus = activePuzzle
+    ? "잠금 장치 조작 중"
+    : roomClearVisible
+      ? "방 클리어"
+      : availablePuzzle
+        ? "다음 장치 감지"
+        : blockedPuzzle
+          ? "연계 단서 필요"
+          : "엔딩 준비";
+  const caseTitle = activeCasePuzzle?.title ?? (roomClearVisible ? `${nextRoomTitle}로 이동` : "모든 단서 정리");
+  const caseDetail = activePuzzle
+    ? activePuzzle.chainNote
+    : availablePuzzle
+      ? availablePuzzle.prompt
+      : blockedPuzzle
+        ? `${blockedPuzzle.title}은 앞 단서를 먼저 이어야 열립니다.`
+        : canAdvanceRoom
+          ? "이 방의 장치가 모두 반응했습니다. 문 앞의 빛을 따라가세요."
+          : currentRoom.mood;
 
   return (
     <main className="site-shell">
@@ -701,6 +723,26 @@ function App() {
             ))}
           </div>
 
+          <aside className="case-file-panel" aria-label="현재 사건 파일">
+            <div className="case-file-heading">
+              <KeyRound aria-hidden="true" />
+              <span>{caseStatus}</span>
+              <b>
+                {roomSolvedCount}/{currentRoomPuzzles.length}
+              </b>
+            </div>
+            <strong>{caseTitle}</strong>
+            <p>{caseDetail}</p>
+            <div className="case-file-meter" aria-hidden="true">
+              {currentRoomPuzzles.map((puzzle) => (
+                <span
+                  key={puzzle.id}
+                  className={solvedSet.has(puzzle.id) ? "is-solved" : activeCasePuzzle?.id === puzzle.id ? "is-current" : ""}
+                />
+              ))}
+            </div>
+          </aside>
+
           <div className="message-strip">
             <Sparkles aria-hidden="true" />
             <span>{message}</span>
@@ -782,6 +824,13 @@ function App() {
                 <span>
                   문제 {activePuzzle.id}/10 · {kindLabel(activePuzzle.kind)}
                 </span>
+                <div className="lock-status-rail" aria-hidden="true">
+                  <span>{currentRoom.days}</span>
+                  <b>{activePuzzle.requires?.length ? "연계 잠금" : "첫 단서"}</b>
+                  <span>
+                    {answer.length}/{activePuzzle.answer.length}
+                  </span>
+                </div>
                 <h2>{activePuzzle.title}</h2>
                 <p>{activePuzzle.prompt}</p>
                 <LockPreview kind={activePuzzle.kind} answer={activePuzzle.answer} />
