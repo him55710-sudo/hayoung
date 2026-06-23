@@ -53,6 +53,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added a case-file objective HUD: current lock status, next clue title/detail, room solve meter, and compact mobile strip so the player always knows what to inspect next.
 - Added a lock-status rail inside puzzle modals showing the room date range, lock relationship, and answer progress.
 - Extended `scripts/verify-game.mjs` to assert objective tracker metadata.
+- Added themed rear-door escape vistas for all five rooms: glowing breadcrumb floor lights, room-specific silhouettes, portal dressing, and a pulsing vista light so the exit direction reads as a real game objective.
+- Added child-mounted door face details that rotate with the lock door: recessed panels, metal edges, rivets, and scratches to reduce the flat-card look during unlock animations.
+- Extended `scripts/verify-game.mjs` to assert escape-vista metadata.
 
 ## Current QA
 
@@ -72,6 +75,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Latest case-file HUD screenshots inspected: `output/playwright/500-case-file-hud-desktop.png`, `output/playwright/500-case-file-puzzle-modal.png`, and `output/playwright/500-case-file-hud-mobile.png`.
 - `develop-web-game` Playwright client ran successfully for the intro fallback capture at `output/web-game-case-file/shot-0.png`; gameplay-specific coverage remains in `npm run verify:game`.
 - `npm run verify:game` passed after the transition split; it solved all 10 desktop puzzles, reached the ending, checked graphics quality modes, and verified mobile canvas pixels. Result file: `output/playwright/verify-result.json`.
+- Latest escape-vista screenshot inspected: `output/playwright/500-escape-vista-door-detail.png`.
+- `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-escape-vista/shot-0.png`.
+- `npm run verify:game` passed after the escape-vista pass; it solved all 10 desktop puzzles, reached the ending, checked graphics quality modes, asserted escape-vista metadata, and verified mobile canvas pixels.
 - Windows Computer Use detected a UAC consent window titled `Epic Games Launcher이(가) 사용자 권한을 요청하고 있습니다.` The installer cannot continue until the user manually approves that Windows security prompt.
 
 ## Known Limitations

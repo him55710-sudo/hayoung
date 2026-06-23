@@ -453,6 +453,7 @@ function App() {
         environmentDetail: "lived-in escape room wear: floor scuffs, clue tape, shelf props, wall tags, and room-specific residue",
         transitionVfx: "cinematic room transition veil with letterbox bars, energy slit, and particle sparks",
         objectiveTracker: "case-file HUD shows current lock status, next clue, room solve meter, and puzzle input progress",
+        escapeVista: "rear-door escape vista uses themed silhouettes, breadcrumb floor lights, and room-specific portal dressing",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -1466,6 +1467,7 @@ function createRoom(room: Room, index: number) {
   addPhotoWall(group, room, index);
   addPuzzleDesk(group, room, accentMaterial, glowMaterial);
   addDoorAssembly(group, room, accentMaterial, glowMaterial);
+  addEscapeVista(group, room, index);
   addRoomSpecifics(group, room, index);
   addLivedInEscapeRoomDetails(group, room, index);
   addCinematicAtmosphere(group, room, index);
@@ -2056,6 +2058,47 @@ function addDoorAssembly(group: THREE.Group, room: Room, accentMaterial: THREE.M
   group.add(door);
   group.userData.door = door;
 
+  const insetMaterial = mat(new THREE.Color(room.palette[3]).lerp(new THREE.Color(0x0d0a0a), 0.36).getHex(), {
+    roughness: 0.48,
+    metalness: 0.28,
+    emissive: room.palette[3],
+    emissiveIntensity: 0.08,
+    texture: "metal",
+    textureRepeat: [1.1, 1.1],
+    textureSeed: 1180,
+  });
+  const rivetMaterial = mat(room.palette[2], { roughness: 0.3, metalness: 0.72, emissive: room.palette[2], emissiveIntensity: 0.22 });
+  [-0.78, 0.02, 0.82].forEach((localY, panelIndex) => {
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.5, 0.045), insetMaterial);
+    panel.position.set(0, localY, 0.155);
+    panel.userData.doorFaceDetail = true;
+    door.add(panel);
+
+    const edgeTop = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.035, 0.055), rivetMaterial);
+    edgeTop.position.set(0, localY + 0.28, 0.18);
+    const edgeBottom = edgeTop.clone();
+    edgeBottom.position.y = localY - 0.28;
+    edgeTop.userData.doorFaceDetail = true;
+    edgeBottom.userData.doorFaceDetail = true;
+    door.add(edgeTop, edgeBottom);
+
+    [-0.82, 0.82].forEach((localX, rivetIndex) => {
+      const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), rivetMaterial);
+      rivet.position.set(localX, localY + (rivetIndex === 0 ? 0.18 : -0.18), 0.2);
+      rivet.scale.set(1, 1, 0.46);
+      rivet.userData.doorFaceDetail = true;
+      door.add(rivet);
+    });
+
+    if (panelIndex === 1) {
+      const scratch = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.026, 0.052), rivetMaterial);
+      scratch.position.set(-0.08, localY - 0.03, 0.205);
+      scratch.rotation.z = -0.22;
+      scratch.userData.doorFaceDetail = true;
+      door.add(scratch);
+    }
+  });
+
   const frame = box(2.62, 3.55, 0.12, mat(0x2a211f, { roughness: 0.55, metalness: 0.1 }), 4.95, 1.72, -4.61);
   group.add(frame);
 
@@ -2148,6 +2191,206 @@ function addDoorAssembly(group: THREE.Group, room: Room, accentMaterial: THREE.M
     spark.userData.sparkSeed = i + 40;
     group.add(spark);
   }
+}
+
+function markEscapeGlow(mesh: THREE.Mesh, seed: number) {
+  mesh.userData.escapeVistaGlow = true;
+  mesh.userData.vistaSeed = seed;
+  mesh.userData.baseY = mesh.position.y;
+  mesh.userData.baseScaleX = mesh.scale.x;
+  mesh.userData.baseScaleY = mesh.scale.y;
+  mesh.userData.baseScaleZ = mesh.scale.z;
+  mesh.userData.baseOpacity = (mesh.material as THREE.Material).opacity;
+  return mesh;
+}
+
+function addEscapeVista(group: THREE.Group, room: Room, index: number) {
+  const vista = new THREE.Group();
+  vista.userData.escapeVistaRig = true;
+  vista.userData.vistaSeed = 70 + index * 19;
+
+  const archMaterial = mat(new THREE.Color(room.palette[3]).lerp(new THREE.Color(0x120e0d), 0.4).getHex(), {
+    roughness: 0.58,
+    metalness: 0.22,
+    emissive: room.palette[3],
+    emissiveIntensity: 0.08,
+    texture: "metal",
+    textureRepeat: [0.8, 2.6],
+    textureSeed: 1210 + index,
+  });
+  const glowMaterial = mat(room.palette[2], {
+    roughness: 0.22,
+    metalness: 0.18,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.48,
+    transparent: true,
+    opacity: index === 4 ? 0.66 : 0.46,
+  });
+  const accentMaterial = mat(room.palette[1], {
+    roughness: 0.36,
+    metalness: 0.2,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.18,
+    texture: "metal",
+    textureSeed: 1220 + index,
+  });
+  const paperMaterial = mat(0xffedcf, { roughness: 0.82, texture: "paper", textureSeed: 1230 + index });
+
+  const portalPanel = scenePlane(
+    1.44,
+    2.56,
+    cinematicMaterial(room.palette[2], index === 4 ? 0.095 : 0.045, "reflection"),
+    4.95,
+    1.82,
+    -4.18,
+  );
+  portalPanel.userData.escapeVistaPanel = true;
+  portalPanel.userData.baseOpacity = (portalPanel.material as THREE.MeshBasicMaterial).opacity;
+  portalPanel.userData.vistaSeed = index * 9 + 2;
+  vista.add(portalPanel);
+
+  const archParts = [
+    box(0.18, 2.84, 0.18, archMaterial, 3.54, 1.7, -4.02),
+    box(0.18, 2.84, 0.18, archMaterial, 6.36, 1.7, -4.02),
+    box(3.0, 0.18, 0.18, archMaterial, 4.95, 3.08, -4.02),
+    box(3.28, 0.08, 0.12, glowMaterial.clone(), 4.95, 0.32, -4.0),
+  ];
+  archParts.forEach((part, partIndex) => {
+    part.userData.escapeVistaSolid = true;
+    if (partIndex === 3) markEscapeGlow(part, partIndex + index * 11);
+    vista.add(part);
+  });
+
+  for (let i = 0; i < 8; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const rail = box(0.05, 0.38 + (i % 3) * 0.08, 0.055, glowMaterial.clone(), 4.95 + side * 1.23, 0.78 + Math.floor(i / 2) * 0.47, -3.91);
+    rail.rotation.z = side * (0.08 + i * 0.012);
+    markEscapeGlow(rail, 18 + i + index * 13);
+    vista.add(rail);
+  }
+
+  for (let i = 0; i < 9; i += 1) {
+    const t = (i + 1) / 9;
+    const breadcrumb = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.16, 0.024, 28), glowMaterial.clone());
+    breadcrumb.position.set(0.72 + t * 4.05 + Math.sin(index + i * 0.8) * 0.1, 0.17, 2.14 - t * 5.58);
+    breadcrumb.scale.set(1.24 - t * 0.24, 1, 0.58 + t * 0.34);
+    breadcrumb.rotation.y = -0.63 + Math.sin(i) * 0.04;
+    breadcrumb.userData.escapeBreadcrumb = true;
+    breadcrumb.userData.trailIndex = i;
+    breadcrumb.userData.baseY = breadcrumb.position.y;
+    breadcrumb.userData.baseScaleX = breadcrumb.scale.x;
+    breadcrumb.userData.baseScaleY = breadcrumb.scale.y;
+    breadcrumb.userData.baseScaleZ = breadcrumb.scale.z;
+    breadcrumb.userData.baseOpacity = (breadcrumb.material as THREE.Material).opacity;
+    vista.add(breadcrumb);
+  }
+
+  if (index === 0) {
+    const sun = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.018, 10, 56), glowMaterial.clone());
+    sun.position.set(5.38, 2.5, -3.82);
+    markEscapeGlow(sun, 42);
+    vista.add(sun);
+
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (i / 8) * Math.PI * 2;
+      const ray = box(0.18, 0.018, 0.03, glowMaterial.clone(), 5.38 + Math.cos(angle) * 0.42, 2.5 + Math.sin(angle) * 0.42, -3.8);
+      ray.rotation.z = angle;
+      markEscapeGlow(ray, 44 + i);
+      vista.add(ray);
+    }
+
+    [-0.66, 0.66].forEach((offset, frameIndex) => {
+      const photo = box(0.42, 0.56, 0.055, paperMaterial, 4.95 + offset, 1.88 + frameIndex * 0.18, -3.84);
+      const ribbon = box(0.5, 0.035, 0.06, accentMaterial, 4.95 + offset, photo.position.y - 0.36, -3.79);
+      photo.rotation.z = offset * 0.22;
+      ribbon.rotation.z = photo.rotation.z;
+      vista.add(photo, markEscapeGlow(ribbon, 50 + frameIndex));
+    });
+
+    for (let i = 0; i < 10; i += 1) {
+      const vine = box(0.035, 0.42, 0.035, accentMaterial, 3.72 + (i % 2) * 2.46 + Math.sin(i) * 0.05, 0.78 + i * 0.22, -3.82);
+      vine.rotation.z = (i % 2 ? -1 : 1) * (0.18 + Math.sin(i) * 0.12);
+      vista.add(vine);
+    }
+  } else if (index === 1) {
+    const saucer = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.026, 8, 58), accentMaterial);
+    saucer.position.set(4.95, 1.18, -3.84);
+    saucer.rotation.x = Math.PI / 2;
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.24, 0.48, 28), paperMaterial);
+    cup.position.set(4.95, 1.38, -3.86);
+    vista.add(saucer, cup);
+
+    for (let i = 0; i < 5; i += 1) {
+      const steam = box(0.035, 0.5 + i * 0.035, 0.035, glowMaterial.clone(), 4.65 + i * 0.15, 1.9 + Math.sin(i) * 0.06, -3.78);
+      steam.rotation.z = -0.28 + i * 0.14;
+      markEscapeGlow(steam, 64 + i);
+      vista.add(steam);
+    }
+  } else if (index === 2) {
+    const shield = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.026, 10, 72), glowMaterial.clone());
+    shield.position.set(4.95, 2.0, -3.84);
+    shield.scale.set(0.92, 1.22, 1);
+    markEscapeGlow(shield, 75);
+    vista.add(shield);
+
+    for (let i = 0; i < 5; i += 1) {
+      const bolt = box(0.055, 0.56, 0.055, accentMaterial, 4.76 + i * 0.12, 2.46 - i * 0.25, -3.78);
+      bolt.rotation.z = i % 2 === 0 ? -0.55 : 0.42;
+      markEscapeGlow(bolt, 82 + i);
+      vista.add(bolt);
+    }
+
+    for (let i = 0; i < 14; i += 1) {
+      const rain = box(0.018, 0.36 + (i % 4) * 0.08, 0.018, glowMaterial.clone(), 3.82 + (i % 7) * 0.36, 0.88 + Math.floor(i / 7) * 1.22 + Math.sin(i) * 0.08, -3.76);
+      rain.rotation.z = -0.26;
+      markEscapeGlow(rain, 92 + i);
+      vista.add(rain);
+    }
+  } else if (index === 3) {
+    for (let i = 0; i < 9; i += 1) {
+      const tower = box(0.18 + (i % 3) * 0.08, 0.45 + (i % 4) * 0.18, 0.09, i % 2 ? archMaterial : accentMaterial, 3.82 + i * 0.28, 1.05 + (i % 4) * 0.09, -3.84);
+      vista.add(tower);
+      const light = box(0.06, 0.06, 0.04, glowMaterial.clone(), tower.position.x, tower.position.y + 0.12, -3.77);
+      markEscapeGlow(light, 110 + i);
+      vista.add(light);
+    }
+
+    const bridge = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.024, 8, 64, Math.PI), glowMaterial.clone());
+    bridge.position.set(4.95, 1.58, -3.75);
+    bridge.rotation.z = Math.PI;
+    markEscapeGlow(bridge, 124);
+    vista.add(bridge);
+  } else {
+    for (let i = 0; i < 3; i += 1) {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.78 + i * 0.22, 0.022, 10, 86), glowMaterial.clone());
+      halo.position.set(4.95, 2.05, -3.78 + i * 0.018);
+      halo.rotation.z = i * 0.2;
+      markEscapeGlow(halo, 140 + i);
+      vista.add(halo);
+    }
+
+    for (let i = 0; i < 7; i += 1) {
+      const cloud = new THREE.Mesh(new THREE.SphereGeometry(0.24 + (i % 3) * 0.04, 18, 10), paperMaterial);
+      cloud.position.set(3.88 + i * 0.36, 0.54 + Math.sin(i) * 0.05, -3.64 + Math.cos(i) * 0.08);
+      cloud.scale.set(1.55, 0.36, 0.82);
+      cloud.userData.cloud = true;
+      vista.add(cloud);
+    }
+
+    const vowKey = box(0.82, 0.055, 0.055, accentMaterial, 4.95, 2.92, -3.72);
+    const vowBit = box(0.16, 0.16, 0.05, accentMaterial, 5.34, 2.92, -3.7);
+    const vowRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.022, 8, 38), glowMaterial.clone());
+    vowRing.position.set(4.52, 2.92, -3.68);
+    markEscapeGlow(vowRing, 151);
+    vista.add(vowKey, vowBit, vowRing);
+  }
+
+  const vistaLight = new THREE.PointLight(room.palette[2], index === 4 ? 1.52 : 0.92, index === 4 ? 7 : 5.6);
+  vistaLight.position.set(4.95, 2.1, -3.1);
+  vistaLight.userData.escapeVistaLight = true;
+  group.userData.escapeVistaLight = vistaLight;
+
+  group.add(vista, vistaLight);
 }
 
 function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
@@ -2783,6 +3026,7 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
   const consoleLockBody = group.userData.consoleLockBody as THREE.Mesh | undefined;
   const focusStrength = (group.userData.focusStrength as number | undefined) ?? 0;
   const focusLight = group.userData.focusLight as THREE.PointLight | undefined;
+  const escapeVistaLight = group.userData.escapeVistaLight as THREE.PointLight | undefined;
 
   if (door) {
     door.rotation.y = -0.38 * eased;
@@ -2840,8 +3084,16 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
   if (focusLight) {
     focusLight.intensity = 0.22 + focusStrength * 0.95 + unlockProgress * 0.85;
   }
+  if (escapeVistaLight) {
+    escapeVistaLight.intensity = 1.05 + Math.sin(elapsedTime * 1.6) * 0.16 + unlockProgress * 2.1 + focusStrength * 0.36;
+  }
 
   group.traverse((object) => {
+    if (object.userData.escapeVistaRig) {
+      const seed = (object.userData.vistaSeed as number | undefined) ?? object.id;
+      object.rotation.y = Math.sin(elapsedTime * 0.28 + seed) * 0.012 + unlockProgress * 0.025;
+      object.position.z = Math.sin(elapsedTime * 0.42 + seed) * 0.015 - unlockProgress * 0.035;
+    }
     if (object instanceof THREE.Mesh && object.userData.orb) {
       object.position.y = 1.18 + Math.sin(elapsedTime * 1.8) * 0.045;
     }
@@ -2886,6 +3138,41 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
       object.scale.setScalar(0.92 + Math.sin(elapsedTime * 2 + seed) * 0.08 + focusStrength * 0.34 + unlockProgress * 0.18);
       material.opacity = 0.18 + focusStrength * 0.52 + unlockProgress * 0.18;
       material.emissiveIntensity = 0.45 + focusStrength * 1.1 + unlockProgress * 0.5;
+    }
+    if (object instanceof THREE.Mesh && object.userData.escapeVistaPanel) {
+      const material = object.material as THREE.MeshBasicMaterial;
+      const seed = (object.userData.vistaSeed as number | undefined) ?? object.id;
+      const baseOpacity = (object.userData.baseOpacity as number | undefined) ?? 0.08;
+      material.opacity = baseOpacity + Math.sin(elapsedTime * 0.9 + seed) * 0.024 + unlockProgress * 0.075 + focusStrength * 0.025;
+      object.scale.x = 1 + Math.sin(elapsedTime * 0.52 + seed) * 0.018 + unlockProgress * 0.035;
+      object.scale.y = 1 + Math.sin(elapsedTime * 0.62 + seed) * 0.012 + unlockProgress * 0.025;
+    }
+    if (object instanceof THREE.Mesh && object.userData.escapeBreadcrumb) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const trailIndex = (object.userData.trailIndex as number | undefined) ?? 0;
+      const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;
+      const baseScaleX = (object.userData.baseScaleX as number | undefined) ?? object.scale.x;
+      const baseScaleY = (object.userData.baseScaleY as number | undefined) ?? object.scale.y;
+      const baseScaleZ = (object.userData.baseScaleZ as number | undefined) ?? object.scale.z;
+      const chase = Math.max(0, Math.sin(elapsedTime * 2.35 - trailIndex * 0.48));
+      const unlockPulse = Math.sin(unlockProgress * Math.PI);
+      object.position.y = baseY + chase * 0.018 + unlockPulse * 0.035;
+      object.scale.set(baseScaleX * (1 + chase * 0.055 + unlockProgress * 0.08), baseScaleY, baseScaleZ * (1 + chase * 0.08 + unlockProgress * 0.1));
+      material.opacity = 0.38 + chase * 0.18 + unlockProgress * 0.28 + focusStrength * 0.06;
+      material.emissiveIntensity = 0.48 + chase * 0.5 + unlockProgress * 1.05 + focusStrength * 0.22;
+    }
+    if (object instanceof THREE.Mesh && object.userData.escapeVistaGlow) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const seed = (object.userData.vistaSeed as number | undefined) ?? object.id;
+      const baseY = (object.userData.baseY as number | undefined) ?? object.position.y;
+      const baseScaleX = (object.userData.baseScaleX as number | undefined) ?? object.scale.x;
+      const baseScaleY = (object.userData.baseScaleY as number | undefined) ?? object.scale.y;
+      const baseScaleZ = (object.userData.baseScaleZ as number | undefined) ?? object.scale.z;
+      const pulse = Math.sin(elapsedTime * 1.85 + seed) * 0.04 + unlockProgress * 0.11 + focusStrength * 0.035;
+      object.position.y = baseY + Math.sin(elapsedTime * 0.9 + seed) * 0.008 + unlockProgress * 0.022;
+      object.scale.set(baseScaleX * (1 + pulse), baseScaleY * (1 + pulse * 0.55), baseScaleZ * (1 + pulse));
+      material.opacity = Math.min(0.96, ((object.userData.baseOpacity as number | undefined) ?? 0.62) + unlockProgress * 0.22 + focusStrength * 0.04);
+      material.emissiveIntensity = 0.46 + Math.sin(elapsedTime * 2.4 + seed) * 0.18 + unlockProgress * 1.0 + focusStrength * 0.22;
     }
     if (object instanceof THREE.Mesh && object.userData.lightShaft) {
       const material = object.material as THREE.MeshBasicMaterial;

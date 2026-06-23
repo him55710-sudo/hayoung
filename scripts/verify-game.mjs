@@ -228,6 +228,7 @@ async function main() {
     if (!desktopState.environmentDetail?.includes("lived-in escape room")) throw new Error(`Environment detail metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.transitionVfx?.includes("transition veil")) throw new Error(`Transition VFX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.objectiveTracker?.includes("case-file HUD")) throw new Error(`Objective tracker metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.escapeVista?.includes("rear-door escape vista")) throw new Error(`Escape vista metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
