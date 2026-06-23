@@ -407,6 +407,7 @@ button {
 .inventory-dock,
 .interact-button,
 .mobile-pad,
+.look-pad,
 .penalty-card,
 .room-beads,
 .puzzle-modal,
@@ -792,28 +793,173 @@ button {
   left: 18px;
   bottom: 96px;
   display: none;
-  grid-template-columns: repeat(3, 44px);
-  grid-template-rows: repeat(2, 44px);
-  gap: 8px;
+  width: 132px;
+  height: 132px;
+  touch-action: none;
 }
 
 .mobile-pad button {
+  position: absolute;
   display: grid;
   place-items: center;
+  width: 42px;
+  height: 42px;
   border: 1px solid rgba(255, 229, 184, 0.24);
-  border-radius: 8px;
-  background: rgba(12, 13, 18, 0.58);
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.02)),
+    rgba(12, 13, 18, 0.5);
   color: #fff8ec;
   backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.18),
+    0 10px 26px rgba(0, 0, 0, 0.24);
+  cursor: pointer;
 }
 
-.mobile-pad button:first-child {
-  grid-column: 2;
+.mobile-pad button:active {
+  border-color: rgba(255, 223, 154, 0.58);
+  background:
+    linear-gradient(180deg, rgba(255, 223, 154, 0.2), rgba(255, 125, 142, 0.08)),
+    rgba(12, 13, 18, 0.62);
+  transform: scale(0.96);
+}
+
+.mobile-pad-ring,
+.mobile-pad-core {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.mobile-pad-ring {
+  inset: 6px;
+  border: 1px solid rgba(255, 229, 184, 0.2);
+  background:
+    radial-gradient(circle, rgba(255, 223, 154, 0.1), transparent 44%),
+    rgba(8, 10, 15, 0.18);
+  box-shadow:
+    inset 0 0 28px rgba(255, 223, 154, 0.08),
+    0 14px 38px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(14px);
+}
+
+.mobile-pad-core {
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 125, 142, 0.32);
+  background: rgba(255, 125, 142, 0.16);
+  box-shadow: 0 0 24px rgba(255, 125, 142, 0.18);
+  transform: translate(-50%, -50%);
+}
+
+.mobile-pad .move-up {
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+}
+
+.mobile-pad .move-left {
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.mobile-pad .move-down {
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+}
+
+.mobile-pad .move-right {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .mobile-pad svg {
   width: 18px;
   height: 18px;
+}
+
+.look-pad {
+  right: 18px;
+  bottom: 154px;
+  display: none;
+  width: 126px;
+  height: 126px;
+  border: 1px solid rgba(141, 200, 255, 0.26);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(141, 200, 255, 0.16), transparent 38%),
+    radial-gradient(circle at 72% 28%, rgba(255, 223, 154, 0.14), transparent 34%),
+    rgba(8, 11, 18, 0.18);
+  box-shadow:
+    inset 0 0 30px rgba(141, 200, 255, 0.09),
+    0 18px 48px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(14px);
+  cursor: grab;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.look-pad::before,
+.look-pad::after {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  content: "";
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.look-pad::before {
+  width: 76%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 248, 236, 0.42), transparent);
+}
+
+.look-pad::after {
+  width: 1px;
+  height: 76%;
+  background: linear-gradient(180deg, transparent, rgba(255, 248, 236, 0.42), transparent);
+}
+
+.look-pad.is-active,
+.look-pad:active {
+  cursor: grabbing;
+  border-color: rgba(255, 223, 154, 0.46);
+  box-shadow:
+    inset 0 0 34px rgba(255, 223, 154, 0.12),
+    0 0 28px rgba(141, 200, 255, 0.22),
+    0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.look-pad-orbit,
+.look-pad-dot {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.look-pad-orbit {
+  inset: 28px;
+  border: 1px solid rgba(255, 248, 236, 0.22);
+  box-shadow: inset 0 0 18px rgba(141, 200, 255, 0.12);
+}
+
+.look-pad-dot {
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 248, 236, 0.72);
+  box-shadow:
+    0 0 16px rgba(255, 248, 236, 0.46),
+    0 0 28px rgba(141, 200, 255, 0.28);
+  transform: translate(-50%, -50%);
 }
 
 .penalty-card {
@@ -1553,7 +1699,7 @@ button {
   .message-strip {
     left: 8px;
     right: 8px;
-    bottom: 142px;
+    bottom: 210px;
     width: auto;
     min-height: 42px;
     max-height: 62px;
@@ -1610,12 +1756,54 @@ button {
   }
 
   .mobile-pad {
-    display: grid;
+    display: block;
     left: 8px;
     bottom: 70px;
-    grid-template-columns: repeat(3, 36px);
-    grid-template-rows: repeat(2, 36px);
-    gap: 5px;
+    width: 112px;
+    height: 112px;
+  }
+
+  .mobile-pad button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mobile-pad-core {
+    width: 30px;
+    height: 30px;
+  }
+
+  .mobile-pad .move-up {
+    top: 6px;
+  }
+
+  .mobile-pad .move-left {
+    left: 6px;
+  }
+
+  .mobile-pad .move-down {
+    bottom: 6px;
+  }
+
+  .mobile-pad .move-right {
+    right: 6px;
+  }
+
+  .look-pad {
+    display: block;
+    right: 8px;
+    bottom: 116px;
+    width: 104px;
+    height: 104px;
+  }
+
+  .look-pad-orbit {
+    inset: 24px;
+  }
+
+  .look-pad-dot {
+    width: 16px;
+    height: 16px;
   }
 
   .penalty-card {

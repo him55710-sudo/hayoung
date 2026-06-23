@@ -169,6 +169,68 @@ async function verifyGraphicsQuality(page, initialCanvas) {
   };
 }
 
+async function verifyMobileTouchControls(page) {
+  await page.waitForFunction(() => window.hayoungCameraState && window.hayoungTouchControls, { timeout: 15000 });
+  const before = await page.evaluate(() => ({
+    state: JSON.parse(window.render_game_to_text()),
+    camera: window.hayoungCameraState,
+    controls: window.hayoungTouchControls,
+  }));
+
+  await page.evaluate(() => {
+    const pad = document.querySelector(".look-pad");
+    if (!(pad instanceof HTMLElement)) throw new Error("Missing look pad.");
+    const rect = pad.getBoundingClientRect();
+    const base = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      pointerId: 822,
+      pointerType: "touch",
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    };
+    pad.dispatchEvent(new PointerEvent("pointerdown", base));
+    pad.dispatchEvent(new PointerEvent("pointermove", { ...base, clientX: base.clientX + 76, clientY: base.clientY - 18 }));
+  });
+  await page.waitForTimeout(80);
+  await page.evaluate(() => window.advanceTime?.(300));
+  const afterLook = await page.evaluate(() => ({
+    camera: window.hayoungCameraState,
+    controls: window.hayoungTouchControls,
+  }));
+
+  await page.evaluate(() => {
+    const button = document.querySelector(".mobile-pad .move-up");
+    if (!(button instanceof HTMLElement)) throw new Error("Missing mobile move button.");
+    const rect = button.getBoundingClientRect();
+    const base = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      pointerId: 823,
+      pointerType: "touch",
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    };
+    button.dispatchEvent(new PointerEvent("pointerdown", base));
+  });
+  await page.waitForTimeout(80);
+  const controlsAfterMove = await page.evaluate(() => window.hayoungTouchControls);
+  await page.evaluate(() => window.advanceTime?.(900));
+  const afterMove = await page.evaluate(() => window.hayoungCameraState);
+
+  if (!before.state.mobileControls?.includes("touch joystick")) throw new Error(`Mobile controls metadata missing: ${JSON.stringify(before.state)}`);
+  if (!afterLook.controls || afterLook.controls.tick < 1) throw new Error(`Look pad did not publish controls: ${JSON.stringify({ before, afterLook })}`);
+  if (Math.abs(afterLook.camera.yaw - before.camera.yaw) < 0.05) throw new Error(`Look pad did not rotate camera: ${JSON.stringify({ before, afterLook })}`);
+  if (!controlsAfterMove?.forward) throw new Error(`Move pad did not publish forward: ${JSON.stringify({ controlsAfterMove })}`);
+  if (Math.hypot(afterMove.x - afterLook.camera.x, afterMove.z - afterLook.camera.z) < 0.12) {
+    throw new Error(`Move pad did not move camera: ${JSON.stringify({ afterLook, afterMove })}`);
+  }
+
+  return { before, afterLook, controlsAfterMove, afterMove };
+}
+
 async function solveAll(page) {
   for (const [index, answer] of answers.entries()) {
     log(`solve ${answer}`);
@@ -229,6 +291,7 @@ async function main() {
     if (!desktopState.transitionVfx?.includes("transition veil")) throw new Error(`Transition VFX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.objectiveTracker?.includes("case-file HUD")) throw new Error(`Objective tracker metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.escapeVista?.includes("rear-door escape vista")) throw new Error(`Escape vista metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.mobileControls?.includes("touch joystick")) throw new Error(`Mobile control metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
@@ -246,6 +309,8 @@ async function main() {
     log("mobile canvas stats");
     const mobileCanvas = await canvasStats(mobile);
     if (!mobileCanvas.found || mobileCanvas.varied < minCanvasVariation) throw new Error(`Mobile canvas looks blank: ${JSON.stringify(mobileCanvas)}`);
+    log("mobile touch controls");
+    const mobileControls = await verifyMobileTouchControls(mobile);
     log("mobile canvas ok");
     await mobile.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
 
@@ -257,6 +322,7 @@ async function main() {
       ending,
       mobileState,
       mobileCanvas,
+      mobileControls,
     };
     mkdirSync("output/playwright", { recursive: true });
     writeFileSync("output/playwright/verify-result.json", JSON.stringify(result, null, 2));

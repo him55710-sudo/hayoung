@@ -28,6 +28,9 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 type Phase = "intro" | "game" | "ending";
 type PuzzleKind = "code" | "direction" | "symbol" | "memory" | "device" | "final";
 type GraphicsQuality = "cinematic" | "balanced" | "performance";
+type MovementState = { forward: boolean; back: boolean; left: boolean; right: boolean };
+type LookInput = { yawDelta: number; pitchDelta: number; active: boolean; tick: number };
+type TouchControlState = MovementState & { yawDelta: number; pitchDelta: number; lookActive: boolean; tick: number };
 
 type Room = {
   id: number;
@@ -89,10 +92,123 @@ const graphicsQualitySettings: Record<
 };
 
 const graphicsQualityCycle: GraphicsQuality[] = ["cinematic", "balanced", "performance"];
+const defaultTouchControls: TouchControlState = {
+  forward: false,
+  back: false,
+  left: false,
+  right: false,
+  yawDelta: 0,
+  pitchDelta: 0,
+  lookActive: false,
+  tick: 0,
+};
+
+let touchDelegationInstalled = false;
+let delegatedLookDrag: { pointerId: number | null; x: number; y: number } = { pointerId: null, x: 0, y: 0 };
+let delegatedMoveHold: { pointerId: number | null; direction: keyof MovementState | null } = { pointerId: null, direction: null };
+
+function publishDelegatedTouchControls(next: Partial<TouchControlState> = {}) {
+  const current = window.hayoungTouchControls ?? defaultTouchControls;
+  window.hayoungTouchControls = { ...current, ...next };
+  return window.hayoungTouchControls;
+}
+
+function installDelegatedTouchControls() {
+  if (touchDelegationInstalled || typeof document === "undefined") {
+    return;
+  }
+  touchDelegationInstalled = true;
+  publishDelegatedTouchControls();
+
+  const directionFromEvent = (event: PointerEvent) => {
+    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(".mobile-pad [data-move]");
+    return button?.dataset.move as keyof MovementState | undefined;
+  };
+
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const direction = directionFromEvent(event);
+      if (!direction) {
+        return;
+      }
+      event.preventDefault();
+      delegatedMoveHold = { pointerId: event.pointerId, direction };
+      publishDelegatedTouchControls({ [direction]: true });
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "pointerup",
+    (event) => {
+      const direction = directionFromEvent(event) ?? (delegatedMoveHold.pointerId === event.pointerId ? delegatedMoveHold.direction : null);
+      if (!direction) {
+        return;
+      }
+      publishDelegatedTouchControls({ [direction]: false });
+      delegatedMoveHold = { pointerId: null, direction: null };
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "pointercancel",
+    () => {
+      delegatedMoveHold = { pointerId: null, direction: null };
+      publishDelegatedTouchControls({ forward: false, back: false, left: false, right: false });
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const lookPad = (event.target as HTMLElement | null)?.closest<HTMLElement>(".look-pad");
+      if (!lookPad) {
+        return;
+      }
+      event.preventDefault();
+      delegatedLookDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      publishDelegatedTouchControls({ yawDelta: 0, pitchDelta: 0, lookActive: true, tick: (window.hayoungTouchControls?.tick ?? 0) + 1 });
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "pointermove",
+    (event) => {
+      if (delegatedLookDrag.pointerId !== event.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      const yawDelta = event.clientX - delegatedLookDrag.x;
+      const pitchDelta = event.clientY - delegatedLookDrag.y;
+      delegatedLookDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      if (Math.abs(yawDelta) + Math.abs(pitchDelta) < 0.5) {
+        return;
+      }
+      publishDelegatedTouchControls({ yawDelta, pitchDelta, lookActive: true, tick: (window.hayoungTouchControls?.tick ?? 0) + 1 });
+    },
+    true,
+  );
+
+  const endLook = (event: PointerEvent) => {
+    if (delegatedLookDrag.pointerId !== event.pointerId) {
+      return;
+    }
+    delegatedLookDrag = { pointerId: null, x: 0, y: 0 };
+    publishDelegatedTouchControls({ yawDelta: 0, pitchDelta: 0, lookActive: false, tick: (window.hayoungTouchControls?.tick ?? 0) + 1 });
+  };
+  document.addEventListener("pointerup", endLook, true);
+  document.addEventListener("pointercancel", endLook, true);
+}
 
 declare global {
   interface Window {
     advanceTime?: (ms?: number) => void;
+    hayoungCameraState?: { x: number; z: number; yaw: number; pitch: number };
+    hayoungTouchControls?: TouchControlState;
     render_game_to_text?: () => string;
   }
 }
@@ -338,7 +454,8 @@ function App() {
   const [answer, setAnswer] = useState("");
   const [message, setMessage] = useState("빛나는 장치가 조용히 반응하고 있어요.");
   const [hintCount, setHintCount] = useState(0);
-  const [movement, setMovement] = useState({ forward: false, back: false, left: false, right: false });
+  const [movement, setMovement] = useState<MovementState>({ forward: false, back: false, left: false, right: false });
+  const [lookInput, setLookInput] = useState<LookInput>({ yawDelta: 0, pitchDelta: 0, active: false, tick: 0 });
   const [unlockTick, setUnlockTick] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
@@ -419,6 +536,10 @@ function App() {
   });
 
   useEffect(() => {
+    if (phase === "game") {
+      installDelegatedTouchControls();
+      publishDelegatedTouchControls();
+    }
     window.render_game_to_text = () =>
       JSON.stringify({
         phase,
@@ -454,6 +575,8 @@ function App() {
         transitionVfx: "cinematic room transition veil with letterbox bars, energy slit, and particle sparks",
         objectiveTracker: "case-file HUD shows current lock status, next clue, room solve meter, and puzzle input progress",
         escapeVista: "rear-door escape vista uses themed silhouettes, breadcrumb floor lights, and room-specific portal dressing",
+        mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
+        mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -471,6 +594,7 @@ function App() {
     graphicsQualitySetting.renderScale,
     hintCount,
     hintsLeft,
+    lookInput.active,
     message,
     nearInteractable,
     nextRoomTitle,
@@ -660,6 +784,7 @@ function App() {
             phase={phase}
             solvedCount={solvedIds.length}
             movement={movement}
+            lookInput={lookInput}
             unlockTick={unlockTick}
             graphicsQuality={graphicsQuality}
             onNearObject={handleNearObject}
@@ -773,19 +898,49 @@ function App() {
             </button>
           )}
 
-          <div className="mobile-pad" aria-label="모바일 이동 패드">
-            <button type="button" onPointerDown={() => setMovement((v) => ({ ...v, forward: true }))} onPointerUp={() => setMovement((v) => ({ ...v, forward: false }))}>
+          <div
+            className="mobile-pad"
+            aria-label="모바일 이동 패드"
+          >
+            <span className="mobile-pad-ring" aria-hidden="true" />
+            <span className="mobile-pad-core" aria-hidden="true" />
+            <button
+              className="move-up"
+              type="button"
+              data-move="forward"
+            >
               <ArrowUp aria-hidden="true" />
             </button>
-            <button type="button" onPointerDown={() => setMovement((v) => ({ ...v, left: true }))} onPointerUp={() => setMovement((v) => ({ ...v, left: false }))}>
+            <button
+              className="move-left"
+              type="button"
+              data-move="left"
+            >
               <ArrowLeft aria-hidden="true" />
             </button>
-            <button type="button" onPointerDown={() => setMovement((v) => ({ ...v, back: true }))} onPointerUp={() => setMovement((v) => ({ ...v, back: false }))}>
+            <button
+              className="move-down"
+              type="button"
+              data-move="back"
+            >
               <ArrowDown aria-hidden="true" />
             </button>
-            <button type="button" onPointerDown={() => setMovement((v) => ({ ...v, right: true }))} onPointerUp={() => setMovement((v) => ({ ...v, right: false }))}>
+            <button
+              className="move-right"
+              type="button"
+              data-move="right"
+            >
               <ArrowRight aria-hidden="true" />
             </button>
+          </div>
+
+          <div
+            className={`look-pad${lookInput.active ? " is-active" : ""}`}
+            aria-label="모바일 시점 조작 패드"
+            role="application"
+          >
+            <span className="look-pad-orbit" aria-hidden="true" />
+            <span className="look-pad-dot" aria-hidden="true" />
           </div>
 
           {hintCount > 0 && (
@@ -1120,7 +1275,8 @@ type SceneProps = {
   roomIndex: number;
   phase: Phase;
   solvedCount: number;
-  movement: { forward: boolean; back: boolean; left: boolean; right: boolean };
+  movement: MovementState;
+  lookInput: LookInput;
   unlockTick: number;
   graphicsQuality: GraphicsQuality;
   onNearObject: (label: string) => void;
@@ -1137,9 +1293,10 @@ type FirstPersonRig = {
   light: THREE.SpotLight;
 };
 
-function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick, graphicsQuality, onNearObject, onInteractFocusChange }: SceneProps) {
+function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, unlockTick, graphicsQuality, onNearObject, onInteractFocusChange }: SceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const movementRef = useRef(movement);
+  const lookInputRef = useRef(lookInput);
   const roomIndexRef = useRef(roomIndex);
   const phaseRef = useRef(phase);
   const solvedRef = useRef(solvedCount);
@@ -1149,6 +1306,10 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
   useEffect(() => {
     movementRef.current = movement;
   }, [movement]);
+
+  useEffect(() => {
+    lookInputRef.current = lookInput;
+  }, [lookInput]);
 
   useEffect(() => {
     roomIndexRef.current = roomIndex;
@@ -1244,6 +1405,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
     let activePixelRatio = 0;
     let activeShadowMode: boolean | null = null;
     let activeAtmosphereMode: boolean | null = null;
+    let lastLookInputTick = window.hayoungTouchControls?.tick ?? lookInputRef.current.tick;
 
     const applyGraphicsQuality = (forceSize = false) => {
       const setting = graphicsQualitySettings[graphicsQualityRef.current];
@@ -1292,8 +1454,10 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       applyGraphicsQuality(true);
     };
 
-    const onPointerDown = () => {
-      renderer.domElement.requestPointerLock?.();
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "mouse") {
+        renderer.domElement.requestPointerLock?.();
+      }
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -1324,15 +1488,22 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
         bob = 0;
       }
       const move = movementRef.current;
+      const touchControls = window.hayoungTouchControls;
+      const touchLook = touchControls ?? lookInputRef.current;
+      if (touchLook.tick !== lastLookInputTick) {
+        player.yaw -= touchLook.yawDelta * 0.0042;
+        player.pitch = THREE.MathUtils.clamp(player.pitch - touchLook.pitchDelta * 0.0032, -0.78, 0.62);
+        lastLookInputTick = touchLook.tick;
+      }
       const speed = 4.4 * delta;
       const forward = new THREE.Vector3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
       const right = new THREE.Vector3(Math.cos(player.yaw), 0, Math.sin(player.yaw));
       const velocity = new THREE.Vector3();
 
-      if (move.forward) velocity.add(forward);
-      if (move.back) velocity.sub(forward);
-      if (move.right) velocity.add(right);
-      if (move.left) velocity.sub(right);
+      if (move.forward || touchControls?.forward) velocity.add(forward);
+      if (move.back || touchControls?.back) velocity.sub(forward);
+      if (move.right || touchControls?.right) velocity.add(right);
+      if (move.left || touchControls?.left) velocity.sub(right);
       if (velocity.lengthSq() > 0) {
         velocity.normalize().multiplyScalar(speed);
         bob += delta * 9;
@@ -1362,6 +1533,12 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       const cameraRoll = Math.sin(bob * 0.74) * (isMoving ? 0.012 : 0.003);
       camera.position.copy(player.position);
       camera.rotation.set(player.pitch, player.yaw, cameraRoll, "YXZ");
+      window.hayoungCameraState = {
+        x: Number(player.position.x.toFixed(3)),
+        z: Number(player.position.z.toFixed(3)),
+        yaw: Number(player.yaw.toFixed(4)),
+        pitch: Number(player.pitch.toFixed(4)),
+      };
 
       const targetBackground = new THREE.Color(activeRoom.palette[0]).lerp(new THREE.Color(activeRoom.palette[3]), roomIndexRef.current === 4 ? 0.08 : 0.5);
       scene.background = targetBackground;
@@ -1442,6 +1619,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
       renderer.dispose();
       mount.removeChild(renderer.domElement);
       window.advanceTime = undefined;
+      window.hayoungCameraState = undefined;
     };
   }, [onInteractFocusChange, onNearObject]);
 
