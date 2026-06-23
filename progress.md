@@ -78,6 +78,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added structured hint penalty data, active penalty state, stage metadata, desktop/mobile ticket styling, and non-overlapping mobile layering so the hint cost feels like an in-game contract.
 - Added `.lazyweb/design-improve/hint-penalty-2026-06-23/report.html` with current desktop/mobile hint-contract screenshots and reference rationale.
 - Extended `scripts/verify-game.mjs` to click the hint button on desktop and mobile, assert the contract ticket DOM/state, save hint-contract screenshots, and carry the used penalty through the ending state.
+- Refreshed `docs/escape-room-research-and-quality.md` with current Korean escape-room cafe expectations, common lock families, single-player clue guidance, a five-room puzzle blueprint, and design risks to avoid.
+- Installed LazyCodex Codex Light (`lazycodex-ai 4.13.0`) globally via `npx --yes lazycodex-ai install --no-tui --codex-autonomous`; the `omo@sisyphuslabs` plugin and related MCP/hook config are now present in `~/.codex/config.toml`.
+- Added repo-level `AGENTS.md` so future Codex/LazyCodex sessions preserve the 500-day framing, verification commands, Unreal MCP state, deployment target, and game quality bar.
 
 ## Current QA
 
@@ -128,6 +131,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm audit --omit=dev` passed with 0 vulnerabilities after the hint-contract pass.
 - Mobile hint-contract layering was rechecked with Playwright DOM/computed styles: card at `x=8, y=246`, decorative stamp `z-index: 0`, ticket layer `z-index: 1`, active text `1바나나우유`.
 - `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-hint-penalty/shot-0.png`.
+- LazyCodex install succeeded, `npx --yes lazycodex-ai version` reports `lazycodex-ai 4.13.0`; `npx --yes lazycodex-ai doctor` currently fails on this Windows machine with `spawn EPERM`, so installed files/config were verified manually instead.
 
 ## Known Limitations
 
