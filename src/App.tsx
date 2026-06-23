@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AnimationEvent } from "react";
 import * as THREE from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -340,6 +341,7 @@ function App() {
   const [movement, setMovement] = useState({ forward: false, back: false, left: false, right: false });
   const [unlockTick, setUnlockTick] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [nearInteractable, setNearInteractable] = useState(false);
   const [graphicsQuality, setGraphicsQuality] = useState<GraphicsQuality>("cinematic");
@@ -449,6 +451,7 @@ function App() {
         collisionModel: "room bounds plus solid central puzzle console stop-zone",
         hudBehavior: "calm HUD dims secondary panels while moving and restores clarity near interactables",
         environmentDetail: "lived-in escape room wear: floor scuffs, clue tape, shelf props, wall tags, and room-specific residue",
+        transitionVfx: "cinematic room transition veil with letterbox bars, energy slit, and particle sparks",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -476,10 +479,25 @@ function App() {
     solvedSet,
   ]);
 
-  const triggerUnlock = () => {
+  const triggerUnlock = (showTransition = false) => {
     setUnlockTick((value) => value + 1);
     setUnlocking(true);
-    window.setTimeout(() => setUnlocking(false), 880);
+    window.setTimeout(() => setUnlocking(false), 980);
+    if (showTransition) {
+      setTransitioning(true);
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          window.setTimeout(() => setTransitioning(false), 6200);
+        });
+      });
+    }
+  };
+
+  const finishUnlockTransition = (event: AnimationEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    setTransitioning(false);
   };
 
   const evadeButton = () => {
@@ -521,7 +539,7 @@ function App() {
     if (roomIndex < rooms.length - 1) {
       const nextRoom = rooms[roomIndex + 1];
       setRoomIndex((value) => value + 1);
-      triggerUnlock();
+      triggerUnlock(true);
       setMessage(`${nextRoom.title}으로 문이 열렸습니다. 공기와 음악이 달라졌어요.`);
       return;
     }
@@ -542,7 +560,7 @@ function App() {
     setMessage(`${activePuzzle.reward} 획득! ${activePuzzle.chainNote}`);
     setActivePuzzleId(null);
     setAnswer("");
-    triggerUnlock();
+    triggerUnlock(activePuzzle.id === 10);
 
     if (activePuzzle.id === 10) {
       window.setTimeout(() => setPhase("ending"), 520);
@@ -577,6 +595,14 @@ function App() {
 
   return (
     <main className="site-shell">
+      {transitioning && (
+        <div className="transition-veil" aria-hidden="true" onAnimationEnd={finishUnlockTransition}>
+          <span />
+          <span />
+          <span />
+        </div>
+      )}
+
       {phase === "intro" && (
         <section className="intro-screen">
           <div className="intro-backdrop" />

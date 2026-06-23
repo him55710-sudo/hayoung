@@ -30,15 +30,19 @@ async function waitForPhase(page, phase) {
 }
 
 async function settleClose(label, promise) {
+  let timeoutId;
   await Promise.race([
-    promise,
+    promise.finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+    }),
     new Promise((resolve) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         log(`${label} close timed out; continuing cleanup`);
         resolve(undefined);
       }, 10000);
     }),
   ]);
+  if (timeoutId) clearTimeout(timeoutId);
 }
 
 async function canvasStats(page) {
@@ -94,7 +98,9 @@ async function clickGraphicsQuality(page, expectedQuality) {
 async function enterGame(page, isMobile = false) {
   log(`enter ${isMobile ? "mobile" : "desktop"}`);
   await page.goto(url, { waitUntil: "domcontentloaded" });
+  log(`goto ${isMobile ? "mobile" : "desktop"}`);
   await page.waitForSelector(".runaway-button");
+  log(`intro ready ${isMobile ? "mobile" : "desktop"}`);
   const introText = await page.locator(".intro-copy h1").innerText();
   if (!introText.includes("500일")) throw new Error(`Unexpected intro: ${introText}`);
 
@@ -111,7 +117,9 @@ async function enterGame(page, isMobile = false) {
   await page.waitForTimeout(6500);
   if (isMobile) await clickSelector(page, ".runaway-button");
   else await page.locator(".runaway-button").click({ force: true });
-  await page.waitForSelector("canvas");
+  log(`start clicked ${isMobile ? "mobile" : "desktop"}`);
+  await page.waitForSelector("canvas", { state: "attached" });
+  log(`canvas attached ${isMobile ? "mobile" : "desktop"}`);
   await waitForPhase(page, "game");
   await page.waitForTimeout(900);
   log(`entered ${isMobile ? "mobile" : "desktop"}`);
@@ -218,32 +226,39 @@ async function main() {
     if (!desktopState.collisionModel?.includes("console")) throw new Error(`Collision metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.hudBehavior?.includes("calm HUD")) throw new Error(`HUD behavior metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.environmentDetail?.includes("lived-in escape room")) throw new Error(`Environment detail metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.transitionVfx?.includes("transition veil")) throw new Error(`Transition VFX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
     if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
 
+    log("park desktop");
+    await desktop.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
+    await settleClose("desktop", desktop.close({ runBeforeUnload: false }).catch(() => undefined));
+    desktop = undefined;
+
     mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     await enterGame(mobile, true);
+    log("mobile state");
     const mobileState = await gameState(mobile);
+    log("mobile canvas stats");
     const mobileCanvas = await canvasStats(mobile);
     if (!mobileCanvas.found || mobileCanvas.varied < minCanvasVariation) throw new Error(`Mobile canvas looks blank: ${JSON.stringify(mobileCanvas)}`);
+    log("mobile canvas ok");
+    await mobile.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
 
-    console.log(
-      JSON.stringify(
-        {
-          url,
-          desktopState,
-          desktopCanvas,
-          graphicsCheck,
-          ending,
-          mobileState,
-          mobileCanvas,
-        },
-        null,
-        2,
-      ),
-    );
+    const result = {
+      url,
+      desktopState,
+      desktopCanvas,
+      graphicsCheck,
+      ending,
+      mobileState,
+      mobileCanvas,
+    };
+    mkdirSync("output/playwright", { recursive: true });
+    writeFileSync("output/playwright/verify-result.json", JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result, null, 2));
   } finally {
     await Promise.all(
       [desktop, mobile]
@@ -254,7 +269,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
