@@ -45,6 +45,7 @@
 - Puzzle count: 10 total, 2 per room.
 - Puzzle forms: numeric lock, direction lock, memory/photo choice, symbol lock, final confirmation.
 - Puzzle input: modal locks now use tactile numeric pads, direction pads, and choice chips while keeping the keyboard input for accessibility and automation.
+- Physical device kits: each room now adds a distinct 3D console kit so the puzzle surface changes from diary/photo slot to cafe tokens, rain-direction rail, note bridge, and finale prism gate.
 - Room clear moment: after each non-final room's two puzzles, a centered completion overlay shows the earned clue rewards and next room CTA.
 - Hint system: 3 uses, escalating real-world penalties, now presented as a stamped `Hint Contract` ticket HUD on desktop and mobile.
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
@@ -108,6 +109,7 @@ npm audit --omit=dev
 - all 10 placeholder puzzles can be solved
 - ending state is reached
 - desktop and mobile hint use creates the contract ticket HUD, exposes active penalty metadata, and keeps the used penalty through the ending state
+- room-specific physical device-kit metadata is exposed so the five-room console variation remains testable
 
 For deployed verification:
 

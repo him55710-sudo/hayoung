@@ -81,6 +81,11 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Refreshed `docs/escape-room-research-and-quality.md` with current Korean escape-room cafe expectations, common lock families, single-player clue guidance, a five-room puzzle blueprint, and design risks to avoid.
 - Installed LazyCodex Codex Light (`lazycodex-ai 4.13.0`) globally via `npx --yes lazycodex-ai install --no-tui --codex-autonomous`; the `omo@sisyphuslabs` plugin and related MCP/hook config are now present in `~/.codex/config.toml`.
 - Added repo-level `AGENTS.md` so future Codex/LazyCodex sessions preserve the 500-day framing, verification commands, Unreal MCP state, deployment target, and game quality bar.
+- Used Lazyweb references for dark subsystem UIs, holographic scanner motifs, and minimal game status HUDs, then upgraded the 3D central console with five room-specific physical puzzle kits.
+- Added room-specific console props: diary/photo slot, cafe receipt/token kit, rain direction rail with broken-heart switch, note bridge, and finale prism gate.
+- Added animated device-kit behavior for floating props, scanner plates, rain drops, cafe tokens, heart beats, prism rotation, and halo rings without cumulative drift.
+- Added `.lazyweb/design-improve/room-device-kits-2026-06-23/report.html` with current screenshots and Lazyweb reference captures.
+- Extended `scripts/verify-game.mjs` to assert `roomDeviceKits` metadata so the physical device-kit pass remains covered.
 
 ## Current QA
 
@@ -132,6 +137,11 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Mobile hint-contract layering was rechecked with Playwright DOM/computed styles: card at `x=8, y=246`, decorative stamp `z-index: 0`, ticket layer `z-index: 1`, active text `1바나나우유`.
 - `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-hint-penalty/shot-0.png`.
 - LazyCodex install succeeded, `npx --yes lazycodex-ai version` reports `lazycodex-ai 4.13.0`; `npx --yes lazycodex-ai doctor` currently fails on this Windows machine with `spawn EPERM`, so installed files/config were verified manually instead.
+- Latest room-device-kit screenshot inspected: `output/playwright/500-room-device-kit-room1.png`.
+- `npm run build` passed after the room-device-kit pass.
+- `npm run verify:game` passed after the room-device-kit pass; it checks the new room-device-kit metadata, solves all 10 puzzles, reaches the ending, checks graphics modes, verifies desktop/mobile hint contracts, and verifies mobile canvas/controls.
+- `npm audit --omit=dev` passed with 0 vulnerabilities after the room-device-kit pass.
+- `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-room-device-kits/shot-0.png`.
 
 ## Known Limitations
 

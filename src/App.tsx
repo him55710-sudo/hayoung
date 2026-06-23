@@ -615,6 +615,7 @@ function App() {
         prologueSetDressing: "cinematic intro splash plus first-room prologue arches, photo garland, and floor light path",
         lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, tactile lock console, and short unlocked success state",
         unlockFeedbackUX: "correct answers briefly hold the device modal in an OPEN readout state before the 3D latch, sparks, flash, and door motion fire",
+        roomDeviceKits: "five room-specific physical puzzle kits on the central console: diary/photo slot, cafe token receipt, rain direction rail, note bridge, and finale prism gate",
         activeUnlockFeedback: unlockFeedback?.reward ?? null,
         mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
@@ -2297,7 +2298,149 @@ function addPuzzleDesk(group: THREE.Group, room: Room, accentMaterial: THREE.Mat
   lamp.position.set(2.05, 1.6, -0.52);
   group.add(lamp);
 
+  addRoomDeviceKit(group, room, accentMaterial, glowMaterial);
   addInteractionFocus(group, room);
+}
+
+function addRoomDeviceKit(group: THREE.Group, room: Room, accentMaterial: THREE.Material, glowMaterial: THREE.Material) {
+  const roomIndex = room.id - 1;
+  const kit = new THREE.Group();
+  kit.userData.roomDeviceKit = true;
+  kit.userData.deviceKitIndex = roomIndex;
+
+  const metal = mat(0x443b38, { roughness: 0.3, metalness: 0.78, texture: "metal", textureSeed: 420 + room.id });
+  const brass = mat(0xd4a45d, { roughness: 0.35, metalness: 0.7, emissive: 0xffbd72, emissiveIntensity: 0.05, texture: "metal", textureSeed: 440 + room.id });
+  const paper = mat(0xffebce, { roughness: 0.84, texture: "paper", textureRepeat: [1.2, 1], textureSeed: 460 + room.id });
+  const ink = mat(0x2c2231, { roughness: 0.62, metalness: 0.04, emissive: 0x161019, emissiveIntensity: 0.04 });
+  const glass = mat(room.palette[2], { roughness: 0.18, metalness: 0.16, emissive: room.palette[2], emissiveIntensity: 0.42, transparent: true, opacity: 0.72 });
+  const signal = glowMaterial.clone();
+  signal.transparent = true;
+  signal.opacity = 0.68;
+
+  const baseRail = box(1.76, 0.035, 0.05, brass, 0.02, 1.02, -0.05);
+  const topRail = box(1.76, 0.035, 0.05, brass, 0.02, 1.84, -0.05);
+  baseRail.userData.deviceKitGlow = true;
+  topRail.userData.deviceKitGlow = true;
+  kit.add(baseRail, topRail);
+
+  if (roomIndex === 0) {
+    const album = box(0.78, 0.08, 0.5, paper, -0.52, 1.22, -0.03);
+    album.rotation.z = -0.08;
+    album.userData.deviceKitFloat = true;
+    const spine = box(0.055, 0.11, 0.54, accentMaterial, -0.91, 1.23, -0.025);
+    spine.rotation.z = -0.08;
+    const photoSlot = box(0.58, 0.32, 0.035, glass, 0.48, 1.48, -0.015);
+    photoSlot.userData.deviceKitScanner = true;
+    const slotRailA = box(0.68, 0.025, 0.04, brass, 0.48, 1.67, 0.005);
+    const slotRailB = box(0.68, 0.025, 0.04, brass, 0.48, 1.29, 0.005);
+    [slotRailA, slotRailB].forEach((rail) => (rail.userData.deviceKitGlow = true));
+    [-0.18, 0, 0.18].forEach((offset, index) => {
+      const mark = box(0.12, 0.18, 0.026, index === 1 ? accentMaterial : ink, -0.64 + index * 0.23, 1.25 + offset * 0.05, 0.03);
+      mark.rotation.z = -0.08;
+      mark.userData.deviceKitGlow = index === 1;
+      kit.add(mark);
+    });
+    kit.add(album, spine, photoSlot, slotRailA, slotRailB);
+  } else if (roomIndex === 1) {
+    const receipt = box(0.52, 0.62, 0.035, paper, -0.58, 1.43, -0.015);
+    receipt.userData.deviceKitScanner = true;
+    for (let i = 0; i < 4; i += 1) {
+      const line = box(0.36 - i * 0.04, 0.018, 0.022, ink, -0.58, 1.59 - i * 0.095, 0.02);
+      kit.add(line);
+    }
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 0.34, 24), accentMaterial);
+    cup.position.set(0.28, 1.28, -0.02);
+    cup.rotation.z = -0.12;
+    cup.userData.deviceKitFloat = true;
+    const cupBand = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 28), brass);
+    cupBand.position.set(0.28, 1.37, -0.02);
+    cupBand.rotation.x = Math.PI / 2;
+    cupBand.userData.deviceKitGlow = true;
+    [0, 1, 2].forEach((index) => {
+      const token = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.024, 24), index === 0 ? signal.clone() : brass);
+      token.position.set(0.56 + index * 0.18, 1.18 + index * 0.015, -0.005);
+      token.rotation.x = Math.PI / 2;
+      token.userData.deviceKitSpin = true;
+      token.userData.deviceKitSeed = index;
+      kit.add(token);
+    });
+    kit.add(receipt, cup, cupBand);
+  } else if (roomIndex === 2) {
+    const rail = box(1.18, 0.045, 0.045, metal, -0.04, 1.54, -0.005);
+    rail.userData.deviceKitGlow = true;
+    const heartLeft = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 12), accentMaterial);
+    heartLeft.position.set(0.48, 1.25, 0.005);
+    heartLeft.scale.set(1, 0.76, 0.4);
+    const heartRight = heartLeft.clone();
+    heartRight.position.x = 0.64;
+    const heartTip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.2, 24), accentMaterial);
+    heartTip.position.set(0.56, 1.15, 0.005);
+    heartTip.rotation.z = Math.PI;
+    heartTip.scale.z = 0.42;
+    [heartLeft, heartRight, heartTip].forEach((part) => {
+      part.userData.deviceKitBeat = true;
+      kit.add(part);
+    });
+    [-0.48, -0.18, 0.12, 0.42].forEach((x, index) => {
+      const drop = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 18), glass.clone());
+      drop.position.set(x, 1.68 - (index % 2) * 0.07, 0.02);
+      drop.rotation.z = Math.PI;
+      drop.userData.deviceKitRainDrop = true;
+      drop.userData.deviceKitSeed = index;
+      kit.add(drop);
+    });
+    ["U", "R", "D", "L"].forEach((_, index) => {
+      const pad = box(0.18, 0.13, 0.05, signal.clone(), -0.46 + index * 0.28, 1.31, 0.01);
+      pad.userData.deviceKitGlow = true;
+      pad.userData.deviceKitSeed = index;
+      kit.add(pad);
+    });
+    kit.add(rail);
+  } else if (roomIndex === 3) {
+    const bridgeRail = box(1.32, 0.045, 0.04, brass, 0.02, 1.34, 0.005);
+    bridgeRail.userData.deviceKitGlow = true;
+    for (let i = 0; i < 5; i += 1) {
+      const note = box(0.22, 0.28, 0.026, paper, -0.54 + i * 0.27, 1.54 + Math.sin(i) * 0.035, 0.02);
+      note.rotation.z = -0.16 + i * 0.08;
+      note.userData.deviceKitFloat = true;
+      note.userData.deviceKitSeed = i;
+      const pin = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 8), signal.clone());
+      pin.position.set(note.position.x, note.position.y + 0.12, 0.052);
+      pin.userData.deviceKitGlow = true;
+      kit.add(note, pin);
+      if (i < 4) {
+        const wire = box(0.24, 0.018, 0.018, signal.clone(), -0.405 + i * 0.27, 1.43 + Math.sin(i + 0.5) * 0.025, 0.04);
+        wire.rotation.z = 0.12 - i * 0.06;
+        wire.userData.deviceKitGlow = true;
+        kit.add(wire);
+      }
+    }
+    kit.add(bridgeRail);
+  } else {
+    const prism = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), glass.clone());
+    prism.position.set(0.02, 1.48, 0.02);
+    prism.scale.set(1, 1.18, 0.72);
+    prism.userData.deviceKitPrism = true;
+    const memoryRail = box(1.28, 0.035, 0.04, brass, 0.02, 1.14, 0.01);
+    memoryRail.userData.deviceKitGlow = true;
+    [0, 1, 2, 3].forEach((index) => {
+      const frame = box(0.18, 0.24, 0.026, index % 2 ? paper : accentMaterial, -0.48 + index * 0.32, 1.18, 0.04);
+      frame.userData.deviceKitFloat = true;
+      frame.userData.deviceKitSeed = index;
+      kit.add(frame);
+    });
+    [0.38, 0.58, 0.78].forEach((radius, index) => {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.01, 8, 64), signal.clone());
+      halo.position.set(0.02, 1.48, 0.04 + index * 0.008);
+      halo.userData.deviceKitHalo = true;
+      halo.userData.deviceKitSeed = index;
+      kit.add(halo);
+    });
+    kit.add(prism, memoryRail);
+  }
+
+  group.add(kit);
+  group.userData.roomDeviceKit = kit;
 }
 
 function addInteractionFocus(group: THREE.Group, room: Room) {
@@ -3684,6 +3827,67 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
     if (object instanceof THREE.Mesh && object.userData.padGlow) {
       const material = object.material as THREE.MeshStandardMaterial;
       material.emissiveIntensity = 0.34 + Math.sin(elapsedTime * 2.8 + object.id) * 0.12 + unlockProgress * 0.46;
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitFloat) {
+      if (typeof object.userData.baseY !== "number") object.userData.baseY = object.position.y;
+      if (typeof object.userData.baseRotationZ !== "number") object.userData.baseRotationZ = object.rotation.z;
+      const seed = (object.userData.deviceKitSeed as number | undefined) ?? object.id;
+      object.position.y = (object.userData.baseY as number) + Math.sin(elapsedTime * 1.4 + seed) * 0.018 + unlockProgress * 0.032;
+      object.rotation.z = (object.userData.baseRotationZ as number) + Math.sin(elapsedTime * 0.8 + seed) * 0.018 + unlockProgress * 0.028;
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitGlow) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const seed = (object.userData.deviceKitSeed as number | undefined) ?? object.id;
+      material.emissiveIntensity = 0.22 + Math.sin(elapsedTime * 2.7 + seed) * 0.12 + focusStrength * 0.26 + unlockProgress * 0.58;
+      if (material.transparent) {
+        material.opacity = Math.min(0.94, 0.46 + focusStrength * 0.22 + unlockProgress * 0.28);
+      }
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitScanner) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const scan = Math.max(0, Math.sin(elapsedTime * 2.1 + object.id));
+      object.scale.x = 1 + scan * 0.025 + focusStrength * 0.035 + unlockProgress * 0.06;
+      material.emissiveIntensity = 0.08 + scan * 0.18 + focusStrength * 0.22 + unlockProgress * 0.48;
+      if (material.transparent) {
+        material.opacity = Math.min(0.9, 0.62 + scan * 0.08 + unlockProgress * 0.18);
+      }
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitSpin) {
+      if (typeof object.userData.baseY !== "number") object.userData.baseY = object.position.y;
+      const seed = (object.userData.deviceKitSeed as number | undefined) ?? object.id;
+      object.rotation.z = elapsedTime * (0.65 + seed * 0.08) + unlockProgress * Math.PI * 1.6;
+      object.position.y = (object.userData.baseY as number) + Math.sin(elapsedTime * 2.2 + seed) * 0.014 + unlockProgress * 0.032;
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitRainDrop) {
+      if (typeof object.userData.baseY !== "number") object.userData.baseY = object.position.y;
+      const seed = (object.userData.deviceKitSeed as number | undefined) ?? object.id;
+      object.position.y = (object.userData.baseY as number) - ((elapsedTime * 0.18 + seed * 0.07) % 0.18) + unlockProgress * 0.055;
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.opacity = 0.58 + Math.sin(elapsedTime * 3.1 + seed) * 0.12 + unlockProgress * 0.12;
+      material.emissiveIntensity = 0.36 + focusStrength * 0.26 + unlockProgress * 0.55;
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitBeat) {
+      const beat = 1 + Math.max(0, Math.sin(elapsedTime * 2.6)) * 0.035 + unlockProgress * 0.08;
+      object.scale.x = beat;
+      object.scale.y = beat * 0.8;
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = 0.08 + focusStrength * 0.2 + unlockProgress * 0.42;
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitPrism) {
+      object.rotation.x = elapsedTime * 0.22 + unlockProgress * 0.8;
+      object.rotation.y = elapsedTime * 0.42 + unlockProgress * 1.4;
+      object.scale.set(1 + focusStrength * 0.08 + unlockProgress * 0.18, 1.18 + unlockProgress * 0.16, 0.72 + focusStrength * 0.04);
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = 0.58 + Math.sin(elapsedTime * 2.2) * 0.16 + focusStrength * 0.42 + unlockProgress * 1.1;
+      material.opacity = 0.68 + Math.sin(elapsedTime * 1.6) * 0.05;
+    }
+    if (object instanceof THREE.Mesh && object.userData.deviceKitHalo) {
+      const seed = (object.userData.deviceKitSeed as number | undefined) ?? object.id;
+      object.rotation.z = elapsedTime * (0.28 + seed * 0.08) + unlockProgress * Math.PI;
+      object.scale.setScalar(1 + Math.sin(elapsedTime * 1.8 + seed) * 0.035 + focusStrength * 0.08 + unlockProgress * 0.16);
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.opacity = 0.38 + Math.sin(elapsedTime * 2.1 + seed) * 0.08 + unlockProgress * 0.26;
+      material.emissiveIntensity = 0.5 + focusStrength * 0.36 + unlockProgress * 0.9;
     }
     if (object instanceof THREE.Mesh && object.userData.float) {
       object.position.y += Math.sin(elapsedTime + object.id) * 0.0008;

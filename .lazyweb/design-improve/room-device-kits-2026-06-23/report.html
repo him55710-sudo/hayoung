@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Room Device Kits UX Pass</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        color: #f8efe4;
+        background: #0f1117;
+        font: 15px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.18;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 34px;
+      }
+
+      h2 {
+        margin-top: 34px;
+        color: #ffdf9a;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+      }
+
+      .meta,
+      p,
+      li,
+      figcaption {
+        color: rgba(248, 239, 228, 0.78);
+      }
+
+      .tldr {
+        margin: 20px 0;
+        padding: 16px 18px;
+        border: 1px solid rgba(141, 200, 255, 0.28);
+        border-radius: 8px;
+        background: rgba(141, 200, 255, 0.1);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+      }
+
+      figure {
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid rgba(255, 223, 154, 0.2);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      figcaption {
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+
+      pre {
+        overflow-x: auto;
+        padding: 14px;
+        border-radius: 8px;
+        color: #ffe2a6;
+        background: rgba(0, 0, 0, 0.28);
+      }
+
+      code {
+        color: #ffdf9a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="meta">Lazyweb design-improve pass · 2026-06-23</p>
+      <h1>방마다 다른 물리 퍼즐 장치 만들기</h1>
+      <section class="tldr">
+        <strong>TL;DR</strong>
+        <p>
+          중앙 콘솔이 모든 방에서 비슷해 보이던 문제를 줄이기 위해, 5개 방마다 다른 3D 장치 키트를 추가했다.
+          이제 콘솔은 다이어리/사진 슬롯, 카페 토큰 영수증, 빗방울 방향 레일, 노트 브리지, 피날레 프리즘 게이트로 구분된다.
+        </p>
+      </section>
+
+      <h2>Current State</h2>
+      <div class="grid">
+        <figure>
+          <img src="./references/current-room-device-kit-room1.png" alt="Current room 1 device kit" />
+          <figcaption>현재 1방: 공통 콘솔 위에 다이어리/사진 슬롯 키트가 올라간 상태.</figcaption>
+        </figure>
+        <figure>
+          <img src="./references/web-game-room-device-kits-shot-0.png" alt="Web game harness intro capture" />
+          <figcaption>develop-web-game 하네스 캡처: 첫 화면 렌더링 정상.</figcaption>
+        </figure>
+      </div>
+
+      <h2>Reference Patterns</h2>
+      <div class="grid">
+        <figure>
+          <img src="./references/lazyweb-endurosat-subsystem-ui.png" alt="Dark subsystem UI reference" />
+          <figcaption>[Lazyweb] Endurosat: dark subsystem browsing UI. 각 방 콘솔을 다른 subsystem처럼 보이게 하는 근거.</figcaption>
+        </figure>
+        <figure>
+          <img src="./references/lazyweb-camber-holographic-scanner.png" alt="Holographic scanner UI reference" />
+          <figcaption>[Lazyweb] Camber/HII: 중앙 홀로그램 스캐너와 원형 HUD. 피날레 프리즘/halo 장치에 반영.</figcaption>
+        </figure>
+        <figure>
+          <img src="./references/lazyweb-times-newer-roman-status-hud.png" alt="Minimal game HUD reference" />
+          <figcaption>[Lazyweb] Times Newer Roman: 단순한 상태 표시 HUD. 장치별 상태 레일과 메타데이터 검증에 반영.</figcaption>
+        </figure>
+      </div>
+
+      <h2>Implemented Ideas</h2>
+      <h3>1. Room-Specific Device Silhouettes</h3>
+      <p>
+        모든 방이 같은 콘솔을 반복한다는 느낌을 줄이기 위해 각 방 전면 장치를 다른 물체 조합으로 만들었다.
+        1방은 앨범/사진 슬롯, 2방은 영수증/컵/토큰, 3방은 빗방울/방향 패드/갈라진 하트, 4방은 노트 브리지,
+        5방은 프리즘과 메모리 프레임으로 보인다.
+      </p>
+      <pre>┌ 콘솔 ─────────────────────┐
+│ Room 1: diary + photo slot │
+│ Room 2: receipt + tokens   │
+│ Room 3: rain rail + heart  │
+│ Room 4: note bridge        │
+│ Room 5: prism gate         │
+└───────────────────────────┘</pre>
+
+      <h3>2. Animated, Verifiable Props</h3>
+      <p>
+        장치별 메쉬에 <code>deviceKitFloat</code>, <code>deviceKitScanner</code>, <code>deviceKitRainDrop</code>,
+        <code>deviceKitPrism</code> 같은 상태를 붙이고, 언락/포커스에 반응하도록 만들었다.
+        <code>render_game_to_text()</code>에는 <code>roomDeviceKits</code>가 추가되어 검증에서 빠지면 실패한다.
+      </p>
+
+      <h2>QA</h2>
+      <ul>
+        <li><code>npm run build</code> 통과.</li>
+        <li><code>npm run verify:game</code> 통과. 10개 퍼즐, 엔딩, 모바일 조작, 그래픽 모드, 힌트 계약서, 새 장치 메타데이터를 검증했다.</li>
+        <li><code>npm audit --omit=dev</code> 통과, 취약점 0개.</li>
+        <li>develop-web-game Playwright 하네스 통과.</li>
+      </ul>
+    </main>
+  </body>
+</html>

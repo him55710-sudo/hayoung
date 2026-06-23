@@ -379,6 +379,7 @@ async function main() {
     if (!desktopState.prologueSetDressing?.includes("prologue arches")) throw new Error(`Prologue set dressing metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.lockConsoleUX?.includes("two-zone puzzle modal")) throw new Error(`Lock console UX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.unlockFeedbackUX?.includes("OPEN readout")) throw new Error(`Unlock feedback UX metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.roomDeviceKits?.includes("five room-specific physical puzzle kits")) throw new Error(`Room device kit metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const hintCheck = await verifyHintPenaltyUX(desktop, "desktop");
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
