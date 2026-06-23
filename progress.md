@@ -66,6 +66,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added first-room prologue arches, photo garland, string bulbs, and a floor light path, then tuned them after screenshot review so the camera is not blocked by the new geometry.
 - Added `.lazyweb/design-improve/prologue-splash-2026-06-23/report.html` with current screenshots and the reference patterns behind this pass.
 - Extended `scripts/verify-game.mjs` to assert prologue set-dressing metadata.
+- Used Lazyweb quick-reference searches for mission briefing, sci-fi control panels, and puzzle game UI, then upgraded puzzle modals into a two-zone lock console with a case-file panel, device readout, answer progress strip, clue chips, and mobile stacking.
+- Added `.lazyweb/quick-references/lock-console-ui-2026-06-23/report.html` with before/after lock-console screenshots and the reference patterns behind this pass.
+- Extended `scripts/verify-game.mjs` to assert lock-console UX metadata.
 
 ## Current QA
 
@@ -98,6 +101,12 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run verify:game` passed after the prologue pass; it asserts prologue set-dressing metadata in addition to the existing full puzzle, graphics, ending, and mobile-control checks.
 - `develop-web-game` Playwright client ran successfully again for the updated prologue capture at `output/web-game-prologue-stage/shot-0.png`.
 - Windows Computer Use detected a UAC consent window titled `Epic Games Launcher이(가) 사용자 권한을 요청하고 있습니다.` The installer cannot continue until the user manually approves that Windows security prompt.
+- Latest lock-console screenshots inspected: `output/playwright/500-puzzle-modal-lock-console.png` and `output/playwright/500-puzzle-modal-lock-console-mobile.png`.
+- `npm run build` passed after the lock-console pass.
+- `npm run verify:game` passed after the lock-console pass; it now asserts lock-console UX metadata in addition to the existing full puzzle, graphics, ending, and mobile-control checks.
+- `npm audit --omit=dev` passed with 0 vulnerabilities after the lock-console pass.
+- `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-lock-console/shot-0.png`.
+- `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` still reports `EpicInstallerExists: True`, `UnrealEditor` absent, and elevated `msiexec.exe` PID `28632` waiting for the user-approved Epic Games Launcher installation.
 
 ## Known Limitations
 

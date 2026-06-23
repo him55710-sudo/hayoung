@@ -1217,19 +1217,143 @@ button {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(4, 5, 8, 0.46);
+  background:
+    radial-gradient(circle at 62% 42%, rgba(141, 200, 255, 0.12), transparent 18rem),
+    radial-gradient(circle at 36% 46%, rgba(255, 125, 142, 0.1), transparent 16rem),
+    rgba(4, 5, 8, 0.56);
 }
 
 .puzzle-modal {
   position: relative;
-  width: min(560px, calc(100vw - 36px));
+  width: min(920px, calc(100vw - 36px));
+  padding: 0;
+  overflow: hidden;
+}
+
+.lock-console-modal::before,
+.lock-console-modal::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.lock-console-modal::before {
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 229, 184, 0.12), transparent),
+    repeating-linear-gradient(90deg, rgba(255, 248, 236, 0.035) 0 1px, transparent 1px 82px);
+  opacity: 0.64;
+}
+
+.lock-console-modal::after {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background:
+    linear-gradient(90deg, rgba(255, 125, 142, 0.95) var(--answer-progress, 0%), rgba(255, 229, 184, 0.16) var(--answer-progress, 0%));
+  box-shadow: 0 0 24px rgba(255, 125, 142, 0.3);
+}
+
+.lock-console-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+  gap: 0;
+}
+
+.lock-case-file,
+.lock-device-console {
+  min-width: 0;
   padding: 28px;
 }
 
-.puzzle-modal > span {
+.lock-case-file {
+  display: grid;
+  align-content: start;
+  border-right: 1px solid rgba(255, 229, 184, 0.16);
+  background:
+    radial-gradient(circle at 16% 10%, rgba(255, 223, 154, 0.12), transparent 12rem),
+    rgba(8, 8, 12, 0.2);
+}
+
+.lock-device-console {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(141, 200, 255, 0.12), transparent 12rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.12));
+}
+
+.lock-kicker {
   color: #ffdf9a;
   font-size: 12px;
   font-weight: 950;
+}
+
+.lock-clue-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.lock-clue-chips span {
+  min-height: 30px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 229, 184, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.08)),
+    rgba(255, 255, 255, 0.04);
+  color: rgba(255, 248, 236, 0.82);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.lock-device-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(255, 248, 236, 0.64);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.lock-device-topline b {
+  color: #ffdf9a;
+}
+
+.device-readout {
+  display: grid;
+  place-items: center;
+  min-height: 58px;
+  margin-top: 10px;
+  border: 1px solid rgba(141, 200, 255, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(141, 200, 255, 0.14), rgba(255, 125, 142, 0.08)),
+    rgba(5, 8, 13, 0.62);
+  color: #fff8ec;
+  box-shadow:
+    inset 0 0 28px rgba(141, 200, 255, 0.1),
+    0 16px 36px rgba(0, 0, 0, 0.2);
+}
+
+.device-readout span {
+  font-size: 24px;
+  font-weight: 950;
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 18px rgba(141, 200, 255, 0.42);
+}
+
+.lock-console-modal.has-answer .device-readout {
+  border-color: rgba(255, 223, 154, 0.46);
+  box-shadow:
+    inset 0 0 34px rgba(255, 223, 154, 0.1),
+    0 0 32px rgba(255, 125, 142, 0.18),
+    0 16px 36px rgba(0, 0, 0, 0.2);
 }
 
 .lock-status-rail {
@@ -1297,7 +1421,9 @@ button {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.08)),
     rgba(10, 11, 15, 0.34);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 0 30px rgba(141, 200, 255, 0.05);
 }
 
 .code-preview,
@@ -1391,6 +1517,9 @@ button {
   font-weight: 950;
   letter-spacing: 0;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 .puzzle-pad button:hover,
@@ -2153,7 +2282,28 @@ button {
   .puzzle-modal {
     max-height: calc(100vh - 26px);
     overflow: auto;
-    padding: 22px;
+  }
+
+  .lock-console-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lock-case-file,
+  .lock-device-console {
+    padding: 20px;
+  }
+
+  .lock-case-file {
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 229, 184, 0.16);
+  }
+
+  .device-readout {
+    min-height: 48px;
+  }
+
+  .device-readout span {
+    font-size: 18px;
   }
 
   .lock-preview {

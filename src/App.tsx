@@ -578,6 +578,7 @@ function App() {
         mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
         endingExperience: "heavenly finale with vow stats, cloud-step memory timeline, photo placeholders, and replay action",
         prologueSetDressing: "cinematic intro splash plus first-room prologue arches, photo garland, and floor light path",
+        lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, and tactile lock console",
         mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
@@ -741,6 +742,11 @@ function App() {
         : canAdvanceRoom
           ? "이 방의 장치가 모두 반응했습니다. 문 앞의 빛을 따라가세요."
           : currentRoom.mood;
+  const activePuzzleProgress = activePuzzle ? Math.round((answer.length / activePuzzle.answer.length) * 100) : 0;
+  const activePuzzleRequirementLabel = activePuzzle?.requires?.length ? `연계 ${activePuzzle.requires.length}개` : "첫 단서";
+  const activePuzzleReadout = activePuzzle
+    ? answer.padEnd(activePuzzle.answer.length, "·")
+    : "";
 
   return (
     <main className="site-shell">
@@ -973,40 +979,62 @@ function App() {
 
           {activePuzzle && (
             <div className="modal-layer">
-              <section className="puzzle-modal" role="dialog" aria-label={activePuzzle.title}>
+              <section
+                className={`puzzle-modal lock-console-modal${answer ? " has-answer" : ""}`}
+                role="dialog"
+                aria-label={activePuzzle.title}
+                style={{ "--answer-progress": `${activePuzzleProgress}%` } as CSSProperties}
+              >
                 <button className="close-button" type="button" onClick={() => setActivePuzzleId(null)}>
                   <X aria-hidden="true" />
                 </button>
-                <span>
-                  문제 {activePuzzle.id}/10 · {kindLabel(activePuzzle.kind)}
-                </span>
-                <div className="lock-status-rail" aria-hidden="true">
-                  <span>{currentRoom.days}</span>
-                  <b>{activePuzzle.requires?.length ? "연계 잠금" : "첫 단서"}</b>
-                  <span>
-                    {answer.length}/{activePuzzle.answer.length}
-                  </span>
-                </div>
-                <h2>{activePuzzle.title}</h2>
-                <p>{activePuzzle.prompt}</p>
-                <LockPreview kind={activePuzzle.kind} answer={activePuzzle.answer} />
-                <PuzzleInputPad puzzle={activePuzzle} answer={answer} setAnswer={setAnswer} />
-                <p className="chain-note">{activePuzzle.chainNote}</p>
-                <div className="answer-row">
-                  <input
-                    value={answer}
-                    onChange={(event) => setAnswer(normalizePuzzleAnswer(activePuzzle, event.target.value))}
-                    inputMode={activePuzzle.kind === "code" || activePuzzle.kind === "memory" ? "numeric" : "text"}
-                    maxLength={activePuzzle.answer.length}
-                    placeholder={`초안 정답: ${activePuzzle.answer}`}
-                    autoCapitalize="characters"
-                    spellCheck="false"
-                    autoFocus
-                  />
-                  <button type="button" onClick={submitPuzzle}>
-                    <Check aria-hidden="true" />
-                    확인
-                  </button>
+                <div className="lock-console-grid">
+                  <div className="lock-case-file">
+                    <span className="lock-kicker">
+                      문제 {activePuzzle.id}/10 · {kindLabel(activePuzzle.kind)}
+                    </span>
+                    <h2>{activePuzzle.title}</h2>
+                    <p>{activePuzzle.prompt}</p>
+                    <div className="lock-clue-chips" aria-label="잠금 정보">
+                      <span>{currentRoom.days}</span>
+                      <span>{activePuzzleRequirementLabel}</span>
+                      <span>{activePuzzle.reward}</span>
+                    </div>
+                    <p className="chain-note">{activePuzzle.chainNote}</p>
+                  </div>
+
+                  <div className="lock-device-console">
+                    <div className="lock-device-topline" aria-hidden="true">
+                      <span>LOCK DEVICE</span>
+                      <b>{answer.length}/{activePuzzle.answer.length}</b>
+                    </div>
+                    <div className="device-readout" aria-label="입력 진행 상황">
+                      <span>{activePuzzleReadout}</span>
+                    </div>
+                    <div className="lock-status-rail" aria-hidden="true">
+                      <span>{activePuzzle.requires?.length ? "CHAIN" : "FIRST"}</span>
+                      <b>{activePuzzle.kind.toUpperCase()}</b>
+                      <span>{activePuzzleProgress}%</span>
+                    </div>
+                    <LockPreview kind={activePuzzle.kind} answer={activePuzzle.answer} />
+                    <PuzzleInputPad puzzle={activePuzzle} answer={answer} setAnswer={setAnswer} />
+                    <div className="answer-row">
+                      <input
+                        value={answer}
+                        onChange={(event) => setAnswer(normalizePuzzleAnswer(activePuzzle, event.target.value))}
+                        inputMode={activePuzzle.kind === "code" || activePuzzle.kind === "memory" ? "numeric" : "text"}
+                        maxLength={activePuzzle.answer.length}
+                        placeholder={`초안 정답: ${activePuzzle.answer}`}
+                        autoCapitalize="characters"
+                        spellCheck="false"
+                        autoFocus
+                      />
+                      <button type="button" onClick={submitPuzzle}>
+                        <Check aria-hidden="true" />
+                        확인
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </section>
             </div>

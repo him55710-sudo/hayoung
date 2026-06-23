@@ -293,6 +293,7 @@ async function main() {
     if (!desktopState.escapeVista?.includes("rear-door escape vista")) throw new Error(`Escape vista metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.mobileControls?.includes("touch joystick")) throw new Error(`Mobile control metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.prologueSetDressing?.includes("prologue arches")) throw new Error(`Prologue set dressing metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.lockConsoleUX?.includes("two-zone puzzle modal")) throw new Error(`Lock console UX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
