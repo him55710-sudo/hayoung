@@ -178,6 +178,21 @@ button {
   background: #0d0f14;
 }
 
+.game-screen::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    radial-gradient(ellipse at 50% 47%, transparent 0 44%, rgba(4, 5, 9, 0.2) 72%, rgba(1, 2, 5, 0.62) 100%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 3px),
+    repeating-radial-gradient(circle at 18% 24%, rgba(255, 244, 210, 0.034) 0 1px, transparent 1px 6px);
+  mix-blend-mode: soft-light;
+  opacity: 0.58;
+  transition: opacity 220ms ease;
+}
+
 .game-screen::after {
   position: absolute;
   z-index: 2;
@@ -188,6 +203,10 @@ button {
     radial-gradient(circle at 50% 48%, rgba(255, 246, 210, 0.72), transparent 0),
     linear-gradient(90deg, transparent, rgba(255, 221, 145, 0), transparent);
   opacity: 0;
+}
+
+.game-screen.has-focus-target::before {
+  opacity: 0.7;
 }
 
 .game-screen.is-unlocking::after {

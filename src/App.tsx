@@ -438,12 +438,15 @@ function App() {
         cinematicAtmosphere: graphicsQualitySetting.atmosphere
           ? "volumetric light shafts, floor reflections, room-specific rain/city/heaven light layers"
           : "reduced in performance mode",
+        cinematicCamera: "dynamic FOV breathing, ACES exposure ramping, movement sway, focus pull, and unlock impact",
+        screenPostFx: "soft vignette, fine film grain, scanline texture, and unlock flash overlay",
         cameraMode: "first-person",
         embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
         characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
         interactableInRange: nearInteractable,
         interactionFocus: "distance-reactive reticle, floor glyph, lock halo, and focus light around the active puzzle console",
         unlockDetail: "animated latch lift, sliding bolts, glowing door seam, hinges, handle, and unlock sparks",
+        collisionModel: "room bounds plus solid central puzzle console stop-zone",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -1258,12 +1261,28 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
         bob += delta * 2.2;
       }
 
-      player.position.x = THREE.MathUtils.clamp(player.position.x + velocity.x, targetX - 5.95, targetX + 5.95);
-      player.position.z = THREE.MathUtils.clamp(player.position.z + velocity.z, -3.35, 3.85);
+      let nextPlayerX = THREE.MathUtils.clamp(player.position.x + velocity.x, targetX - 5.95, targetX + 5.95);
+      let nextPlayerZ = THREE.MathUtils.clamp(player.position.z + velocity.z, -3.35, 3.85);
+      const consoleHalfWidth = 3.38;
+      const consoleFrontZ = 0.18;
+      const consoleBackZ = -2.62;
+      if (Math.abs(nextPlayerX - targetX) < consoleHalfWidth && nextPlayerZ < consoleFrontZ && nextPlayerZ > consoleBackZ) {
+        if (player.position.z >= consoleFrontZ) {
+          nextPlayerZ = consoleFrontZ;
+        } else if (player.position.z <= consoleBackZ) {
+          nextPlayerZ = consoleBackZ;
+        } else {
+          nextPlayerX = player.position.x < targetX ? targetX - consoleHalfWidth : targetX + consoleHalfWidth;
+        }
+      }
+      player.position.x = nextPlayerX;
+      player.position.z = nextPlayerZ;
       player.position.y = 1.66 + Math.sin(bob) * (velocity.lengthSq() > 0 ? 0.035 : 0.012);
 
+      const isMoving = velocity.lengthSq() > 0;
+      const cameraRoll = Math.sin(bob * 0.74) * (isMoving ? 0.012 : 0.003);
       camera.position.copy(player.position);
-      camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
+      camera.rotation.set(player.pitch, player.yaw, cameraRoll, "YXZ");
 
       const targetBackground = new THREE.Color(activeRoom.palette[0]).lerp(new THREE.Color(activeRoom.palette[3]), roomIndexRef.current === 4 ? 0.08 : 0.5);
       scene.background = targetBackground;
@@ -1275,11 +1294,20 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, unlockTick,
         unlockStartedAt = elapsedTime;
       }
       const unlockProgress = THREE.MathUtils.clamp((elapsedTime - unlockStartedAt) / 1.2, 0, 1);
-      animateFirstPersonRig(firstPersonRig, elapsedTime, velocity.lengthSq() > 0, unlockProgress, solvedRef.current);
+      animateFirstPersonRig(firstPersonRig, elapsedTime, isMoving, unlockProgress, solvedRef.current);
 
       const puzzlePoint = new THREE.Vector3(targetX, 1.0, -1.35);
       const distance = puzzlePoint.distanceTo(player.position);
       const focusStrength = THREE.MathUtils.clamp(1 - (distance - 1.15) / 2.35, 0, 1);
+      const targetFov = 66 + (isMoving ? 1.1 : 0) - focusStrength * 2.45 - unlockProgress * 0.9 + (roomIndexRef.current === 4 ? -1.2 : 0);
+      const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.055);
+      if (Math.abs(camera.fov - nextFov) > 0.01) {
+        camera.fov = nextFov;
+        camera.updateProjectionMatrix();
+      }
+      const roomExposure = roomIndexRef.current === 4 ? 0.98 : roomIndexRef.current === 2 ? 0.82 : 0.88;
+      const targetExposure = roomExposure + focusStrength * 0.035 + unlockProgress * 0.075 + (phaseRef.current === "ending" ? 0.045 : 0);
+      renderer.toneMappingExposure = THREE.MathUtils.lerp(renderer.toneMappingExposure, targetExposure, 0.045);
       const nextFocusState = distance < 3.1;
       if (nextFocusState !== lastFocusState) {
         onInteractFocusChange(nextFocusState);

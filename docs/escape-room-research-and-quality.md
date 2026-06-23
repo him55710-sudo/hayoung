@@ -23,8 +23,11 @@
 - Room audio: procedural Web Audio ambience per room, so the game has room-specific BGM without shipping large audio files yet.
 - Graphics quality: top-right HUD cycles cinematic, balanced, and performance modes. The modes cap render pixel ratio and tune bloom, shadows, and dust so high-end machines keep the richer image while weaker devices can lower GPU cost.
 - Cinematic atmosphere: each room now has soft alpha-textured light shafts, floor reflection ribbons, and room-specific rain, night-city, or heaven-gate light layers. Performance mode disables this atmosphere layer.
+- Cinematic camera: the first-person camera now has subtle movement roll, FOV breathing near interactables, and room/unlock-aware ACES exposure ramping.
+- Screen post-FX: the playfield has a soft vignette, fine film grain, scanline texture, and a separate unlock flash layer below the HUD.
 - Interaction focus: the active puzzle console has distance-reactive reticle/button styling plus a restrained in-world floor glyph, lock halo, and focus light.
 - Unlock feedback: correct answers trigger latch lift, door seam glow, sliding bolts, hinge/handle motion, gear/dial motion, unlock sparks, and a screen flash.
+- Collision: room bounds now include a solid stop-zone around the central puzzle console so the player can approach it without walking through the device.
 - Performance: procedural geometry, cached procedural material textures, shared simple materials, pixel ratio capped by graphics mode, bloom strength kept moderate.
 
 ## Open-Source Usage
@@ -67,6 +70,7 @@ npm audit --omit=dev
 - graphics quality metadata is exposed through `render_game_to_text`
 - graphics quality cycling lowers the canvas render buffer in performance mode
 - cinematic atmosphere metadata is exposed through `render_game_to_text`
+- cinematic camera, screen post-FX, and central console collision metadata are exposed through `render_game_to_text`
 - room-clear overlays appear after every non-final room's second solved puzzle
 - all 10 placeholder puzzles still solve after room-transition spawn reset
 - WebGL canvas is not blank on desktop and mobile
