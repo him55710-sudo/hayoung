@@ -25,6 +25,7 @@
 - Cinematic atmosphere: each room now has soft alpha-textured light shafts, floor reflection ribbons, and room-specific rain, night-city, or heaven-gate light layers. Performance mode disables this atmosphere layer.
 - Cinematic camera: the first-person camera now has subtle movement roll, FOV breathing near interactables, and room/unlock-aware ACES exposure ramping.
 - Screen post-FX: the playfield has a soft vignette, fine film grain, scanline texture, and a separate unlock flash layer below the HUD.
+- Calm HUD: secondary HUD panels dim while the player is moving, then restore clarity near interactables or on hover so the room art and lock device stay dominant.
 - Interaction focus: the active puzzle console has distance-reactive reticle/button styling plus a restrained in-world floor glyph, lock halo, and focus light.
 - Unlock feedback: correct answers trigger latch lift, door seam glow, sliding bolts, hinge/handle motion, gear/dial motion, unlock sparks, and a screen flash.
 - Collision: room bounds now include a solid stop-zone around the central puzzle console so the player can approach it without walking through the device.
@@ -71,6 +72,7 @@ npm audit --omit=dev
 - graphics quality cycling lowers the canvas render buffer in performance mode
 - cinematic atmosphere metadata is exposed through `render_game_to_text`
 - cinematic camera, screen post-FX, and central console collision metadata are exposed through `render_game_to_text`
+- calm HUD metadata is exposed through `render_game_to_text`
 - room-clear overlays appear after every non-final room's second solved puzzle
 - all 10 placeholder puzzles still solve after room-transition spawn reset
 - WebGL canvas is not blank on desktop and mobile

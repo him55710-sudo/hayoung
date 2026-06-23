@@ -45,6 +45,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Added web-side cinematic atmosphere layers: soft alpha-textured volumetric light shafts, floor reflection ribbons, room-specific rain/city/heaven layers, and performance-mode atmosphere hiding.
 - Added a cinematic camera/post-FX pass: subtle first-person camera roll, focus-distance FOV breathing, room/unlock-aware ACES exposure ramping, soft vignette, fine film grain, and scanline texture.
 - Added a solid central puzzle-console stop-zone so players can approach the lock device without walking through it.
+- Added calm HUD behavior: secondary panels dim during movement and restore near interactables/hover, keeping the lock device and room art visually dominant while walking.
 
 ## Current QA
 
@@ -58,6 +59,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` reports the Epic installer MSI exists, Unreal Editor is absent, and one elevated `msiexec` process is still active.
 - Latest cinematic atmosphere screenshots inspected: `output/playwright/500-cinematic-atmosphere-room1-soft.png`, `output/playwright/500-cinematic-atmosphere-room3-rain-soft.png`, `output/playwright/500-cinematic-atmosphere-room5-heaven-soft.png`, and `output/playwright/500-cinematic-atmosphere-mobile-soft.png`.
 - Latest post-FX/collision screenshots inspected: `output/playwright/500-postfx-collision-establishing.png`, `output/playwright/500-postfx-collision-focus-live.png`, and `output/playwright/500-postfx-mobile.png`.
+- Latest calm HUD screenshots inspected: `output/playwright/500-calm-hud-moving-desktop.png` and `output/playwright/500-calm-hud-moving-mobile.png`.
 - Windows Computer Use detected a UAC consent window titled `Epic Games Launcher이(가) 사용자 권한을 요청하고 있습니다.` The installer cannot continue until the user manually approves that Windows security prompt.
 
 ## Known Limitations

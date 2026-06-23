@@ -447,6 +447,7 @@ function App() {
         interactionFocus: "distance-reactive reticle, floor glyph, lock halo, and focus light around the active puzzle console",
         unlockDetail: "animated latch lift, sliding bolts, glowing door seam, hinges, handle, and unlock sparks",
         collisionModel: "room bounds plus solid central puzzle console stop-zone",
+        hudBehavior: "calm HUD dims secondary panels while moving and restores clarity near interactables",
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
         coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
@@ -571,6 +572,7 @@ function App() {
 
   const roomProgress = `${roomIndex + 1}/${rooms.length}`;
   const puzzleProgress = `${solvedIds.length}/${puzzles.length}`;
+  const playerIsMoving = movement.forward || movement.back || movement.left || movement.right;
 
   return (
     <main className="site-shell">
@@ -602,7 +604,7 @@ function App() {
       )}
 
       {(phase === "game" || phase === "ending") && (
-        <section className={`game-screen${unlocking ? " is-unlocking" : ""}${nearInteractable ? " has-focus-target" : ""}`} aria-label="500일 1인칭 3D 방탈출">
+        <section className={`game-screen${unlocking ? " is-unlocking" : ""}${nearInteractable ? " has-focus-target" : ""}${playerIsMoving ? " is-moving" : ""}`} aria-label="500일 1인칭 3D 방탈출">
           <AnniversaryScene
             roomIndex={roomIndex}
             phase={phase}

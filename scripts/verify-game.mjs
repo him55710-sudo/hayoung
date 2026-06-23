@@ -216,6 +216,7 @@ async function main() {
     if (!desktopState.cinematicCamera?.includes("FOV")) throw new Error(`Cinematic camera metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.screenPostFx?.includes("vignette")) throw new Error(`Screen post-FX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.collisionModel?.includes("console")) throw new Error(`Collision metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.hudBehavior?.includes("calm HUD")) throw new Error(`HUD behavior metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
