@@ -59,6 +59,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Replaced the mobile 4-button movement UI with a translucent gamepad-style touch joystick and added a right-side look pad for drag-responsive first-person camera control.
 - Added delegated mobile touch input plumbing via `window.hayoungTouchControls` so touch movement/look is consumed directly by the Three.js loop and can be verified deterministically.
 - Extended `scripts/verify-game.mjs` to assert mobile touch controls by rotating the camera and moving the player in the mobile viewport.
+- Upgraded the ending into a cleaner heavenly finale with vow stats, halo/aura layers, a cloud-step memory rail, numbered memory cards, and a replay action.
+- Added ending-only HUD suppression so the final letter is not visually competing with game chrome.
+- Extended `scripts/verify-game.mjs` to assert the heavenly ending metadata, wait for ending HUD chrome to fade out, and save desktop/mobile finale screenshots.
 
 ## Current QA
 
@@ -85,6 +88,8 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Mobile input verification passed: the look pad changed yaw from `0` to `-0.3192`, and the move pad changed camera position from `(0, 3.25)` to `(-1.379, 0.18)`.
 - `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-mobile-controls/shot-0.png`.
 - `npm run verify:game` passed after the mobile-control pass; it now checks 10 desktop puzzle solves, ending, graphics quality, mobile canvas pixels, mobile-control metadata, look-pad rotation, and touch movement.
+- Latest heavenly finale screenshots inspected: `output/playwright/500-ending-heavenly-finale-clean.png` and `output/playwright/500-ending-heavenly-finale-mobile-hudless.png`.
+- `npm run verify:game` passed after the heavenly-finale pass; it now checks 10 desktop puzzle solves, ending metadata, ending HUD suppression, graphics quality, mobile canvas pixels, mobile-control metadata, look-pad rotation, and touch movement.
 - Windows Computer Use detected a UAC consent window titled `Epic Games Launcher이(가) 사용자 권한을 요청하고 있습니다.` The installer cannot continue until the user manually approves that Windows security prompt.
 
 ## Known Limitations

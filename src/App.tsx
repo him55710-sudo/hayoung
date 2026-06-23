@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AnimationEvent } from "react";
+import type { AnimationEvent, CSSProperties } from "react";
 import * as THREE from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -576,6 +576,7 @@ function App() {
         objectiveTracker: "case-file HUD shows current lock status, next clue, room solve meter, and puzzle input progress",
         escapeVista: "rear-door escape vista uses themed silhouettes, breadcrumb floor lights, and room-specific portal dressing",
         mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
+        endingExperience: "heavenly finale with vow stats, cloud-step memory timeline, photo placeholders, and replay action",
         mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
@@ -778,7 +779,10 @@ function App() {
       )}
 
       {(phase === "game" || phase === "ending") && (
-        <section className={`game-screen${unlocking ? " is-unlocking" : ""}${nearInteractable ? " has-focus-target" : ""}${playerIsMoving ? " is-moving" : ""}`} aria-label="500일 1인칭 3D 방탈출">
+        <section
+          className={`game-screen${unlocking ? " is-unlocking" : ""}${nearInteractable ? " has-focus-target" : ""}${playerIsMoving ? " is-moving" : ""}${phase === "ending" ? " is-ending" : ""}`}
+          aria-label="500일 1인칭 3D 방탈출"
+        >
           <AnniversaryScene
             roomIndex={roomIndex}
             phase={phase}
@@ -891,57 +895,38 @@ function App() {
             </div>
           </footer>
 
-          {!roomClearVisible && (
+          {phase === "game" && !roomClearVisible && (
             <button className={`interact-button${nearInteractable ? " is-focused" : ""}`} type="button" onClick={openNextPuzzle}>
               {canAdvanceRoom && roomIndex < rooms.length - 1 ? <DoorOpen aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
               {availablePuzzle ? "E 조사하기" : roomIndex < rooms.length - 1 ? "다음 방" : "엔딩 보기"}
             </button>
           )}
 
-          <div
-            className="mobile-pad"
-            aria-label="모바일 이동 패드"
-          >
-            <span className="mobile-pad-ring" aria-hidden="true" />
-            <span className="mobile-pad-core" aria-hidden="true" />
-            <button
-              className="move-up"
-              type="button"
-              data-move="forward"
-            >
-              <ArrowUp aria-hidden="true" />
-            </button>
-            <button
-              className="move-left"
-              type="button"
-              data-move="left"
-            >
-              <ArrowLeft aria-hidden="true" />
-            </button>
-            <button
-              className="move-down"
-              type="button"
-              data-move="back"
-            >
-              <ArrowDown aria-hidden="true" />
-            </button>
-            <button
-              className="move-right"
-              type="button"
-              data-move="right"
-            >
-              <ArrowRight aria-hidden="true" />
-            </button>
-          </div>
+          {phase === "game" && (
+            <>
+              <div className="mobile-pad" aria-label="모바일 이동 패드">
+                <span className="mobile-pad-ring" aria-hidden="true" />
+                <span className="mobile-pad-core" aria-hidden="true" />
+                <button className="move-up" type="button" data-move="forward">
+                  <ArrowUp aria-hidden="true" />
+                </button>
+                <button className="move-left" type="button" data-move="left">
+                  <ArrowLeft aria-hidden="true" />
+                </button>
+                <button className="move-down" type="button" data-move="back">
+                  <ArrowDown aria-hidden="true" />
+                </button>
+                <button className="move-right" type="button" data-move="right">
+                  <ArrowRight aria-hidden="true" />
+                </button>
+              </div>
 
-          <div
-            className={`look-pad${lookInput.active ? " is-active" : ""}`}
-            aria-label="모바일 시점 조작 패드"
-            role="application"
-          >
-            <span className="look-pad-orbit" aria-hidden="true" />
-            <span className="look-pad-dot" aria-hidden="true" />
-          </div>
+              <div className={`look-pad${lookInput.active ? " is-active" : ""}`} aria-label="모바일 시점 조작 패드" role="application">
+                <span className="look-pad-orbit" aria-hidden="true" />
+                <span className="look-pad-dot" aria-hidden="true" />
+              </div>
+            </>
+          )}
 
           {hintCount > 0 && (
             <aside className="penalty-card">
@@ -1014,17 +999,42 @@ function App() {
 
           {phase === "ending" && (
             <div className="ending-letter">
+              <div className="ending-aura" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
               <div className="ending-copy">
                 <span>500일의 문이 열렸어</span>
-                <h2>하영아, 500일부터는 더 다정하게 같이 걷자.</h2>
+                <h2>하영아, 다음 방도 우리 둘이 같이 열자.</h2>
                 <p>
-                  지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로 돌아왔어. 앞으로의 방은 혼자 푸는 문제가 아니라,
-                  둘이 같이 만드는 추억이면 좋겠어.
+                  지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로 돌아왔어. 500일 이후의 방은 혼자 푸는 문제가 아니라,
+                  같이 웃고 같이 쉬면서 천천히 열어가자.
                 </p>
+                <div className="ending-vows" aria-label="다음 약속">
+                  <span>
+                    <b>500</b>
+                    <small>함께 쌓은 날</small>
+                  </span>
+                  <span>
+                    <b>10</b>
+                    <small>풀어낸 단서</small>
+                  </span>
+                  <span>
+                    <b>∞</b>
+                    <small>다음 약속</small>
+                  </span>
+                </div>
+              </div>
+              <div className="cloud-step-rail" aria-hidden="true">
+                {memorySlots.map((slot, index) => (
+                  <span key={`${slot.id}-cloud`} style={{ "--step": index } as CSSProperties} />
+                ))}
               </div>
               <div className="memory-timeline" aria-label="500일 기억 타임라인">
-                {memorySlots.map((slot) => (
+                {memorySlots.map((slot, index) => (
                   <figure className="memory-card" key={slot.id}>
+                    <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
                     <img src={slot.image} alt={`${slot.dayRange} ${slot.title}`} />
                     <figcaption>
                       <b>{slot.dayRange}</b>
@@ -1034,6 +1044,10 @@ function App() {
                   </figure>
                 ))}
               </div>
+              <button className="ending-replay" type="button" onClick={() => window.location.reload()}>
+                <RotateCcw aria-hidden="true" />
+                처음부터 다시 걷기
+              </button>
             </div>
           )}
         </section>

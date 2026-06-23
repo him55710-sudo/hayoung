@@ -296,6 +296,34 @@ async function main() {
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
     if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
+    if (!ending.endingExperience?.includes("heavenly finale")) throw new Error(`Ending experience metadata missing: ${JSON.stringify(ending)}`);
+    await desktop.waitForFunction(() => {
+      const screen = document.querySelector(".game-screen");
+      const topHud = document.querySelector(".top-hud");
+      const inventory = document.querySelector(".inventory-dock");
+      return Boolean(
+        screen?.classList.contains("is-ending") &&
+          topHud &&
+          inventory &&
+          Number.parseFloat(getComputedStyle(topHud).opacity) < 0.05 &&
+          Number.parseFloat(getComputedStyle(inventory).opacity) < 0.05,
+      );
+    }, null, { timeout: 5000 });
+    const endingHudHidden = await desktop.evaluate(() => {
+      const topHud = document.querySelector(".top-hud");
+      const inventory = document.querySelector(".inventory-dock");
+      return Boolean(
+        topHud &&
+          inventory &&
+          Number.parseFloat(getComputedStyle(topHud).opacity) < 0.05 &&
+          Number.parseFloat(getComputedStyle(inventory).opacity) < 0.05,
+      );
+    });
+    if (!endingHudHidden) throw new Error("Ending HUD chrome is still visible.");
+    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-clean.png", fullPage: true });
+    await desktop.setViewportSize({ width: 390, height: 844 });
+    await desktop.waitForTimeout(320);
+    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-mobile-hudless.png", fullPage: true });
 
     log("park desktop");
     await desktop.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
