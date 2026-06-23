@@ -69,6 +69,11 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Used Lazyweb quick-reference searches for mission briefing, sci-fi control panels, and puzzle game UI, then upgraded puzzle modals into a two-zone lock console with a case-file panel, device readout, answer progress strip, clue chips, and mobile stacking.
 - Added `.lazyweb/quick-references/lock-console-ui-2026-06-23/report.html` with before/after lock-console screenshots and the reference patterns behind this pass.
 - Extended `scripts/verify-game.mjs` to assert lock-console UX metadata.
+- Used Lazyweb design-improve references for achievement unlock, sci-fi success modal, targeting/energy feedback, and success confirmation patterns.
+- Added short puzzle unlock feedback: correct answers now hold the modal in an `OPEN` device-readout state, show a reward-circuit confirmation chip, disable further input during the hold, and then hand off to the existing 3D latch/spark/door motion.
+- Added `window.hayoungDebugHoldUnlock` as a QA-only capture hook so visual tests can hold the success state without slowing production gameplay.
+- Added `.lazyweb/design-improve/unlock-feedback-2026-06-23/report.html` with current unlock-feedback screenshots and reference rationale.
+- Extended `scripts/verify-game.mjs` to assert unlock-feedback metadata and verify every solved puzzle briefly exposes the `OPEN` success state before the modal closes.
 
 ## Current QA
 
@@ -106,6 +111,12 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run verify:game` passed after the lock-console pass; it now asserts lock-console UX metadata in addition to the existing full puzzle, graphics, ending, and mobile-control checks.
 - `npm audit --omit=dev` passed with 0 vulnerabilities after the lock-console pass.
 - `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-lock-console/shot-0.png`.
+- `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` still reports `EpicInstallerExists: True`, `UnrealEditor` absent, and elevated `msiexec.exe` PID `28632` waiting for the user-approved Epic Games Launcher installation.
+- Latest unlock-feedback screenshot inspected: `output/playwright/500-puzzle-unlock-feedback-desktop.png`.
+- `npm run build` passed after the unlock-feedback pass.
+- `npm run verify:game` passed after the unlock-feedback pass; it solved all 10 puzzles, checked each puzzle's `OPEN` success state, reached the ending, checked graphics quality, and verified mobile controls/canvas pixels.
+- `npm audit --omit=dev` passed with 0 vulnerabilities after the unlock-feedback pass.
+- `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-unlock-feedback/shot-0.png`.
 - `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` still reports `EpicInstallerExists: True`, `UnrealEditor` absent, and elevated `msiexec.exe` PID `28632` waiting for the user-approved Epic Games Launcher installation.
 
 ## Known Limitations

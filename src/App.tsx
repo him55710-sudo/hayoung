@@ -60,6 +60,12 @@ type Puzzle = {
   chainNote: string;
 };
 
+type UnlockFeedback = {
+  puzzleId: number;
+  title: string;
+  reward: string;
+};
+
 type MemorySlot = {
   id: string;
   dayRange: string;
@@ -208,6 +214,7 @@ declare global {
   interface Window {
     advanceTime?: (ms?: number) => void;
     hayoungCameraState?: { x: number; z: number; yaw: number; pitch: number };
+    hayoungDebugHoldUnlock?: boolean;
     hayoungTouchControls?: TouchControlState;
     render_game_to_text?: () => string;
   }
@@ -452,6 +459,7 @@ function App() {
   const [solvedIds, setSolvedIds] = useState<number[]>([]);
   const [activePuzzleId, setActivePuzzleId] = useState<number | null>(null);
   const [answer, setAnswer] = useState("");
+  const [unlockFeedback, setUnlockFeedback] = useState<UnlockFeedback | null>(null);
   const [message, setMessage] = useState("빛나는 장치가 조용히 반응하고 있어요.");
   const [hintCount, setHintCount] = useState(0);
   const [movement, setMovement] = useState<MovementState>({ forward: false, back: false, left: false, right: false });
@@ -578,7 +586,9 @@ function App() {
         mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
         endingExperience: "heavenly finale with vow stats, cloud-step memory timeline, photo placeholders, and replay action",
         prologueSetDressing: "cinematic intro splash plus first-room prologue arches, photo garland, and floor light path",
-        lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, and tactile lock console",
+        lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, tactile lock console, and short unlocked success state",
+        unlockFeedbackUX: "correct answers briefly hold the device modal in an OPEN readout state before the 3D latch, sparks, flash, and door motion fire",
+        activeUnlockFeedback: unlockFeedback?.reward ?? null,
         mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
         message,
@@ -606,6 +616,7 @@ function App() {
     roomClearVisible,
     solvedIds.length,
     solvedSet,
+    unlockFeedback,
   ]);
 
   const triggerUnlock = (showTransition = false) => {
@@ -657,6 +668,7 @@ function App() {
     if (availablePuzzle) {
       setActivePuzzleId(availablePuzzle.id);
       setAnswer("");
+      setUnlockFeedback(null);
       setMessage(`${availablePuzzle.title} 장치가 열렸습니다. ${availablePuzzle.chainNote}`);
       return;
     }
@@ -676,24 +688,33 @@ function App() {
   }
 
   function submitPuzzle() {
-    if (!activePuzzle) {
+    if (!activePuzzle || unlockFeedback) {
       return;
     }
     const normalizedAnswer = normalizePuzzleAnswer(activePuzzle, answer);
     if (normalizedAnswer !== activePuzzle.answer) {
       setAnswer(normalizedAnswer);
+      setUnlockFeedback(null);
       setMessage("아직 맞지 않아요. 단서의 순서와 장치의 형태를 다시 맞춰보세요.");
       return;
     }
-    setSolvedIds((ids) => (ids.includes(activePuzzle.id) ? ids : [...ids, activePuzzle.id]));
-    setMessage(`${activePuzzle.reward} 획득! ${activePuzzle.chainNote}`);
-    setActivePuzzleId(null);
-    setAnswer("");
-    triggerUnlock(activePuzzle.id === 10);
+    const solvedPuzzle = activePuzzle;
+    setAnswer(normalizedAnswer);
+    setUnlockFeedback({ puzzleId: solvedPuzzle.id, title: solvedPuzzle.title, reward: solvedPuzzle.reward });
+    setMessage(`장치가 열리는 중... ${solvedPuzzle.reward} 회로가 연결됐습니다.`);
 
-    if (activePuzzle.id === 10) {
-      window.setTimeout(() => setPhase("ending"), 520);
-    }
+    window.setTimeout(() => {
+      setSolvedIds((ids) => (ids.includes(solvedPuzzle.id) ? ids : [...ids, solvedPuzzle.id]));
+      setMessage(`${solvedPuzzle.reward} 획득! ${solvedPuzzle.chainNote}`);
+      setActivePuzzleId((current) => (current === solvedPuzzle.id ? null : current));
+      setUnlockFeedback((current) => (current?.puzzleId === solvedPuzzle.id ? null : current));
+      setAnswer("");
+      triggerUnlock(solvedPuzzle.id === 10);
+
+      if (solvedPuzzle.id === 10) {
+        window.setTimeout(() => setPhase("ending"), 520);
+      }
+    }, window.hayoungDebugHoldUnlock ? 5200 : 1400);
   }
 
   function useHint() {
@@ -742,10 +763,13 @@ function App() {
         : canAdvanceRoom
           ? "이 방의 장치가 모두 반응했습니다. 문 앞의 빛을 따라가세요."
           : currentRoom.mood;
-  const activePuzzleProgress = activePuzzle ? Math.round((answer.length / activePuzzle.answer.length) * 100) : 0;
+  const activePuzzleUnlocked = Boolean(activePuzzle && unlockFeedback?.puzzleId === activePuzzle.id);
+  const activePuzzleProgress = activePuzzle ? (activePuzzleUnlocked ? 100 : Math.round((answer.length / activePuzzle.answer.length) * 100)) : 0;
   const activePuzzleRequirementLabel = activePuzzle?.requires?.length ? `연계 ${activePuzzle.requires.length}개` : "첫 단서";
   const activePuzzleReadout = activePuzzle
-    ? answer.padEnd(activePuzzle.answer.length, "·")
+    ? activePuzzleUnlocked
+      ? "OPEN"
+      : answer.padEnd(activePuzzle.answer.length, "·")
     : "";
 
   return (
@@ -980,12 +1004,23 @@ function App() {
           {activePuzzle && (
             <div className="modal-layer">
               <section
-                className={`puzzle-modal lock-console-modal${answer ? " has-answer" : ""}`}
+                className={`puzzle-modal lock-console-modal${answer ? " has-answer" : ""}${activePuzzleUnlocked ? " is-unlocked" : ""}`}
                 role="dialog"
                 aria-label={activePuzzle.title}
+                aria-live="polite"
                 style={{ "--answer-progress": `${activePuzzleProgress}%` } as CSSProperties}
               >
-                <button className="close-button" type="button" onClick={() => setActivePuzzleId(null)}>
+                <button
+                  className="close-button"
+                  type="button"
+                  onClick={() => {
+                    if (!activePuzzleUnlocked) {
+                      setActivePuzzleId(null);
+                      setUnlockFeedback(null);
+                    }
+                  }}
+                  disabled={activePuzzleUnlocked}
+                >
                   <X aria-hidden="true" />
                 </button>
                 <div className="lock-console-grid">
@@ -1005,19 +1040,25 @@ function App() {
 
                   <div className="lock-device-console">
                     <div className="lock-device-topline" aria-hidden="true">
-                      <span>LOCK DEVICE</span>
-                      <b>{answer.length}/{activePuzzle.answer.length}</b>
+                      <span>{activePuzzleUnlocked ? "UNLOCKED" : "LOCK DEVICE"}</span>
+                      <b>{activePuzzleUnlocked ? "OPEN" : `${answer.length}/${activePuzzle.answer.length}`}</b>
                     </div>
                     <div className="device-readout" aria-label="입력 진행 상황">
                       <span>{activePuzzleReadout}</span>
                     </div>
+                    {activePuzzleUnlocked && (
+                      <div className="unlock-confirmation" role="status">
+                        <Check aria-hidden="true" />
+                        {unlockFeedback?.reward} 회로 연결
+                      </div>
+                    )}
                     <div className="lock-status-rail" aria-hidden="true">
-                      <span>{activePuzzle.requires?.length ? "CHAIN" : "FIRST"}</span>
-                      <b>{activePuzzle.kind.toUpperCase()}</b>
+                      <span>{activePuzzleUnlocked ? "CLEAR" : activePuzzle.requires?.length ? "CHAIN" : "FIRST"}</span>
+                      <b>{activePuzzleUnlocked ? "UNLOCKED" : activePuzzle.kind.toUpperCase()}</b>
                       <span>{activePuzzleProgress}%</span>
                     </div>
                     <LockPreview kind={activePuzzle.kind} answer={activePuzzle.answer} />
-                    <PuzzleInputPad puzzle={activePuzzle} answer={answer} setAnswer={setAnswer} />
+                    <PuzzleInputPad puzzle={activePuzzle} answer={answer} setAnswer={setAnswer} disabled={activePuzzleUnlocked} />
                     <div className="answer-row">
                       <input
                         value={answer}
@@ -1028,14 +1069,22 @@ function App() {
                         autoCapitalize="characters"
                         spellCheck="false"
                         autoFocus
+                        disabled={activePuzzleUnlocked}
                       />
-                      <button type="button" onClick={submitPuzzle}>
+                      <button type="button" onClick={submitPuzzle} disabled={activePuzzleUnlocked}>
                         <Check aria-hidden="true" />
-                        확인
+                        {activePuzzleUnlocked ? "열림" : "확인"}
                       </button>
                     </div>
                   </div>
                 </div>
+                {activePuzzleUnlocked && (
+                  <div className="lock-success-burst" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                )}
               </section>
             </div>
           )}
@@ -1135,43 +1184,57 @@ function PuzzleInputPad({
   puzzle,
   answer,
   setAnswer,
+  disabled = false,
 }: {
   puzzle: Puzzle;
   answer: string;
   setAnswer: (value: string | ((current: string) => string)) => void;
+  disabled?: boolean;
 }) {
   const appendValue = (value: string) => {
+    if (disabled) {
+      return;
+    }
     setAnswer((current: string) => normalizePuzzleAnswer(puzzle, current + value));
   };
   const setPreset = (value: string) => {
+    if (disabled) {
+      return;
+    }
     setAnswer(normalizePuzzleAnswer(puzzle, value));
   };
   const removeLast = () => {
+    if (disabled) {
+      return;
+    }
     setAnswer((current: string) => current.slice(0, -1));
   };
   const clearValue = () => {
+    if (disabled) {
+      return;
+    }
     setAnswer("");
   };
 
   if (puzzle.kind === "direction") {
     return (
-      <div className="puzzle-pad direction-pad" aria-label="Direction lock controls">
-        <button className="dir-key dir-up" type="button" onClick={() => appendValue("U")} aria-label="Up">
+      <div className="puzzle-pad direction-pad" aria-label="Direction lock controls" aria-disabled={disabled}>
+        <button className="dir-key dir-up" type="button" onClick={() => appendValue("U")} aria-label="Up" disabled={disabled}>
           <ArrowUp aria-hidden="true" />
         </button>
-        <button className="dir-key dir-left" type="button" onClick={() => appendValue("L")} aria-label="Left">
+        <button className="dir-key dir-left" type="button" onClick={() => appendValue("L")} aria-label="Left" disabled={disabled}>
           <ArrowLeft aria-hidden="true" />
         </button>
-        <button className="pad-utility dir-back" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기">
+        <button className="pad-utility dir-back" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기" disabled={disabled}>
           <Delete aria-hidden="true" />
         </button>
-        <button className="dir-key dir-right" type="button" onClick={() => appendValue("R")} aria-label="Right">
+        <button className="dir-key dir-right" type="button" onClick={() => appendValue("R")} aria-label="Right" disabled={disabled}>
           <ArrowRight aria-hidden="true" />
         </button>
-        <button className="dir-key dir-down" type="button" onClick={() => appendValue("D")} aria-label="Down">
+        <button className="dir-key dir-down" type="button" onClick={() => appendValue("D")} aria-label="Down" disabled={disabled}>
           <ArrowDown aria-hidden="true" />
         </button>
-        <button className="pad-utility dir-clear" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기">
+        <button className="pad-utility dir-clear" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기" disabled={disabled}>
           <RotateCcw aria-hidden="true" />
         </button>
       </div>
@@ -1180,16 +1243,16 @@ function PuzzleInputPad({
 
   if (puzzle.kind === "code") {
     return (
-      <div className="puzzle-pad code-pad" aria-label="Numeric lock controls">
+      <div className="puzzle-pad code-pad" aria-label="Numeric lock controls" aria-disabled={disabled}>
         {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
-          <button type="button" key={digit} onClick={() => appendValue(digit)} aria-label={`Digit ${digit}`}>
+          <button type="button" key={digit} onClick={() => appendValue(digit)} aria-label={`Digit ${digit}`} disabled={disabled}>
             {digit}
           </button>
         ))}
-        <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기">
+        <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기" disabled={disabled}>
           <Delete aria-hidden="true" />
         </button>
-        <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기">
+        <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기" disabled={disabled}>
           <RotateCcw aria-hidden="true" />
         </button>
       </div>
@@ -1205,7 +1268,7 @@ function PuzzleInputPad({
   const choices = choicesByKind[puzzle.kind] ?? [];
 
   return (
-    <div className="puzzle-pad choice-pad" aria-label="Puzzle choice controls">
+    <div className="puzzle-pad choice-pad" aria-label="Puzzle choice controls" aria-disabled={disabled}>
       {choices.map((choice) => (
         <button
           className={`choice-key${answer === choice ? " is-active" : ""}`}
@@ -1213,14 +1276,15 @@ function PuzzleInputPad({
           key={choice}
           onClick={() => setPreset(choice)}
           aria-pressed={answer === choice}
+          disabled={disabled}
         >
           {choice}
         </button>
       ))}
-      <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기">
+      <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기" disabled={disabled}>
         <Delete aria-hidden="true" />
       </button>
-      <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기">
+      <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기" disabled={disabled}>
         <RotateCcw aria-hidden="true" />
       </button>
     </div>

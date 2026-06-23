@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Design Improvement: Unlock Feedback</title>
+    <style>
+      :root {
+        color: #171512;
+        background: #f5f7fb;
+        font-family:
+          Inter,
+          "Pretendard",
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 36px 20px;
+      }
+
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      h2 {
+        margin-top: 36px;
+        font-size: 23px;
+      }
+
+      h3 {
+        margin-top: 28px;
+        font-size: 19px;
+      }
+
+      p,
+      li {
+        color: #4d4a43;
+        line-height: 1.75;
+      }
+
+      .tldr {
+        margin: 22px 0;
+        padding: 18px 20px;
+        border: 1px solid #b9d7ff;
+        border-radius: 8px;
+        background: #eaf4ff;
+      }
+
+      figure {
+        margin: 18px 0;
+        border: 1px solid #e0dfda;
+        border-radius: 8px;
+        overflow: hidden;
+        background: white;
+        box-shadow: 0 14px 34px rgba(20, 24, 33, 0.08);
+      }
+
+      img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      figcaption {
+        padding: 12px 14px;
+        color: #5d594f;
+        font-size: 13px;
+      }
+
+      pre {
+        overflow: auto;
+        padding: 16px;
+        border-radius: 8px;
+        background: #15171c;
+        color: #fff8ec;
+        line-height: 1.55;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Design Improvement: Unlock Feedback</h1>
+      <div class="tldr">
+        <strong>TL;DR:</strong> 정답 제출 후 모달이 즉시 닫히던 흐름을, 약 1.4초 동안
+        <code>OPEN</code> readout과 회로 연결 상태를 보여준 뒤 3D 자물쇠/문 해제 연출로 이어지게 바꿨습니다.
+      </div>
+
+      <h2>Current State</h2>
+      <figure>
+        <img src="references/current-unlock-feedback-desktop.png" alt="Desktop unlock feedback modal" />
+        <figcaption>현재 데스크톱 성공 상태. 정답을 맞히면 장치 콘솔이 OPEN 상태로 전환되고, 보상 회로 연결 문구가 나타납니다.</figcaption>
+      </figure>
+
+      <h2>Improvement Ideas Implemented</h2>
+      <h3>1. Hold Success Before Closing</h3>
+      <p>
+        Lazyweb의 achievement unlock/성공 모달 참고들은 보상 순간을 사용자가 인지할 수 있게 잠깐 붙잡습니다.
+        이 패스에서는 정답 제출 즉시 모달을 닫지 않고, 짧은 성공 상태를 보여준 뒤 3D latch, sparks, flash, door motion으로 넘깁니다.
+      </p>
+      <pre>
+┌──────────── case file ────────────┬──────────── lock device ────────────┐
+│ 첫 자물쇠                          │ UNLOCKED                       OPEN │
+│ 단서/보상/연계 설명                │       [ O P E N ]                  │
+│ 첫 설렘 열쇠                       │ ✓ 첫 설렘 열쇠 회로 연결            │
+└───────────────────────────────────┴────────────────────────────────────┘
+      </pre>
+
+      <h3>2. Tie Modal State To The World Reaction</h3>
+      <p>
+        Eikon식 laser/targeting 참고에서 가져온 패턴은 "한 지점의 반응이 장면 전체로 퍼진다"는 감각입니다.
+        모달 안에서는 OPEN readout, 진행 rail, 버튼 상태가 바뀌고, 그 다음 기존 3D 장치의 latch/bolt/spark가 이어집니다.
+      </p>
+
+      <h3>3. Keep The Test Harness Honest</h3>
+      <p>
+        <code>render_game_to_text()</code>에 <code>unlockFeedbackUX</code>와 <code>activeUnlockFeedback</code>를 추가했고,
+        <code>npm run verify:game</code>이 모든 퍼즐 풀이 중 성공 상태를 확인하게 했습니다.
+      </p>
+
+      <h2>What's Working</h2>
+      <ul>
+        <li>기존 2구역 lock console 구조는 유지하면서 성공 상태만 얹어서 레이아웃 리스크가 작습니다.</li>
+        <li>모바일에서는 모달 후속 해제 상태와 HUD가 겹치지 않고, 자동 검증에서 모바일 조작과 캔버스 픽셀이 유지됩니다.</li>
+        <li>프로덕션 UX는 1.4초 hold, 시각 QA만 디버그 hold를 써서 캡처 안정성을 얻었습니다.</li>
+      </ul>
+
+      <h2>All References</h2>
+      <div class="gallery">
+        <figure>
+          <img src="references/previous-lock-console.png" alt="Previous lock console" />
+          <figcaption>이전 lock console 상태. 구조는 좋지만 정답 성공 순간의 보상감이 약했습니다.</figcaption>
+        </figure>
+        <figure>
+          <img src="references/current-unlock-feedback-desktop.png" alt="Current unlock feedback" />
+          <figcaption>현재 unlock feedback 상태. OPEN readout, 연결 chip, 100% rail이 함께 반응합니다.</figcaption>
+        </figure>
+        <figure>
+          <img src="references/mobile-post-unlock.png" alt="Mobile post unlock state" />
+          <figcaption>모바일 후속 해제 상태. 3D 장치 반응과 HUD 흐름이 유지됩니다.</figcaption>
+        </figure>
+      </div>
+    </main>
+  </body>
+</html>

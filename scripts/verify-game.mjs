@@ -79,6 +79,38 @@ async function clickSelector(page, selector) {
   }, selector);
 }
 
+async function dispatchMouseClick(page, selector) {
+  await page.evaluate((targetSelector) => {
+    const element = document.querySelector(targetSelector);
+    if (!(element instanceof HTMLElement)) {
+      throw new Error(`Missing mouse click selector: ${targetSelector}`);
+    }
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+  }, selector);
+}
+
+async function setPuzzleAnswer(page, answer) {
+  await page.locator(".answer-row input").evaluate((input, value) => {
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("Puzzle answer input is not an HTMLInputElement");
+    }
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+    if (!setter) {
+      throw new Error("Native input value setter missing");
+    }
+    setter.call(input, "");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    setter.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, answer);
+  await page.waitForFunction(
+    (expected) => document.querySelector(".device-readout span")?.textContent === expected,
+    answer,
+    { timeout: 5000 },
+  );
+}
+
 async function clickGraphicsQuality(page, expectedQuality) {
   const qualityButton = page.locator(".icon-actions button[data-quality]");
   const count = await qualityButton.count();
@@ -252,10 +284,22 @@ async function solveAll(page) {
       }
     }
     if (!opened) throw new Error(`Puzzle did not open for answer ${answer}`);
-    await page.locator(".answer-row input").fill(answer);
+    await setPuzzleAnswer(page, answer);
     await page.waitForTimeout(80);
     log(`submit ${answer}`);
-    await clickSelector(page, ".answer-row button");
+    await dispatchMouseClick(page, ".answer-row button");
+    await page.waitForTimeout(300);
+    const unlockFeedback = await page.evaluate(() => {
+      const state = JSON.parse(window.render_game_to_text());
+      return {
+        modalClass: document.querySelector(".puzzle-modal")?.className ?? "",
+        readout: document.querySelector(".device-readout span")?.textContent ?? "",
+        activeUnlockFeedback: state.activeUnlockFeedback,
+      };
+    });
+    if (!unlockFeedback.modalClass.includes("is-unlocked") || unlockFeedback.readout !== "OPEN" || !unlockFeedback.activeUnlockFeedback) {
+      throw new Error(`Unlock feedback state missing after answer ${answer}: ${JSON.stringify(unlockFeedback)}`);
+    }
     await page.waitForFunction(() => !document.querySelector(".puzzle-modal"), null, { timeout: 15000 });
     await page.waitForTimeout(160);
     if ((index + 1) % 2 === 0 && index < answers.length - 1) {
@@ -294,6 +338,7 @@ async function main() {
     if (!desktopState.mobileControls?.includes("touch joystick")) throw new Error(`Mobile control metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.prologueSetDressing?.includes("prologue arches")) throw new Error(`Prologue set dressing metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.lockConsoleUX?.includes("two-zone puzzle modal")) throw new Error(`Lock console UX metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.unlockFeedbackUX?.includes("OPEN readout")) throw new Error(`Unlock feedback UX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
     const ending = await solveAll(desktop);
