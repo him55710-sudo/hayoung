@@ -142,6 +142,17 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run verify:game` passed after the room-device-kit pass; it checks the new room-device-kit metadata, solves all 10 puzzles, reaches the ending, checks graphics modes, verifies desktop/mobile hint contracts, and verifies mobile canvas/controls.
 - `npm audit --omit=dev` passed with 0 vulnerabilities after the room-device-kit pass.
 - `develop-web-game` Playwright client ran successfully again for the current intro fallback capture at `output/web-game-room-device-kits/shot-0.png`.
+- Used Lazyweb references for evidence boards, investigation cards, and quest/status UI patterns, then added an in-world physical clue network to all five rooms.
+- Added wall evidence boards, pinned clue/photo nodes, glowing string links, floor cable trails, and console-side clue seals so room props visibly connect to the active lock and exit path.
+- Added progress-aware animation for clue cards, board pins, string links, floor trails, and clue seals; solved-count stages brighten the route from room clue to console to door.
+- Added `?play=1` as a QA-only direct game entrypoint so the `develop-web-game` harness can exercise the actual Three.js game canvas instead of the intro-only splash.
+- Hardened `scripts/verify-game.mjs` with DOM predicate waits/clicks for fixed HUD controls and viewport screenshots, avoiding Playwright navigation-wait hangs on the heavy WebGL scene.
+- Extended `scripts/verify-game.mjs` to assert `physicalClueNetwork` metadata.
+- Latest physical clue-network screenshot inspected: `output/playwright/500-physical-clue-network-room1.png`.
+- `npm run build` passed after the physical clue-network pass.
+- `npm run verify:game` passed after the physical clue-network pass; it checked the new clue-network metadata, solved all 10 desktop puzzles, reached the ending, checked graphics modes, verified desktop/mobile hint contracts, and verified mobile canvas/controls.
+- `npm audit --omit=dev` passed with 0 vulnerabilities after the physical clue-network pass.
+- `develop-web-game` Playwright client ran against the real game scene with `?play=1` and passed; latest inspected screenshot: `output/web-game-physical-clue-network/shot-1.png`.
 
 ## Known Limitations
 
@@ -150,7 +161,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Puzzle prompts and answers are placeholders awaiting user-provided content.
 - BGM is procedural oscillator ambience; replace with authored or open-licensed loops later if desired.
 - High-end GLB room props, hand/flashlight model, compressed textures, and better collision are still future art/tech passes.
-- LazyCodex was researched but not blindly installed because it modifies global Codex config. The safe equivalent added here is a local verification harness and persistent project docs.
+- LazyCodex CLI is installed (`lazycodex-ai 4.13.0`), but `lazycodex-ai doctor` currently fails on this Windows machine with `spawn EPERM`; installed files/config were verified manually instead.
 
 ## Next TODOs
 

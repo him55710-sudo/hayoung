@@ -474,16 +474,19 @@ function normalizePuzzleAnswer(puzzle: Puzzle, value: string) {
 }
 
 function App() {
-  const [phase, setPhase] = useState<Phase>("intro");
-  const [introUnlocked, setIntroUnlocked] = useState(false);
-  const [introSeconds, setIntroSeconds] = useState(0);
+  const skipIntroForHarness = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("play") === "1";
+  const [phase, setPhase] = useState<Phase>(skipIntroForHarness ? "game" : "intro");
+  const [introUnlocked, setIntroUnlocked] = useState(skipIntroForHarness);
+  const [introSeconds, setIntroSeconds] = useState(skipIntroForHarness ? 6 : 0);
   const [buttonOffset, setButtonOffset] = useState({ x: 0, y: 0 });
   const [roomIndex, setRoomIndex] = useState(0);
   const [solvedIds, setSolvedIds] = useState<number[]>([]);
   const [activePuzzleId, setActivePuzzleId] = useState<number | null>(null);
   const [answer, setAnswer] = useState("");
   const [unlockFeedback, setUnlockFeedback] = useState<UnlockFeedback | null>(null);
-  const [message, setMessage] = useState("빛나는 장치가 조용히 반응하고 있어요.");
+  const [message, setMessage] = useState(
+    skipIntroForHarness ? "하영이가 첫 번째 방에 들어왔어요. 중앙의 잠금 장치가 첫 단서를 기다립니다." : "빛나는 장치가 조용히 반응하고 있어요.",
+  );
   const [hintCount, setHintCount] = useState(0);
   const [movement, setMovement] = useState<MovementState>({ forward: false, back: false, left: false, right: false });
   const [lookInput, setLookInput] = useState<LookInput>({ yawDelta: 0, pitchDelta: 0, active: false, tick: 0 });
@@ -616,6 +619,7 @@ function App() {
         lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, tactile lock console, and short unlocked success state",
         unlockFeedbackUX: "correct answers briefly hold the device modal in an OPEN readout state before the 3D latch, sparks, flash, and door motion fire",
         roomDeviceKits: "five room-specific physical puzzle kits on the central console: diary/photo slot, cafe token receipt, rain direction rail, note bridge, and finale prism gate",
+        physicalClueNetwork: "in-world evidence boards, pinned clue nodes, glowing string links, and floor cable trails connect room props to the active lock and exit",
         activeUnlockFeedback: unlockFeedback?.reward ?? null,
         mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
         ambience: audioEnabled ? currentRoom.ambience.label : "muted",
@@ -1817,6 +1821,7 @@ function createRoom(room: Room, index: number) {
   addEscapeVista(group, room, index);
   addRoomSpecifics(group, room, index);
   addLivedInEscapeRoomDetails(group, room, index);
+  addPhysicalClueNetwork(group, room, index);
   addCinematicAtmosphere(group, room, index);
 
   const keyLight = new THREE.PointLight(room.palette[1], index === 4 ? 3.6 : 2.15, 13);
@@ -2996,6 +3001,155 @@ function addLivedInEscapeRoomDetails(group: THREE.Group, room: Room, index: numb
   }
 }
 
+function addPhysicalClueNetwork(group: THREE.Group, room: Room, index: number) {
+  const boardMaterial = mat(0x2a211c, {
+    roughness: 0.74,
+    metalness: 0.05,
+    emissive: room.palette[3],
+    emissiveIntensity: 0.05,
+    texture: "wood",
+    textureRepeat: [1.3, 0.8],
+    textureSeed: 1500 + index,
+  });
+  const paperMaterial = mat(0xffebcf, {
+    roughness: 0.86,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.04,
+    transparent: true,
+    opacity: 0.92,
+    texture: "paper",
+    textureSeed: 1520 + index,
+  });
+  const photoMaterial = mat(room.palette[2], {
+    roughness: 0.5,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.16,
+    transparent: true,
+    opacity: 0.82,
+    texture: "paper",
+    textureSeed: 1540 + index,
+  });
+  const linkMaterial = mat(room.palette[2], {
+    roughness: 0.42,
+    metalness: 0.08,
+    emissive: room.palette[2],
+    emissiveIntensity: 0.42,
+    transparent: true,
+    opacity: 0.48,
+  });
+  const pinMaterial = mat(room.palette[1], {
+    roughness: 0.32,
+    metalness: 0.18,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.26,
+  });
+
+  const boardX = index === 4 ? -5.0 : -5.35;
+  const boardY = 2.55;
+  const boardZ = -4.17;
+  const roomStart = index * 2;
+  const board = box(2.35, 1.36, 0.06, boardMaterial, boardX, boardY, boardZ);
+  board.userData.physicalClueNetwork = true;
+  group.add(board);
+
+  const nodePositions: Array<[number, number, number]> = [
+    [boardX - 0.58, boardY + 0.26, 0],
+    [boardX + 0.08, boardY - 0.12, 1],
+    [boardX + 0.68, boardY + 0.2, 2],
+  ];
+
+  nodePositions.forEach(([x, y, stage], nodeIndex) => {
+    const cardMaterial = nodeIndex === 1 ? photoMaterial.clone() : paperMaterial.clone();
+    const card = box(0.48 + nodeIndex * 0.04, 0.38, 0.035, cardMaterial, x, y, boardZ + 0.055);
+    card.rotation.z = -0.12 + nodeIndex * 0.11;
+    card.userData.physicalClueNetwork = true;
+    card.userData.clueNode = true;
+    card.userData.clueStage = stage;
+    card.userData.clueRoomStart = roomStart;
+    card.userData.baseY = card.position.y;
+    card.userData.baseRotationZ = card.rotation.z;
+    group.add(card);
+
+    const pin = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), pinMaterial.clone());
+    pin.position.set(x - 0.14 + nodeIndex * 0.07, y + 0.17, boardZ + 0.095);
+    pin.scale.set(1, 1, 0.55);
+    pin.userData.physicalClueNetwork = true;
+    pin.userData.clueNode = true;
+    pin.userData.clueStage = stage;
+    pin.userData.clueRoomStart = roomStart;
+    group.add(pin);
+
+    const stamp = box(0.18, 0.025, 0.026, linkMaterial.clone(), x + 0.04, y - 0.11, boardZ + 0.09);
+    stamp.rotation.z = card.rotation.z + 0.08;
+    stamp.userData.physicalClueNetwork = true;
+    stamp.userData.clueLink = true;
+    stamp.userData.clueStage = stage;
+    stamp.userData.clueRoomStart = roomStart;
+    group.add(stamp);
+  });
+
+  for (let i = 0; i < nodePositions.length - 1; i += 1) {
+    const [x1, y1] = nodePositions[i];
+    const [x2, y2] = nodePositions[i + 1];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const link = box(Math.hypot(dx, dy), 0.018, 0.026, linkMaterial.clone(), (x1 + x2) / 2, (y1 + y2) / 2, boardZ + 0.1);
+    link.rotation.z = Math.atan2(dy, dx);
+    link.userData.physicalClueNetwork = true;
+    link.userData.clueLink = true;
+    link.userData.clueStage = i + 1;
+    link.userData.clueRoomStart = roomStart;
+    group.add(link);
+  }
+
+  const kitAnchor = box(0.18, 0.18, 0.034, linkMaterial.clone(), -1.35, 1.12, -0.2);
+  kitAnchor.rotation.z = Math.PI / 4;
+  kitAnchor.userData.physicalClueNetwork = true;
+  kitAnchor.userData.clueLink = true;
+  kitAnchor.userData.clueStage = 1;
+  kitAnchor.userData.clueRoomStart = roomStart;
+  group.add(kitAnchor);
+
+  const floorPoints: Array<[number, number, number]> = [
+    [-5.42, -3.86, 0],
+    [-3.75, -2.65, 0],
+    [-2.1, -1.42, 1],
+    [-0.54, -0.46, 1],
+    [1.15, -1.25, 2],
+    [3.18, -2.86, 2],
+    [4.72, -3.78, 2],
+  ];
+
+  for (let i = 0; i < floorPoints.length - 1; i += 1) {
+    const [x1, z1, stageA] = floorPoints[i];
+    const [x2, z2, stageB] = floorPoints[i + 1];
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const trail = box(Math.hypot(dx, dz), 0.024, 0.052, linkMaterial.clone(), (x1 + x2) / 2, 0.164, (z1 + z2) / 2);
+    trail.rotation.y = -Math.atan2(dz, dx);
+    trail.userData.physicalClueNetwork = true;
+    trail.userData.clueFloorTrail = true;
+    trail.userData.clueStage = Math.max(stageA, stageB);
+    trail.userData.clueRoomStart = roomStart;
+    trail.userData.baseY = trail.position.y;
+    trail.userData.baseScaleX = trail.scale.x;
+    trail.userData.baseScaleY = trail.scale.y;
+    trail.userData.baseScaleZ = trail.scale.z;
+    group.add(trail);
+  }
+
+  [0, 1, 2].forEach((stage) => {
+    const seal = new THREE.Mesh(new THREE.TorusGeometry(0.18 + stage * 0.045, 0.011, 8, 46), linkMaterial.clone());
+    seal.position.set(-0.55 + stage * 0.55, 0.19, -0.66 - stage * 0.26);
+    seal.rotation.x = Math.PI / 2;
+    seal.userData.physicalClueNetwork = true;
+    seal.userData.clueSeal = true;
+    seal.userData.clueStage = stage;
+    seal.userData.clueRoomStart = roomStart;
+    group.add(seal);
+  });
+}
+
 function addThemedClueCluster(group: THREE.Group, room: Room, index: number) {
   const wood = mat(0x5a3827, { roughness: 0.62, metalness: 0.04, texture: "wood", textureRepeat: [1.2, 0.8], textureSeed: 940 + index });
   const accent = mat(room.palette[1], { roughness: 0.36, metalness: 0.16, emissive: room.palette[1], emissiveIntensity: 0.18 });
@@ -3888,6 +4042,36 @@ function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: nu
       const material = object.material as THREE.MeshStandardMaterial;
       material.opacity = 0.38 + Math.sin(elapsedTime * 2.1 + seed) * 0.08 + unlockProgress * 0.26;
       material.emissiveIntensity = 0.5 + focusStrength * 0.36 + unlockProgress * 0.9;
+    }
+    if (object instanceof THREE.Mesh && object.userData.physicalClueNetwork) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const stage = (object.userData.clueStage as number | undefined) ?? 0;
+      const roomStart = (object.userData.clueRoomStart as number | undefined) ?? 0;
+      const stageActive = solvedCount >= roomStart + stage;
+      const stageLit = stageActive ? 1 : 0.32;
+      const seed = object.id + stage * 11;
+      if (object.userData.clueNode) {
+        if (typeof object.userData.baseY !== "number") object.userData.baseY = object.position.y;
+        if (typeof object.userData.baseRotationZ !== "number") object.userData.baseRotationZ = object.rotation.z;
+        object.position.y = (object.userData.baseY as number) + Math.sin(elapsedTime * 1.45 + seed) * 0.006 * stageLit + unlockProgress * 0.012;
+        object.rotation.z = (object.userData.baseRotationZ as number) + Math.sin(elapsedTime * 0.9 + seed) * 0.006 * stageLit;
+        material.emissiveIntensity = 0.04 + stageLit * 0.22 + focusStrength * 0.08 + unlockProgress * 0.2;
+        if (material.transparent) material.opacity = Math.min(0.96, 0.5 + stageLit * 0.34 + unlockProgress * 0.1);
+      }
+      if (object.userData.clueLink || object.userData.clueFloorTrail || object.userData.clueSeal) {
+        const pulse = Math.max(0, Math.sin(elapsedTime * 2.25 + seed));
+        material.emissiveIntensity = 0.12 + stageLit * (0.34 + pulse * 0.18) + focusStrength * 0.14 + unlockProgress * 0.34;
+        if (material.transparent) material.opacity = Math.min(0.88, 0.18 + stageLit * 0.42 + pulse * 0.08 + unlockProgress * 0.14);
+      }
+      if (object.userData.clueFloorTrail) {
+        if (typeof object.userData.baseY !== "number") object.userData.baseY = object.position.y;
+        const chase = Math.max(0, Math.sin(elapsedTime * 2.15 - stage * 0.65));
+        object.position.y = (object.userData.baseY as number) + chase * 0.006 * stageLit + unlockProgress * 0.014;
+      }
+      if (object.userData.clueSeal) {
+        object.rotation.z = elapsedTime * (0.18 + stage * 0.08) + unlockProgress * Math.PI;
+        object.scale.setScalar(1 + Math.sin(elapsedTime * 1.8 + seed) * 0.025 * stageLit + unlockProgress * 0.08);
+      }
     }
     if (object instanceof THREE.Mesh && object.userData.float) {
       object.position.y += Math.sin(elapsedTime + object.id) * 0.0008;

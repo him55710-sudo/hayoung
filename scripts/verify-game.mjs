@@ -79,6 +79,14 @@ async function clickSelector(page, selector) {
   }, selector);
 }
 
+async function waitForElement(page, selector, timeout = 30000) {
+  await page.waitForFunction(
+    (targetSelector) => Boolean(document.querySelector(targetSelector)),
+    selector,
+    { timeout },
+  );
+}
+
 async function dispatchMouseClick(page, selector) {
   await page.evaluate((targetSelector) => {
     const element = document.querySelector(targetSelector);
@@ -115,7 +123,7 @@ async function clickGraphicsQuality(page, expectedQuality) {
   const qualityButton = page.locator(".icon-actions button[data-quality]");
   const count = await qualityButton.count();
   if (count !== 1) throw new Error(`Expected one graphics quality button, got ${count}`);
-  await qualityButton.click({ force: true });
+  await clickSelector(page, ".icon-actions button[data-quality]");
   await page.waitForFunction(
     (quality) => {
       const button = document.querySelector(".icon-actions button[data-quality]");
@@ -131,7 +139,7 @@ async function enterGame(page, isMobile = false) {
   log(`enter ${isMobile ? "mobile" : "desktop"}`);
   await page.goto(url, { waitUntil: "domcontentloaded" });
   log(`goto ${isMobile ? "mobile" : "desktop"}`);
-  await page.waitForSelector(".runaway-button");
+  await waitForElement(page, ".runaway-button");
   log(`intro ready ${isMobile ? "mobile" : "desktop"}`);
   const introText = await page.locator(".intro-copy h1").innerText();
   if (!introText.includes("500일")) throw new Error(`Unexpected intro: ${introText}`);
@@ -146,11 +154,14 @@ async function enterGame(page, isMobile = false) {
     if (moved < 35) throw new Error(`Runaway button did not move enough: ${moved}`);
   }
 
-  await page.waitForTimeout(6500);
-  if (isMobile) await clickSelector(page, ".runaway-button");
-  else await page.locator(".runaway-button").click({ force: true });
+  await page.waitForFunction(
+    () => document.querySelector(".runaway-button")?.classList.contains("is-ready"),
+    null,
+    { timeout: 15000 },
+  );
+  await clickSelector(page, ".runaway-button");
   log(`start clicked ${isMobile ? "mobile" : "desktop"}`);
-  await page.waitForSelector("canvas", { state: "attached" });
+  await page.waitForFunction(() => Boolean(document.querySelector("canvas")), null, { timeout: 30000 });
   log(`canvas attached ${isMobile ? "mobile" : "desktop"}`);
   await waitForPhase(page, "game");
   await page.waitForTimeout(900);
@@ -226,11 +237,11 @@ async function verifyHintPenaltyUX(page, label) {
       );
     },
     null,
-    { timeout: 5000 },
+    { timeout: 15000 },
   );
 
   mkdirSync("output/playwright", { recursive: true });
-  await page.screenshot({ path: `output/playwright/500-hint-penalty-ticket-${label}.png`, fullPage: true });
+  await page.screenshot({ path: `output/playwright/500-hint-penalty-ticket-${label}.png`, timeout: 45000 });
   const after = await gameState(page);
   return {
     beforeHintsLeft: before.hintsLeft,
@@ -343,7 +354,7 @@ async function solveAll(page) {
     await page.waitForFunction(() => !document.querySelector(".puzzle-modal"), null, { timeout: 15000 });
     await page.waitForTimeout(160);
     if ((index + 1) % 2 === 0 && index < answers.length - 1) {
-      await page.waitForSelector(".room-clear-panel", { timeout: 15000 });
+      await waitForElement(page, ".room-clear-panel", 15000);
       const roomClearButtonCount = await page.locator(".room-clear-button").count();
       if (!roomClearButtonCount) throw new Error(`Room clear CTA missing after answer ${answer}`);
     }
@@ -380,6 +391,7 @@ async function main() {
     if (!desktopState.lockConsoleUX?.includes("two-zone puzzle modal")) throw new Error(`Lock console UX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.unlockFeedbackUX?.includes("OPEN readout")) throw new Error(`Unlock feedback UX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.roomDeviceKits?.includes("five room-specific physical puzzle kits")) throw new Error(`Room device kit metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.physicalClueNetwork?.includes("in-world evidence boards")) throw new Error(`Physical clue network metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const hintCheck = await verifyHintPenaltyUX(desktop, "desktop");
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
@@ -409,10 +421,10 @@ async function main() {
       );
     });
     if (!endingHudHidden) throw new Error("Ending HUD chrome is still visible.");
-    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-clean.png", fullPage: true });
+    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-clean.png", timeout: 45000 });
     await desktop.setViewportSize({ width: 390, height: 844 });
     await desktop.waitForTimeout(320);
-    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-mobile-hudless.png", fullPage: true });
+    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-mobile-hudless.png", timeout: 45000 });
 
     log("park desktop");
     await desktop.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
