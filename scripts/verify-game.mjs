@@ -143,6 +143,10 @@ async function enterGame(page, isMobile = false) {
   log(`intro ready ${isMobile ? "mobile" : "desktop"}`);
   const introText = await page.locator(".intro-copy h1").innerText();
   if (!introText.includes("500일")) throw new Error(`Unexpected intro: ${introText}`);
+  const introScreenText = await page.locator(".intro-screen").innerText();
+  if (/\d+\s*초/.test(introScreenText) || introScreenText.includes("클릭할 수 있어요") || introScreenText.includes("뒤에 멈춰요")) {
+    throw new Error(`Intro reveals runaway timing: ${introScreenText}`);
+  }
 
   if (!isMobile) {
     const button = page.locator(".runaway-button");
@@ -376,11 +380,31 @@ async function main() {
     await enterGame(desktop);
     const desktopState = await gameState(desktop);
     const desktopCanvas = await canvasStats(desktop);
+    const desktopGameSurface = await desktop.evaluate(() => {
+      const screen = document.querySelector(".game-screen");
+      const rect = screen?.getBoundingClientRect();
+      return rect
+        ? {
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+            innerWidth: window.innerWidth,
+            innerHeight: window.innerHeight,
+          }
+        : null;
+    });
     if (desktopState.cameraMode !== "first-person") throw new Error("Camera mode is not first-person.");
     if (!desktopState.cinematicAtmosphere?.includes("volumetric")) throw new Error(`Cinematic atmosphere metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.cinematicCamera?.includes("FOV")) throw new Error(`Cinematic camera metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.screenPostFx?.includes("vignette")) throw new Error(`Screen post-FX metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.collisionModel?.includes("console")) throw new Error(`Collision metadata missing: ${JSON.stringify(desktopState)}`);
+    if (!desktopState.playSurface?.includes("full-viewport first-person")) throw new Error(`Play surface metadata missing: ${JSON.stringify(desktopState)}`);
+    if (
+      !desktopGameSurface ||
+      desktopGameSurface.width < desktopGameSurface.innerWidth - 2 ||
+      desktopGameSurface.height < desktopGameSurface.innerHeight - 2
+    ) {
+      throw new Error(`Game surface is not full viewport: ${JSON.stringify(desktopGameSurface)}`);
+    }
     if (!desktopState.hudBehavior?.includes("calm HUD")) throw new Error(`HUD behavior metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.environmentDetail?.includes("lived-in escape room")) throw new Error(`Environment detail metadata missing: ${JSON.stringify(desktopState)}`);
     if (!desktopState.transitionVfx?.includes("transition veil")) throw new Error(`Transition VFX metadata missing: ${JSON.stringify(desktopState)}`);
@@ -422,6 +446,13 @@ async function main() {
     });
     if (!endingHudHidden) throw new Error("Ending HUD chrome is still visible.");
     await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-clean.png", timeout: 45000 });
+    await desktop.evaluate(() => {
+      if (document.fullscreenElement) {
+        return document.exitFullscreen();
+      }
+      return undefined;
+    }).catch(() => undefined);
+    await desktop.waitForTimeout(320);
     await desktop.setViewportSize({ width: 390, height: 844 });
     await desktop.waitForTimeout(320);
     await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-mobile-hudless.png", timeout: 45000 });
@@ -448,6 +479,7 @@ async function main() {
     const result = {
       url,
       desktopState,
+      desktopGameSurface,
       desktopCanvas,
       hintCheck,
       graphicsCheck,

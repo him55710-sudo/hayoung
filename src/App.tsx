@@ -526,6 +526,16 @@ function App() {
 
   useRoomAmbience(phase, roomIndex, audioEnabled);
 
+  const getIntroButtonBounds = () => {
+    if (typeof window === "undefined") {
+      return { maxX: 220, maxY: 95 };
+    }
+    return {
+      maxX: Math.max(64, Math.min(220, window.innerWidth * 0.26)),
+      maxY: Math.max(14, Math.min(28, window.innerHeight * 0.03)),
+    };
+  };
+
   useEffect(() => {
     if (phase !== "intro") {
       return;
@@ -541,6 +551,23 @@ function App() {
       });
     }, 1000);
     return () => window.clearInterval(timer);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "intro") {
+      return;
+    }
+    const clampButtonToViewport = () => {
+      setButtonOffset((offset) => {
+        const { maxX, maxY } = getIntroButtonBounds();
+        return {
+          x: Math.max(-maxX, Math.min(maxX, offset.x)),
+          y: Math.max(-maxY, Math.min(maxY, offset.y)),
+        };
+      });
+    };
+    window.addEventListener("resize", clampButtonToViewport);
+    return () => window.removeEventListener("resize", clampButtonToViewport);
   }, [phase]);
 
   useEffect(() => {
@@ -602,6 +629,7 @@ function App() {
         cinematicCamera: "dynamic FOV breathing, ACES exposure ramping, movement sway, focus pull, and unlock impact",
         screenPostFx: "soft vignette, fine film grain, scanline texture, and unlock flash overlay",
         cameraMode: "first-person",
+        playSurface: "full-viewport first-person Roblox-like room escape surface with keyboard movement, pointer-look, mobile joystick/look pad, and fullscreen request on start",
         embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
         characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
         interactableInRange: nearInteractable,
@@ -678,9 +706,10 @@ function App() {
       return;
     }
     const direction = Math.random() > 0.5 ? 1 : -1;
+    const { maxX, maxY } = getIntroButtonBounds();
     setButtonOffset({
-      x: direction * (90 + Math.random() * 130),
-      y: (Math.random() - 0.5) * 95,
+      x: direction * (maxX * (0.58 + Math.random() * 0.42)),
+      y: (Math.random() - 0.5) * maxY * 2,
     });
   };
 
@@ -689,6 +718,7 @@ function App() {
       evadeButton();
       return;
     }
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
     setPhase("game");
     setAudioEnabled(true);
     setMessage("하영이가 첫 번째 방에 들어왔어요. 중앙의 잠금 장치가 첫 단서를 기다립니다.");
@@ -816,29 +846,36 @@ function App() {
       )}
 
       {phase === "intro" && (
-        <section className="intro-screen">
+        <section className={`intro-screen${introUnlocked ? " is-open" : ""}`}>
           <div className="intro-backdrop" />
           <div className="intro-stage" aria-hidden="true">
+            <span className="intro-veil intro-veil-left" />
+            <span className="intro-veil intro-veil-right" />
             <span className="intro-door-slit" />
             <span className="intro-floor-path" />
+            <span className="intro-threshold" />
             <span className="intro-photo-strip intro-photo-strip-a" />
             <span className="intro-photo-strip intro-photo-strip-b" />
+            <span className="intro-memory-lights intro-memory-lights-a" />
+            <span className="intro-memory-lights intro-memory-lights-b" />
             <span className="intro-sidewall intro-sidewall-left" />
             <span className="intro-sidewall intro-sidewall-right" />
           </div>
           <div className="intro-copy">
-            <p className="couple-mark">임현수 × 정하영</p>
+            <p className="couple-mark">HYUNSU × HAYOUNG / 500 DAYS</p>
             <h1>임현수와의 500일을 함께하실 준비가 되셨나요?</h1>
-            <div className="intro-mission-strip" aria-label="게임 구성">
-              <span>5개의 방</span>
-              <span>10개의 잠금</span>
-              <span>힌트 3번</span>
-              <span>500일 엔딩</span>
+            <div className="intro-memory-line" aria-label="500일의 기억">
+              <span>1-100</span>
+              <span>101-200</span>
+              <span>201-300</span>
+              <span>301-400</span>
+              <span>401-500</span>
             </div>
-            <p>버튼은 잠시 망설이다가 마음이 열리면 멈춰요.</p>
+            <p>닫힌 문 뒤에는 우리가 지나온 계절과 아직 열지 않은 마음이 놓여 있어요.</p>
             <button
               className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
               style={{ translate: `${buttonOffset.x}px ${buttonOffset.y}px` }}
+              aria-label="네, 500일 방탈출 시작하기"
               onClick={startGame}
               onMouseEnter={evadeButton}
               onMouseMove={evadeButton}
@@ -849,9 +886,8 @@ function App() {
               type="button"
             >
               <Heart aria-hidden="true" />
-              네
+              <span>네</span>
             </button>
-            <span className="unlock-timer">{introUnlocked ? "이제 클릭할 수 있어요." : `${Math.max(0, 6 - introSeconds)}초 뒤에 멈춰요`}</span>
           </div>
         </section>
       )}

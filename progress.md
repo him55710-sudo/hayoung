@@ -153,6 +153,19 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run verify:game` passed after the physical clue-network pass; it checked the new clue-network metadata, solved all 10 desktop puzzles, reached the ending, checked graphics modes, verified desktop/mobile hint contracts, and verified mobile canvas/controls.
 - `npm audit --omit=dev` passed with 0 vulnerabilities after the physical clue-network pass.
 - `develop-web-game` Playwright client ran against the real game scene with `?play=1` and passed; latest inspected screenshot: `output/web-game-physical-clue-network/shot-1.png`.
+- Lazyweb quick-search was attempted for romantic onboarding references, but the installed Lazyweb skill pack is outdated and locked the returned results; implementation continued from the existing visual thesis and current app screenshots.
+- Redesigned the initial runaway-button screen into a romantic modern full-viewport door scene: cinematic threshold light, curtain-like side planes, memory date rail, shorter couple-focused copy, and a softer premium `네` button.
+- Removed the visible countdown/ready copy from the intro so the runaway-button timing is not spoiled.
+- Tuned runaway-button movement so desktop hover and mobile touch still make it slide away, but the button stays inside the viewport and no longer covers the hero copy.
+- Start click now attempts browser fullscreen before entering the game, while the app still keeps the actual game as a 100vw/100vh first-person Three.js play surface.
+- Extended `render_game_to_text()` and `scripts/verify-game.mjs` with `playSurface` metadata and a full-viewport `.game-screen` size check.
+- Hardened `scripts/verify-game.mjs` to exit fullscreen before resizing the desktop page for mobile ending screenshots.
+- Latest romantic intro screenshots inspected: `output/playwright/500-romantic-intro-desktop-final.png` and `output/playwright/500-romantic-intro-mobile-final.png`.
+- Intro QA confirmed no countdown text, desktop button movement `173.7px`, mobile touch movement `78.0px`, and mobile button remained visible.
+- `npm run build` passed after the romantic-intro/fullscreen pass.
+- `npm run verify:game` passed after the romantic-intro/fullscreen pass; it now checks hidden intro timing copy, full-viewport first-person play-surface metadata, all 10 desktop puzzle solves, ending, graphics modes, desktop/mobile hint contracts, and mobile canvas/controls.
+- `npm audit --omit=dev` passed with 0 vulnerabilities after the romantic-intro/fullscreen pass.
+- `develop-web-game` Playwright client ran against the real game scene with `?play=1` and passed; latest inspected screenshot: `output/web-game-romantic-intro/shot-1.png`.
 
 ## Known Limitations
 
