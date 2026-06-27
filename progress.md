@@ -166,6 +166,13 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `npm run verify:game` passed after the romantic-intro/fullscreen pass; it now checks hidden intro timing copy, full-viewport first-person play-surface metadata, all 10 desktop puzzle solves, ending, graphics modes, desktop/mobile hint contracts, and mobile canvas/controls.
 - `npm audit --omit=dev` passed with 0 vulnerabilities after the romantic-intro/fullscreen pass.
 - `develop-web-game` Playwright client ran against the real game scene with `?play=1` and passed; latest inspected screenshot: `output/web-game-romantic-intro/shot-1.png`.
+- Added a 2026-06-28 escape-cafe spatial model to `docs/escape-room-research-and-quality.md`: briefing threshold, search wall, central console, locked storage, evidence board, hint/reset fixture, exit motion rig, item taxonomy, and two-step room puzzle loop.
+- Added `HayoungEscapeCafeMasterplanTools.create_escape_cafe_500_masterplan`, a separated Unreal MCP toolset for realistic five-room escape-cafe composition with physical clue networks, carry rewards, room ambience labels, locked cabinets, and Blueprint-ready unlock motion labels.
+- Updated `docs/unreal-mcp-setup.md` with natural-language MCP prompts for the new escape-cafe masterplan tool and a later high-quality art pass using labeled actors, Nanite-ready assets, Blueprint unlocks, Lumen, ACES post-processing, and room ambience triggers.
+- Added `.lazyweb/quick-references/escape-cafe-masterplan-2026-06-28/report.md`; Lazyweb quick search was attempted first but the local skill pack returned locked results because it is out of date.
+- `python -m py_compile` passes for the new `escape_cafe_masterplan.py` toolset and toolset package registration.
+- `npm run build` passed after the Unreal MCP masterplan/documentation pass. Vite still reports the existing large JS chunk warning.
+- `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` now reports `EpicInstallerExists: True`, `UnrealProjectExists: True`, and no active Epic install process, but Epic Launcher and Unreal Editor are still absent.
 
 ## Known Limitations
 
@@ -181,7 +188,7 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Replace placeholder puzzle prompts and answers with user-provided real puzzle content.
 - Replace placeholder photo frames with actual couple photos when the user sends them.
 - Add authored GLB assets and use Draco/KTX2 compression for high detail without heavy load.
-- Finish Epic Games Launcher installation after approving or clearing the elevated Windows Installer process, then install UE 5.8 and run `ModelContextProtocol.GenerateClientConfig Codex`.
+- Install Epic Games Launcher from `C:\Users\임현수\Downloads\EpicInstaller-20.1.0.msi`, then install UE 5.8 and run `ModelContextProtocol.GenerateClientConfig Codex`.
 - Consider `howler` if real music loops replace Web Audio ambience.
 - Consider `three-mesh-bvh` if raycasting/collision with imported rooms becomes heavy.
 - Run `npm run build`, `npm run verify:game`, and deployed `GAME_URL` verification before each production deploy.

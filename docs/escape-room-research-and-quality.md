@@ -17,6 +17,35 @@
 - Beginner advice emphasizes scanning the whole room, collecting suspicious objects, rechecking opened containers, and communicating discoveries. For a single-player web game, the UI needs to do the communication work: objective tracker, clue chips, inventory, and room-lighting changes should repeatedly answer "what became relevant now?"
 - Digital lock tools tend to expose problem, hint, answer, PIN result, and QR-style entry. This project can borrow the clarity of digital puzzle tooling while keeping the physical romance of 3D locks.
 
+## 2026-06-28 Escape-Cafe Spatial Model
+
+Real escape-room cafe rooms should be treated as clue systems, not decorated boxes. Each room in this project should now include these zones:
+
+- Briefing threshold: the first meter inside the room should announce the emotional beat, current date range, and what kind of lock language the room uses.
+- Search wall/shelf zone: the player should see drawers, frames, documents, receipts, notes, tape, residue, and one or two suspicious containers before opening the modal UI.
+- Central interaction console: the 3D object that launches puzzle input must look like the lock type, such as keypad, direction rail, word wheel, scanner, or final gate.
+- Locked cabinet/drawer: every answer should open a physical target, not only advance a counter.
+- Evidence board: clue cards, pins, string links, floor cables, or light trails should show why one object belongs to the next object.
+- Hint/reset fixture: a small staff-room cue, intercom, lamp, or receipt printer should make hints feel diegetic rather than shameful.
+- Exit door motion rig: bolt, shackle, hinge, seam light, and sound cue should visibly confirm the solve.
+
+Item composition should stay consistent across all five rooms:
+
+- Containers: drawers, cabinets, photo frames, receipt boxes, cloud plinths.
+- Locks: numeric keypad, directional rail, choice/magnetic drawer, word/symbol wheel, final vow gate.
+- Clue media: diary pages, photos, receipts, rain marks, torn notes, star chart, final letter.
+- Feedback devices: bolt slides, scanner glow, lamp stages, string/link brightening, room ambience shift.
+- Carry rewards: key, token, heart shard, constellation pin, final letter piece. These should move from room to room conceptually so the five rooms feel chained.
+
+Puzzle composition should use a two-step room loop:
+
+- Puzzle A is search/collection. It makes the player inspect the room and earn a physical carry reward.
+- Puzzle B is device/lock execution. It consumes the reward and opens the exit path.
+- The reward from room `N` should become the first meaningful prop in room `N+1`.
+- The final room should ask the player to combine the four earlier rewards before confirming the 500-day vow.
+
+Unreal MCP generation should therefore start with `HayoungEscapeCafeMasterplanTools.create_escape_cafe_500_masterplan`, then upgrade asset quality in passes: replace blockout cubes with Nanite-ready props, convert lock labels into Blueprint unlock actors, attach ambience trigger volumes, then run lighting/post-process polish.
+
 ## Five-Room Puzzle Blueprint
 
 | Room | Emotional beat | Lock feel | Puzzle chain direction | Audio direction |
