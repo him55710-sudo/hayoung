@@ -1,3 +1,5 @@
+import json
+
 import unreal
 import toolset_registry
 
@@ -175,9 +177,9 @@ def _cloud_path(prefix, x):
 class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
     """Creates 500-day anniversary escape-room layouts, lighting, and city-block mood tests."""
 
-    @staticmethod
     @toolset_registry.tool_call
-    def create_anniversary_room(room_label: str = "500일의 방") -> dict:
+    @staticmethod
+    def create_anniversary_room(room_label: str = "500일의 방") -> str:
         """Create a simple playable escape-room blockout.
 
         Args:
@@ -208,7 +210,7 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
 
         HayoungEscapeRoomTools.setup_anniversary_lighting()
 
-        return {
+        return json.dumps({
             "spawned_count": len(spawned),
             "room_label": room_label,
             "next_steps": [
@@ -216,11 +218,11 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
                 "Ask the agent to replace blockout cubes with real meshes.",
                 "Ask the agent to tune lighting after camera placement.",
             ],
-        }
+        }, ensure_ascii=False)
 
-    @staticmethod
     @toolset_registry.tool_call
-    def setup_anniversary_lighting(warm_intensity: float = 2400.0, moon_intensity: float = 600.0) -> dict:
+    @staticmethod
+    def setup_anniversary_lighting(warm_intensity: float = 2400.0, moon_intensity: float = 600.0) -> str:
         """Set warm romantic practical lighting plus cool moonlight.
 
         Args:
@@ -237,14 +239,14 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
         _point_light("Rose_Table_Glow", unreal.Vector(150, -150, 115), unreal.LinearColor(1.0, 0.22, 0.28, 1.0), 900.0, 420.0)
         _point_light("Moon_Window_Fill", unreal.Vector(280, 315, 230), moon, moon_intensity, 850.0)
 
-        return {
+        return json.dumps({
             "lights": ["Warm_Lamp_Main", "Rose_Table_Glow", "Moon_Window_Fill"],
             "mood": "warm amber interior with cool moonlit contrast",
-        }
+        }, ensure_ascii=False)
 
-    @staticmethod
     @toolset_registry.tool_call
-    def generate_memory_city_block(blocks: int = 3) -> dict:
+    @staticmethod
+    def generate_memory_city_block(blocks: int = 3) -> str:
         """Create a small stylized city block for memory-scene experiments.
 
         Args:
@@ -271,14 +273,14 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
             38.0,
         )
 
-        return {
+        return json.dumps({
             "building_count": count,
             "layout": "simple skyline blockout for later replacement with city assets",
-        }
+        }, ensure_ascii=False)
 
-    @staticmethod
     @toolset_registry.tool_call
-    def create_five_room_escape_level(theme_label: str = "500일의 방") -> dict:
+    @staticmethod
+    def create_five_room_escape_level(theme_label: str = "500일의 방") -> str:
         """Create a five-room Roblox-like 3D escape-game blockout.
 
         Args:
@@ -382,16 +384,16 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
         )
         spawned_count += 2
 
-        return {
+        return json.dumps({
             "spawned_count": spawned_count,
             "rooms": [room["name"] for room in room_specs],
             "puzzles": {room["name"]: room["puzzle"] for room in room_specs},
             "recommended_next_prompt": "Replace blockout puzzle devices with interactive Blueprint actors and connect them to the HUD room progress state.",
-        }
+        }, ensure_ascii=False)
 
-    @staticmethod
     @toolset_registry.tool_call
-    def create_cinematic_500_escape_level(theme_label: str = "500일의 방", detail_density: int = 2) -> dict:
+    @staticmethod
+    def create_cinematic_500_escape_level(theme_label: str = "500일의 방", detail_density: int = 2) -> str:
         """Create a richer five-room anniversary escape environment for first MCP passes.
 
         Args:
@@ -492,7 +494,7 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
         )
         spawned_count += 3
 
-        return {
+        return json.dumps({
             "spawned_count": spawned_count,
             "rooms": [room["prefix"] for room in room_specs],
             "quality_intent": "cinematic blockout: layered rooms, readable puzzle consoles, lock motion reference parts, memory corridor, cloud path, and per-room accent lighting",
@@ -502,4 +504,4 @@ class HayoungEscapeRoomTools(unreal.ToolsetDefinition):
                 "Import the six couple photos and assign them to Cinematic_Final_Memory_Frame materials.",
                 "Add post-process volume: ACES contrast, mild bloom, warm highlights, cool shadows.",
             ],
-        }
+        }, ensure_ascii=False)

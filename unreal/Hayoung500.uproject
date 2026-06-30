@@ -3,6 +3,13 @@
   "EngineAssociation": "5.8",
   "Category": "Game",
   "Description": "500-day anniversary escape-room project with Unreal MCP tooling.",
+  "Modules": [
+    {
+      "Name": "Hayoung500",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
   "Plugins": [
     {
       "Name": "ModelContextProtocol",

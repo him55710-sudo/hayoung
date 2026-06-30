@@ -89,15 +89,36 @@ if ($LaunchProject) {
   if (-not $editor) {
     throw "UnrealEditor.exe was not found. Install Unreal Engine 5.8 from Epic Games Launcher first."
   }
-  Start-Process -FilePath $editor -ArgumentList "`"$ProjectPath`""
+  $editorArgs = @(
+    "`"$ProjectPath`"",
+    "-ModelContextProtocolStartServer",
+    "-ModelContextProtocolPort=8000",
+    "-NoLiveCoding"
+  )
+  Start-Process -FilePath $editor -ArgumentList $editorArgs
 }
 
 if ($CheckMcp) {
   try {
-    $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/mcp" -UseBasicParsing -TimeoutSec 5
+    $headers = @{ Accept = "application/json, text/event-stream" }
+    $body = @{
+      jsonrpc = "2.0"
+      id = 1
+      method = "initialize"
+      params = @{
+        protocolVersion = "2025-06-18"
+        capabilities = @{}
+        clientInfo = @{
+          name = "setup-unreal-58"
+          version = "1.0"
+        }
+      }
+    } | ConvertTo-Json -Depth 8
+    $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/mcp" -Method Post -ContentType "application/json" -Headers $headers -Body $body -UseBasicParsing -TimeoutSec 5
     [pscustomobject]@{
-      MpcEndpoint = "http://127.0.0.1:8000/mcp"
+      McpEndpoint = "http://127.0.0.1:8000/mcp"
       StatusCode = $response.StatusCode
+      SessionId = $response.Headers["Mcp-Session-Id"]
       ContentType = $response.Headers["Content-Type"]
     } | Format-List
   } catch {

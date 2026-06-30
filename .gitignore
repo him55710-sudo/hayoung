@@ -11,3 +11,14 @@ output
 __pycache__
 *.pyc
 Thumbs.db
+
+# Unreal Engine generated files
+unreal/DerivedDataCache/
+unreal/Binaries/
+unreal/Intermediate/
+unreal/Saved/
+unreal/.vs/
+unreal/*.sln
+unreal/SourceAudio/
+unreal/Content/Collections/
+unreal/Content/Developers/

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
+
 from typing import Final, TypedDict
 
 import toolset_registry
 import unreal
 
 from .romantic_escape_room import _cube, _point_light, _shape, _text
+
+
+GENERATED_LEVEL_PATH: Final[str] = "/Game/Maps/Hayoung500EscapeCafe_MCP"
+GENERATED_LABEL_PREFIXES: Final[tuple[str, ...]] = ("CafeEscape_", "EscapeCafe_")
 
 
 class RoomSpec(TypedDict):
@@ -123,6 +129,33 @@ def _rooms(spacing: float) -> list[RoomSpec]:
     ]
 
 
+def _open_or_create_generated_level() -> str:
+    unreal.EditorAssetLibrary.make_directory("/Game/Maps")
+    if unreal.EditorAssetLibrary.does_asset_exist(GENERATED_LEVEL_PATH):
+        unreal.EditorLevelLibrary.load_level(GENERATED_LEVEL_PATH)
+        return "loaded_existing"
+    unreal.EditorLevelLibrary.new_level(GENERATED_LEVEL_PATH)
+    return "created_new"
+
+
+def _clear_generated_actors() -> int:
+    actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    removed = 0
+    for actor in list(actor_subsystem.get_all_level_actors()):
+        label = actor.get_actor_label()
+        if label.startswith(GENERATED_LABEL_PREFIXES):
+            actor_subsystem.destroy_actor(actor)
+            removed += 1
+    return removed
+
+
+def _save_current_level() -> bool:
+    try:
+        return bool(unreal.EditorLevelLibrary.save_current_level())
+    except Exception:
+        return bool(unreal.EditorLoadingAndSavingUtils.save_current_level())
+
+
 def _spawn_architecture(prefix: str, origin_x: float, spec: RoomSpec) -> int:
     _cube(f"{prefix}_Briefing_Threshold", unreal.Vector(origin_x - 245, -270, 45), unreal.Vector(0.9, 0.12, 0.9))
     _cube(f"{prefix}_Search_Wall_Surface", unreal.Vector(origin_x - 245, -25, 140), unreal.Vector(0.08, 4.5, 2.1))
@@ -164,15 +197,39 @@ def _spawn_lock_detail(prefix: str, origin_x: float, spec: RoomSpec) -> int:
 @unreal.uclass()
 class HayoungEscapeCafeMasterplanTools(unreal.ToolsetDefinition):
 
-    @staticmethod
     @toolset_registry.tool_call
+    @staticmethod
+    def inspect_save_apis() -> str:
+        classes = {
+            "EditorLoadingAndSavingUtils": getattr(unreal, "EditorLoadingAndSavingUtils", None),
+            "EditorLevelLibrary": getattr(unreal, "EditorLevelLibrary", None),
+            "EditorLevelUtils": getattr(unreal, "EditorLevelUtils", None),
+            "LevelEditorSubsystem": getattr(unreal, "LevelEditorSubsystem", None),
+        }
+        return json.dumps(
+            {
+                class_name: sorted(
+                    method_name
+                    for method_name in dir(class_value)
+                    if "save" in method_name.lower() or "level" in method_name.lower() or "map" in method_name.lower()
+                )
+                for class_name, class_value in classes.items()
+                if class_value is not None
+            },
+            ensure_ascii=False,
+        )
+
+    @toolset_registry.tool_call
+    @staticmethod
     def create_escape_cafe_500_masterplan(
         theme_label: str = "하영이와 현수의 500일 방탈출",
         fidelity_pass: int = 3,
         compact_layout: bool = False,
-    ) -> MasterplanResult:
+    ) -> str:
         density = max(1, min(int(fidelity_pass), 4))
         spacing = 760.0 if compact_layout else 940.0
+        level_state = _open_or_create_generated_level()
+        removed_count = _clear_generated_actors()
         spawned_count = 0
         room_specs = _rooms(spacing)
 
@@ -196,8 +253,13 @@ class HayoungEscapeCafeMasterplanTools(unreal.ToolsetDefinition):
 
         _text("EscapeCafe_Master_Title_500", theme_label, unreal.Vector(0, -300, 230), unreal.Rotator(0.0, 0.0, 0.0), 42.0)
         spawned_count += 1
+        saved = _save_current_level()
 
-        return {
+        return json.dumps({
+            "level_path": GENERATED_LEVEL_PATH,
+            "level_state": level_state,
+            "removed_count": removed_count,
+            "saved": saved,
             "spawned_count": spawned_count,
             "rooms": [spec["prefix"] for spec in room_specs],
             "room_flow": [spec["carried_clue"] for spec in room_specs],
@@ -215,4 +277,4 @@ class HayoungEscapeCafeMasterplanTools(unreal.ToolsetDefinition):
                 "Attach room-specific ambience loops to the Ambience_Label actors and trigger them by room volume.",
                 "Import real couple photos into the evidence cards and final memory frames.",
             ],
-        }
+        }, ensure_ascii=False)
