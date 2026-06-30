@@ -2,6 +2,10 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 
 ## Progress
 
+- 2026-06-30: Added a web-visible Unreal Room 01 mirror pass so Vercel now shows the MCP room concept instead of only storing Unreal `.umap` files. Room 01 now includes a Jatjeol confession bench garden, symbolic birthday gift table, violin keyring prop, Philippines vista, 100-day four-cut strip, and a large beef-cuts puzzle wall in the first-person Three.js scene.
+- 2026-06-30: Added `DESIGN.md` to lock the premium romantic escape-cafe art direction, installed dev-only React Grab/React Scan plus React Doctor, fixed `index.html` 500-day metadata, and updated `window.render_game_to_text` with `unrealMcpWebMirror`/`roomOneUnrealLandmarks` inspection data.
+- 2026-06-30: Visual QA captured `output/lazyweb/current-room1-after-adjust.png` and `output/web-game-current/shot-0.png`; after review, moved the gift table and violin keyring left so the default first-person view stays open.
+- 2026-06-30: Verification passed with `npm run build`, `npm run verify:game`, `npm audit --omit=dev`, and the develop-web-game Playwright client. `verify:game` completed desktop canvas, hint contract, graphics quality modes, all 10 puzzle solves, ending, mobile canvas, mobile look/move controls, and mobile hint checks.
 - GitHub repository `him55710-sudo/hayoung` is connected and pushed.
 - Vercel project `mongben/hyunsu-hayoung-400` is linked.
 - Production URL: `https://hyunsu-hayoung-400.vercel.app`.

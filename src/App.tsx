@@ -580,7 +580,7 @@ function App() {
       if (event.key.toLowerCase() === "a" || event.key === "ArrowLeft") setMovement((v) => ({ ...v, left: true }));
       if (event.key.toLowerCase() === "d" || event.key === "ArrowRight") setMovement((v) => ({ ...v, right: true }));
       if (event.key.toLowerCase() === "e") openNextPuzzle();
-      if (event.key.toLowerCase() === "h") useHint();
+      if (event.key.toLowerCase() === "h") requestHint();
       if (event.key.toLowerCase() === "f") toggleFullscreen();
     };
     const keyUp = (event: KeyboardEvent) => {
@@ -644,6 +644,12 @@ function App() {
         mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
         endingExperience: "heavenly finale with vow stats, cloud-step memory timeline, photo placeholders, and replay action",
         prologueSetDressing: "cinematic intro splash plus first-room prologue arches, photo garland, and floor light path",
+        unrealMcpWebMirror:
+          "Room 01 visibly mirrors the UE 5.8 MCP map in the browser: Jatjeol confession bench garden, violin keyring, birthday gift table, Philippines vista, 100-day four-cut strip, and a large beef-cuts wall puzzle.",
+        roomOneUnrealLandmarks:
+          roomIndex === 0
+            ? ["Jatjeol park confession bench", "violin keyring prop", "birthday gift table", "Philippines vista", "100-day photo strip", "large beef-cuts puzzle wall"]
+            : [],
         lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, tactile lock console, and short unlocked success state",
         unlockFeedbackUX: "correct answers briefly hold the device modal in an OPEN readout state before the 3D latch, sparks, flash, and door motion fire",
         roomDeviceKits: "five room-specific physical puzzle kits on the central console: diary/photo slot, cafe token receipt, rain direction rail, note bridge, and finale prism gate",
@@ -780,7 +786,7 @@ function App() {
     }, window.hayoungDebugHoldUnlock ? 5200 : 1400);
   }
 
-  function useHint() {
+  function requestHint() {
     if (hintCount >= 3) {
       setMessage("힌트 계약서가 모두 찍혔어요. 이제 남은 건 하영이의 추리력입니다.");
       return;
@@ -922,7 +928,7 @@ function App() {
               <span>Hints {hintsLeft}</span>
             </div>
             <div className="hud-cluster icon-actions">
-              <button type="button" onClick={useHint} title="힌트 사용" aria-label="힌트 사용">
+              <button type="button" onClick={requestHint} title="힌트 사용" aria-label="힌트 사용">
                 <HelpCircle aria-hidden="true" />
               </button>
               <button type="button" onClick={() => setAudioEnabled((value) => !value)} title="배경음 전환" aria-label="배경음 전환">
@@ -2931,6 +2937,7 @@ function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
     addVines(group, room, -4.2, 3.7, -4.38, 18);
     addHeartParticles(group, room, 18);
     addPrologueMemoryStage(group, room);
+    addUnrealRoomOneMemoryMap(group, room);
   }
 
   if (index === 1) {
@@ -3415,6 +3422,448 @@ function addPrologueMemoryStage(group: THREE.Group, room: Room) {
   const stageLight = new THREE.PointLight(room.palette[1], 1.25, 6.4);
   stageLight.position.set(0, 2.9, -2.3);
   group.add(stageLight);
+}
+
+function addUnrealRoomOneMemoryMap(group: THREE.Group, room: Room) {
+  group.userData.unrealRoomOneMirror = true;
+  addRoomOneParkConfessionSet(group, room);
+  addRoomOneBirthdayGiftTable(group, room);
+  addRoomOneViolinKeyring(group, room);
+  addRoomOneMemoryInstallations(group, room);
+  addRoomOneBeefPuzzleWall(group, room);
+  addRoomOneUnrealMarkerLights(group, room);
+}
+
+function addRoomOneParkConfessionSet(group: THREE.Group, room: Room) {
+  const bark = mat(0x5d3928, { roughness: 0.72, texture: "wood", textureRepeat: [1, 2.6], textureSeed: 5101 });
+  const leaf = mat(0x365b38, { roughness: 0.82, emissive: 0x122614, emissiveIntensity: 0.08, texture: "fabric", textureSeed: 5102 });
+  const benchWood = mat(0x5a3625, { roughness: 0.58, metalness: 0.04, texture: "wood", textureRepeat: [1.2, 1], textureSeed: 5103 });
+  const benchIron = mat(0x171719, { roughness: 0.42, metalness: 0.45, emissive: 0x24170f, emissiveIntensity: 0.08, texture: "metal", textureSeed: 5104 });
+  const warmHalo = mat(room.palette[1], { roughness: 0.2, metalness: 0.05, emissive: room.palette[1], emissiveIntensity: 0.45, transparent: true, opacity: 0.34 });
+
+  const hedge = box(2.65, 0.92, 0.32, leaf, -4.52, 0.86, -3.92);
+  hedge.userData.roomOneUnrealMirror = true;
+  group.add(hedge);
+
+  for (let i = 0; i < 3; i += 1) {
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.08 + i * 0.015, 0.13 + i * 0.02, 1.65 + i * 0.18, 10), bark);
+    trunk.position.set(-5.44 + i * 0.72, 1.0 + i * 0.05, -3.83 - i * 0.08);
+    trunk.rotation.z = -0.08 + i * 0.07;
+    trunk.castShadow = true;
+    trunk.receiveShadow = true;
+    trunk.userData.roomOneUnrealMirror = true;
+
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.46 + i * 0.06, 18, 12), leaf);
+    crown.position.set(trunk.position.x + 0.06, trunk.position.y + 0.95, trunk.position.z + 0.02);
+    crown.scale.set(1.18, 0.74, 0.52);
+    crown.castShadow = true;
+    crown.userData.roomOneUnrealMirror = true;
+    group.add(trunk, crown);
+  }
+
+  const bench = new THREE.Group();
+  bench.position.set(-4.28, 0.58, -2.68);
+  bench.rotation.y = 0.18;
+  bench.userData.roomOneUnrealMirror = true;
+  const seat = box(1.75, 0.14, 0.42, benchWood, 0, 0, 0);
+  const back = box(1.82, 0.12, 0.38, benchWood, 0, 0.46, -0.22);
+  back.rotation.x = -0.18;
+  const leftArm = box(0.08, 0.45, 0.48, benchIron, -0.98, 0.18, -0.02);
+  const rightArm = box(0.08, 0.45, 0.48, benchIron, 0.98, 0.18, -0.02);
+  const leftLeg = box(0.08, 0.46, 0.08, benchIron, -0.72, -0.28, 0.08);
+  const rightLeg = box(0.08, 0.46, 0.08, benchIron, 0.72, -0.28, 0.08);
+  bench.add(seat, back, leftArm, rightArm, leftLeg, rightLeg);
+  group.add(bench);
+
+  const memoryGlow = new THREE.Mesh(new THREE.CylinderGeometry(1.28, 1.64, 0.018, 48), warmHalo);
+  memoryGlow.position.set(-4.2, 0.18, -2.68);
+  memoryGlow.scale.set(1, 1, 0.62);
+  memoryGlow.userData.roomOneUnrealMirror = true;
+  group.add(memoryGlow);
+
+  const lamp = new THREE.PointLight(room.palette[1], 1.9, 4.6);
+  lamp.position.set(-4.12, 2.25, -2.46);
+  lamp.userData.roomOneUnrealMirror = true;
+  group.add(lamp);
+}
+
+function addRoomOneBirthdayGiftTable(group: THREE.Group, room: Room) {
+  const wood = mat(0x815332, { roughness: 0.48, metalness: 0.08, texture: "wood", textureRepeat: [1.5, 0.8], textureSeed: 5201 });
+  const bag = mat(0xe9f4ff, { roughness: 0.64, emissive: 0x9bd8ff, emissiveIntensity: 0.06, texture: "paper", textureSeed: 5202 });
+  const greenWrap = mat(0x77c747, { roughness: 0.58, emissive: 0x275d22, emissiveIntensity: 0.06, texture: "paper", textureSeed: 5203 });
+  const pinkWrap = mat(0xe898c8, { roughness: 0.56, emissive: 0x5d2446, emissiveIntensity: 0.08, texture: "paper", textureSeed: 5204 });
+  const ribbon = mat(room.palette[2], { roughness: 0.3, metalness: 0.12, emissive: room.palette[2], emissiveIntensity: 0.28 });
+  const envelope = mat(0xfff3df, { roughness: 0.82, emissive: 0xffd8a1, emissiveIntensity: 0.06, texture: "paper", textureSeed: 5205 });
+  const blackBox = mat(0x161413, { roughness: 0.36, metalness: 0.08, emissive: 0x2b1d14, emissiveIntensity: 0.1, texture: "metal", textureSeed: 5206 });
+
+  const table = new THREE.Group();
+  table.position.set(-2.76, 0.72, 1.24);
+  table.rotation.y = 0.14;
+  table.userData.roomOneUnrealMirror = true;
+  table.add(box(2.52, 0.16, 1.08, wood, 0, 0, 0));
+  table.add(box(0.1, 0.8, 0.1, wood, -1.06, -0.46, -0.36));
+  table.add(box(0.1, 0.8, 0.1, wood, 1.06, -0.46, -0.36));
+  table.add(box(0.1, 0.8, 0.1, wood, -1.06, -0.46, 0.36));
+  table.add(box(0.1, 0.8, 0.1, wood, 1.06, -0.46, 0.36));
+
+  const giftBag = box(0.62, 0.58, 0.16, bag, 0.62, 0.38, -0.12);
+  const bagHandleLeft = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 28), ribbon);
+  const bagHandleRight = bagHandleLeft.clone();
+  bagHandleLeft.position.set(0.48, 0.71, -0.03);
+  bagHandleRight.position.set(0.76, 0.71, -0.03);
+  bagHandleLeft.scale.set(0.78, 1.08, 1);
+  bagHandleRight.scale.set(0.78, 1.08, 1);
+
+  const greenGift = box(0.48, 0.46, 0.46, greenWrap, -0.56, 0.34, -0.12);
+  const pinkGift = box(0.72, 0.34, 0.44, pinkWrap, -0.1, 0.28, 0.22);
+  const blackCase = box(1.16, 0.16, 0.2, blackBox, 0.12, 0.16, -0.42);
+  const letter = box(0.76, 0.035, 0.48, envelope, -0.72, 0.13, 0.32);
+  letter.rotation.y = 0.14;
+  const waxSeal = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.018, 24), ribbon);
+  waxSeal.position.set(-0.64, 0.165, 0.36);
+  waxSeal.rotation.x = Math.PI / 2;
+  table.add(giftBag, bagHandleLeft, bagHandleRight, greenGift, pinkGift, blackCase, letter, waxSeal);
+  group.add(table);
+
+  const giftLight = new THREE.PointLight(room.palette[2], 1.35, 3.6);
+  giftLight.position.set(-0.1, 1.72, 1.15);
+  giftLight.userData.roomOneUnrealMirror = true;
+  group.add(giftLight);
+}
+
+function addRoomOneViolinKeyring(group: THREE.Group, room: Room) {
+  const bodyMaterial = mat(0xa75b2a, { roughness: 0.34, metalness: 0.12, emissive: 0x4f210f, emissiveIntensity: 0.12, texture: "wood", textureSeed: 5301 });
+  const black = mat(0x101010, { roughness: 0.36, metalness: 0.32, texture: "metal", textureSeed: 5302 });
+  const stringMaterial = mat(0xe9d7b8, { roughness: 0.18, metalness: 0.62, emissive: room.palette[1], emissiveIntensity: 0.12 });
+  const brass = mat(0xb89442, { roughness: 0.28, metalness: 0.66, emissive: room.palette[1], emissiveIntensity: 0.18, texture: "metal", textureSeed: 5303 });
+
+  const violin = new THREE.Group();
+  violin.position.set(-2.48, 1.04, 0.9);
+  violin.rotation.set(-0.55, -0.52, 0.08);
+  violin.scale.setScalar(0.9);
+  violin.userData.roomOneUnrealMirror = true;
+
+  const lowerBody = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 12), bodyMaterial);
+  lowerBody.scale.set(1.18, 0.64, 0.28);
+  lowerBody.position.set(0, 0, 0);
+  const upperBody = lowerBody.clone();
+  upperBody.scale.set(0.92, 0.48, 0.24);
+  upperBody.position.set(0, 0.28, 0);
+  const waist = box(0.19, 0.24, 0.045, bodyMaterial, 0, 0.13, 0.012);
+  const neck = box(0.08, 0.56, 0.05, black, 0, 0.64, 0.018);
+  const bridge = box(0.26, 0.035, 0.04, stringMaterial, 0, 0.18, 0.055);
+  const tail = box(0.17, 0.12, 0.055, black, 0, -0.18, 0.04);
+  violin.add(lowerBody, upperBody, waist, neck, bridge, tail);
+
+  for (let i = 0; i < 4; i += 1) {
+    const string = box(0.012, 0.92, 0.012, stringMaterial, -0.045 + i * 0.03, 0.28, 0.078);
+    string.rotation.z = -0.025 + i * 0.016;
+    violin.add(string);
+  }
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.015, 8, 36), brass);
+  ring.position.set(-0.42, 0.28, 0);
+  ring.rotation.z = Math.PI / 2.2;
+  const chain = box(0.28, 0.018, 0.018, brass, -0.24, 0.2, 0.01);
+  chain.rotation.z = -0.45;
+  const note = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.01, 8, 22), brass);
+  note.position.set(-0.27, -0.05, 0.02);
+  note.scale.set(0.8, 1.35, 1);
+  const noteStem = box(0.018, 0.18, 0.018, brass, -0.22, 0.045, 0.02);
+  violin.add(ring, chain, note, noteStem);
+  group.add(violin);
+}
+
+function addRoomOneMemoryInstallations(group: THREE.Group, room: Room) {
+  const frame = mat(0x6b4934, { roughness: 0.42, metalness: 0.14, texture: "wood", textureSeed: 5401 });
+  const brass = mat(room.palette[1], { roughness: 0.28, metalness: 0.42, emissive: room.palette[1], emissiveIntensity: 0.18, texture: "metal", textureSeed: 5402 });
+  const exhibits = [
+    { key: "park", title: "잣절공원 고백", caption: "벤치와 가로등 아래 첫 마음", color: 0xffd88a, x: -2.72, y: 2.48, z: -4.38, width: 1.18, height: 0.78 },
+    { key: "philippines", title: "필리핀 전망", caption: "하늘과 능선, 장난스러운 손길", color: 0x8fd7ff, x: -1.16, y: 2.48, z: -4.38, width: 1.18, height: 0.78 },
+    { key: "photo-strip", title: "100일 네 컷", caption: "검은 프레임 속 네 번의 표정", color: 0xff8ea4, x: 0.4, y: 2.48, z: -4.38, width: 1.18, height: 0.78 },
+  ];
+
+  exhibits.forEach((exhibit, exhibitIndex) => {
+    const frameMesh = box(exhibit.width + 0.16, exhibit.height + 0.16, 0.07, frame, exhibit.x, exhibit.y, exhibit.z - 0.018);
+    const texture = createRoomOneMemoryTexture(exhibit.key, exhibit.title, exhibit.caption, exhibit.color, exhibit.key === "photo-strip" ? "photoStrip" : "memory");
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.78,
+      metalness: 0.02,
+      emissive: exhibit.color,
+      emissiveIntensity: 0.08,
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(exhibit.width, exhibit.height), material);
+    plane.position.set(exhibit.x, exhibit.y, exhibit.z + 0.035);
+    plane.castShadow = true;
+    plane.userData.roomOneUnrealMirror = true;
+    frameMesh.userData.roomOneUnrealMirror = true;
+    group.add(frameMesh, plane);
+
+    const pin = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 8), brass);
+    pin.position.set(exhibit.x - 0.42 + exhibitIndex * 0.06, exhibit.y + 0.32, exhibit.z + 0.075);
+    pin.userData.roomOneUnrealMirror = true;
+    group.add(pin);
+  });
+
+  const vistaTexture = createRoomOneMemoryTexture("philippines-large-vista", "필리핀의 높은 하늘", "창밖으로 이어지는 다음 단서", 0x8fd7ff, "vista");
+  const vistaMaterial = new THREE.MeshStandardMaterial({ map: vistaTexture, roughness: 0.72, emissive: 0x427a96, emissiveIntensity: 0.12 });
+  const vista = new THREE.Mesh(new THREE.PlaneGeometry(1.48, 0.9), vistaMaterial);
+  vista.position.set(5.88, 2.32, -2.24);
+  vista.rotation.y = -Math.PI / 2;
+  vista.userData.roomOneUnrealMirror = true;
+  group.add(vista);
+}
+
+function addRoomOneBeefPuzzleWall(group: THREE.Group, room: Room) {
+  const boardMaterial = mat(0x2f2218, { roughness: 0.72, metalness: 0.08, emissive: 0x1a100a, emissiveIntensity: 0.08, texture: "wood", textureRepeat: [1.2, 0.8], textureSeed: 5501 });
+  const trimMaterial = mat(room.palette[1], { roughness: 0.32, metalness: 0.48, emissive: room.palette[1], emissiveIntensity: 0.18, texture: "metal", textureSeed: 5502 });
+  const magnetMaterial = mat(0xff7d8e, { roughness: 0.36, metalness: 0.18, emissive: 0xff7d8e, emissiveIntensity: 0.24 });
+  const texture = createRoomOneMemoryTexture("beef-cuts-wall", "고기 부위 맞추기", "힌트: 100일의 기억은 윗등 쪽, 목심과 등심 사이", 0xffc36f, "beef");
+  const puzzleMaterial = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.76, metalness: 0.02, emissive: 0xffc36f, emissiveIntensity: 0.07 });
+
+  const board = box(3.36, 2.24, 0.08, boardMaterial, 2.92, 2.22, -4.37);
+  board.userData.roomOneUnrealMirror = true;
+  const puzzle = new THREE.Mesh(new THREE.PlaneGeometry(3.06, 1.94), puzzleMaterial);
+  puzzle.position.set(2.92, 2.24, -4.315);
+  puzzle.userData.roomOneUnrealMirror = true;
+  group.add(board, puzzle);
+
+  const topTrim = box(3.48, 0.045, 0.1, trimMaterial, 2.92, 3.38, -4.3);
+  const bottomTrim = box(3.48, 0.045, 0.1, trimMaterial, 2.92, 1.06, -4.3);
+  const leftTrim = box(0.045, 2.28, 0.1, trimMaterial, 1.16, 2.22, -4.3);
+  const rightTrim = box(0.045, 2.28, 0.1, trimMaterial, 4.68, 2.22, -4.3);
+  [topTrim, bottomTrim, leftTrim, rightTrim].forEach((trim) => {
+    trim.userData.roomOneUnrealMirror = true;
+    group.add(trim);
+  });
+
+  const slots = [
+    [1.82, 1.21],
+    [2.22, 1.14],
+    [2.62, 1.18],
+    [3.02, 1.12],
+    [3.42, 1.2],
+    [3.82, 1.15],
+  ];
+  slots.forEach(([x, y], slotIndex) => {
+    const magnet = box(0.23, 0.12, 0.045, magnetMaterial.clone(), x, y, -4.24);
+    magnet.rotation.z = -0.08 + slotIndex * 0.035;
+    magnet.userData.roomOneUnrealMirror = true;
+    magnet.userData.beefPuzzlePiece = true;
+    group.add(magnet);
+  });
+
+  const focusLight = new THREE.PointLight(0xffc36f, 1.95, 5.4);
+  focusLight.position.set(2.92, 2.66, -3.18);
+  focusLight.userData.roomOneUnrealMirror = true;
+  group.add(focusLight);
+}
+
+function addRoomOneUnrealMarkerLights(group: THREE.Group, room: Room) {
+  const markerMaterial = mat(room.palette[2], { roughness: 0.24, metalness: 0.18, emissive: room.palette[2], emissiveIntensity: 0.62, transparent: true, opacity: 0.72 });
+  const labels = [
+    [-4.2, -2.68],
+    [-0.12, 1.05],
+    [2.92, -3.18],
+    [5.78, -2.24],
+  ];
+  labels.forEach(([x, z], index) => {
+    const marker = new THREE.Mesh(new THREE.TorusGeometry(0.2 + index * 0.018, 0.01, 8, 40), markerMaterial.clone());
+    marker.position.set(x, 0.19, z);
+    marker.rotation.x = Math.PI / 2;
+    marker.userData.roomOneUnrealMirror = true;
+    marker.userData.cinematicAtmosphere = true;
+    group.add(marker);
+  });
+}
+
+function createRoomOneMemoryTexture(key: string, title: string, caption: string, accent: number, kind: "memory" | "beef" | "vista" | "photoStrip") {
+  const cacheKey = `room-one-${key}-${kind}`;
+  const cached = memoryTextureCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 640;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return new THREE.Texture();
+  }
+
+  const accentColor = new THREE.Color(accent);
+  const accentStyle = `#${accentColor.getHexString()}`;
+  const baseGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  baseGradient.addColorStop(0, "#fff8ec");
+  baseGradient.addColorStop(0.54, "#f2dcc2");
+  baseGradient.addColorStop(1, "#30241c");
+  ctx.fillStyle = baseGradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "rgba(26, 16, 10, 0.12)";
+  for (let i = 0; i < 34; i += 1) {
+    const x = (i * 97) % canvas.width;
+    const y = (i * 53) % canvas.height;
+    ctx.fillRect(x, y, 2 + (i % 5), 18 + (i % 7) * 8);
+  }
+
+  if (kind === "beef") {
+    drawBeefPuzzleTexture(ctx, accentStyle);
+  } else if (kind === "vista") {
+    drawVistaTexture(ctx, accentStyle);
+  } else if (kind === "photoStrip") {
+    drawPhotoStripTexture(ctx, accentStyle);
+  } else {
+    drawMemoryPosterTexture(ctx, accentStyle, key);
+  }
+
+  ctx.fillStyle = "rgba(34, 23, 18, 0.9)";
+  ctx.font = "700 56px system-ui, sans-serif";
+  ctx.fillText(title, 70, 550);
+  ctx.font = "500 31px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(34, 23, 18, 0.72)";
+  ctx.fillText(caption, 72, 596);
+  ctx.fillStyle = accentStyle;
+  ctx.fillRect(70, 496, 260, 7);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  memoryTextureCache.set(cacheKey, texture);
+  return texture;
+}
+
+function drawMemoryPosterTexture(ctx: CanvasRenderingContext2D, accentStyle: string, key: string) {
+  ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
+  ctx.fillRect(70, 58, 884, 382);
+  ctx.strokeStyle = "rgba(86, 55, 35, 0.72)";
+  ctx.lineWidth = 10;
+  ctx.strokeRect(70, 58, 884, 382);
+  ctx.fillStyle = accentStyle;
+  ctx.globalAlpha = 0.18;
+  ctx.fillRect(86, 74, 852, 350);
+  ctx.globalAlpha = 1;
+
+  if (key === "park") {
+    ctx.fillStyle = "#355334";
+    ctx.fillRect(84, 292, 856, 132);
+    ctx.fillStyle = "#5b3928";
+    ctx.fillRect(280, 256, 360, 34);
+    ctx.fillRect(314, 290, 34, 86);
+    ctx.fillRect(572, 290, 34, 86);
+    ctx.fillStyle = "rgba(255, 221, 164, 0.78)";
+    ctx.beginPath();
+    ctx.arc(712, 124, 45, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "rgba(35, 54, 75, 0.72)";
+    ctx.beginPath();
+    ctx.moveTo(90, 352);
+    ctx.lineTo(240, 210);
+    ctx.lineTo(390, 352);
+    ctx.lineTo(520, 236);
+    ctx.lineTo(820, 352);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
+    ctx.beginPath();
+    ctx.arc(250, 132, 36, 0, Math.PI * 2);
+    ctx.arc(296, 134, 26, 0, Math.PI * 2);
+    ctx.arc(336, 126, 32, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawVistaTexture(ctx: CanvasRenderingContext2D, accentStyle: string) {
+  const sky = ctx.createLinearGradient(0, 50, 0, 430);
+  sky.addColorStop(0, "#a9ddff");
+  sky.addColorStop(0.6, "#f7fbff");
+  sky.addColorStop(1, "#8ebf72");
+  ctx.fillStyle = sky;
+  ctx.fillRect(70, 58, 884, 382);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.84)";
+  for (let i = 0; i < 6; i += 1) {
+    ctx.beginPath();
+    ctx.ellipse(210 + i * 108, 134 + (i % 2) * 24, 70, 24, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "rgba(38, 97, 74, 0.72)";
+  ctx.beginPath();
+  ctx.moveTo(70, 408);
+  ctx.lineTo(180, 284);
+  ctx.lineTo(340, 402);
+  ctx.lineTo(510, 252);
+  ctx.lineTo(750, 404);
+  ctx.lineTo(954, 312);
+  ctx.lineTo(954, 440);
+  ctx.lineTo(70, 440);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = accentStyle;
+  ctx.lineWidth = 7;
+  ctx.strokeRect(70, 58, 884, 382);
+}
+
+function drawPhotoStripTexture(ctx: CanvasRenderingContext2D, accentStyle: string) {
+  ctx.fillStyle = "#101010";
+  ctx.fillRect(134, 58, 756, 382);
+  ctx.fillStyle = "#f8f3e8";
+  const cells = [
+    [164, 88],
+    [520, 88],
+    [164, 260],
+    [520, 260],
+  ];
+  cells.forEach(([x, y], index) => {
+    ctx.fillRect(x, y, 300, 132);
+    ctx.fillStyle = index % 2 === 0 ? "rgba(255, 126, 145, 0.26)" : "rgba(143, 215, 255, 0.28)";
+    ctx.fillRect(x + 16, y + 16, 268, 100);
+    ctx.fillStyle = "#f8f3e8";
+  });
+  ctx.fillStyle = accentStyle;
+  ctx.font = "700 36px Georgia, serif";
+  ctx.fillText("Mono mansion", 360, 50);
+}
+
+function drawBeefPuzzleTexture(ctx: CanvasRenderingContext2D, accentStyle: string) {
+  ctx.fillStyle = "rgba(255, 250, 242, 0.82)";
+  ctx.fillRect(60, 48, 904, 410);
+  ctx.strokeStyle = "#8c5d2a";
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  ctx.ellipse(514, 260, 300, 126, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(236, 220, 90, 65, -0.18, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(792, 268);
+  ctx.lineTo(930, 346);
+  ctx.lineTo(816, 358);
+  ctx.closePath();
+  ctx.stroke();
+
+  const segmentColors = ["#f0a7a7", "#f7c689", "#c8d7f7", "#ceb2e8", "#a7dddf", "#f5e58c", "#b6d7a8", "#ffb39c"];
+  segmentColors.forEach((color, index) => {
+    const x = 330 + (index % 4) * 126;
+    const y = 164 + Math.floor(index / 4) * 88;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, 104, 64);
+    ctx.strokeStyle = "rgba(255,255,255,0.82)";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(x, y, 104, 64);
+  });
+
+  ctx.fillStyle = accentStyle;
+  ctx.font = "800 30px system-ui, sans-serif";
+  ctx.fillText("윗등 쪽", 390, 146);
+  ctx.fillText("목심", 244, 314);
+  ctx.fillText("등심", 516, 314);
 }
 
 function addCafeTable(group: THREE.Group, room: Room) {
