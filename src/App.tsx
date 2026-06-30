@@ -267,6 +267,7 @@ declare global {
   interface Window {
     advanceTime?: (ms?: number) => void;
     hayoungCameraState?: { x: number; z: number; yaw: number; pitch: number };
+    hayoungDebugSetCameraPose?: (pose: Partial<{ x: number; z: number; yaw: number; pitch: number }>) => void;
     hayoungDebugHoldUnlock?: boolean;
     hayoungTouchControls?: TouchControlState;
     render_game_to_text?: () => string;
@@ -1862,8 +1863,8 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
         lastLookInputTick = touchLook.tick;
       }
       const speed = 4.4 * delta;
-      const forward = new THREE.Vector3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
-      const right = new THREE.Vector3(Math.cos(player.yaw), 0, Math.sin(player.yaw));
+      const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+      const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
       const velocity = new THREE.Vector3();
 
       if (move.forward || touchControls?.forward) velocity.add(forward);
@@ -1972,6 +1973,14 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
         step(1 / 60);
       }
     };
+    window.hayoungDebugSetCameraPose = (pose) => {
+      const targetX = roomIndexRef.current * 24;
+      if (typeof pose.x === "number") player.position.x = THREE.MathUtils.clamp(pose.x, targetX - 5.95, targetX + 5.95);
+      if (typeof pose.z === "number") player.position.z = THREE.MathUtils.clamp(pose.z, -3.35, 3.85);
+      if (typeof pose.yaw === "number") player.yaw = pose.yaw;
+      if (typeof pose.pitch === "number") player.pitch = THREE.MathUtils.clamp(pose.pitch, -0.78, 0.62);
+      step(1 / 60);
+    };
 
     animate();
 
@@ -1986,6 +1995,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
       mount.removeChild(renderer.domElement);
       window.advanceTime = undefined;
       window.hayoungCameraState = undefined;
+      window.hayoungDebugSetCameraPose = undefined;
     };
   }, [onInteractFocusChange, onNearObject]);
 

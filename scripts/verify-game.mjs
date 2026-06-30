@@ -155,9 +155,9 @@ async function enterGame(page, isMobile = false) {
   log(`goto ${isMobile ? "mobile" : "desktop"}`);
   await waitForElement(page, ".theme-card");
   log(`intro ready ${isMobile ? "mobile" : "desktop"}`);
-  const introText = await page.locator("body").innerText({ timeout: 45000 });
+  const introText = await page.evaluate(() => document.body?.innerText ?? "");
   if (!introText.includes("500일")) throw new Error(`Unexpected intro: ${introText}`);
-  const introScreenText = await page.locator(".intro-screen").innerText();
+  const introScreenText = await page.evaluate(() => document.querySelector(".intro-screen")?.textContent ?? "");
   if (/\d+\s*초/.test(introScreenText) || introScreenText.includes("클릭할 수 있어요") || introScreenText.includes("뒤에 멈춰요")) {
     throw new Error(`Intro reveals runaway timing: ${introScreenText}`);
   }
@@ -353,6 +353,54 @@ async function verifyMobileTouchControls(page) {
   return { before, afterLook, controlsAfterMove, afterMove };
 }
 
+async function verifyKeyboardMovementDirections(page) {
+  await page.waitForFunction(() => window.hayoungCameraState && window.hayoungDebugSetCameraPose, { timeout: 15000 });
+  await page.locator("canvas").click({ position: { x: 24, y: 24 }, force: true }).catch(() => undefined);
+
+  const pose = { x: 0, z: 1.2, yaw: -Math.PI / 2, pitch: -0.04 };
+  const sampleKey = async (key) => {
+    await page.evaluate((nextPose) => window.hayoungDebugSetCameraPose?.(nextPose), pose);
+    const before = await page.evaluate(() => window.hayoungCameraState);
+    try {
+      await page.keyboard.down(key);
+      await page.waitForTimeout(80);
+      await page.evaluate(() => window.advanceTime?.(600));
+    } finally {
+      await page.keyboard.up(key).catch(() => undefined);
+    }
+    await page.waitForTimeout(60);
+    const after = await page.evaluate(() => window.hayoungCameraState);
+    return {
+      key,
+      before,
+      after,
+      dx: Number((after.x - before.x).toFixed(3)),
+      dz: Number((after.z - before.z).toFixed(3)),
+    };
+  };
+
+  const forward = await sampleKey("ArrowUp");
+  const back = await sampleKey("ArrowDown");
+  const left = await sampleKey("ArrowLeft");
+  const right = await sampleKey("ArrowRight");
+  const result = { pose, forward, back, left, right };
+
+  for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) {
+    await page.keyboard.up(key).catch(() => undefined);
+  }
+  await page.evaluate(() => {
+    document.exitPointerLock?.();
+    window.hayoungDebugSetCameraPose?.({ x: 0, z: 3.25, yaw: 0, pitch: -0.04 });
+  });
+
+  if (forward.dx < 0.45 || Math.abs(forward.dz) > 0.45) throw new Error(`ArrowUp does not move with camera forward: ${JSON.stringify(result)}`);
+  if (back.dx > -0.45 || Math.abs(back.dz) > 0.45) throw new Error(`ArrowDown does not move with camera backward: ${JSON.stringify(result)}`);
+  if (left.dz > -0.45 || Math.abs(left.dx) > 0.45) throw new Error(`ArrowLeft does not strafe left relative to camera: ${JSON.stringify(result)}`);
+  if (right.dz < 0.45 || Math.abs(right.dx) > 0.45) throw new Error(`ArrowRight does not strafe right relative to camera: ${JSON.stringify(result)}`);
+
+  return result;
+}
+
 async function solveAll(page) {
   await page.evaluate(() => {
     window.hayoungDebugHoldUnlock = false;
@@ -457,6 +505,7 @@ async function main() {
     if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
     const hintCheck = await verifyHintPenaltyUX(desktop, "desktop");
     const graphicsCheck = await verifyGraphicsQuality(desktop, desktopCanvas);
+    const keyboardMovement = await verifyKeyboardMovementDirections(desktop);
     const ending = await solveAll(desktop);
     if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
     if (!ending.endingExperience?.includes("heavenly finale")) throw new Error(`Ending experience metadata missing: ${JSON.stringify(ending)}`);
@@ -521,6 +570,7 @@ async function main() {
       desktopCanvas,
       hintCheck,
       graphicsCheck,
+      keyboardMovement,
       ending,
       mobileState,
       mobileCanvas,
