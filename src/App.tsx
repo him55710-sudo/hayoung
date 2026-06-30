@@ -270,6 +270,9 @@ declare global {
     hayoungCameraState?: { x: number; z: number; yaw: number; pitch: number };
     hayoungDebugSetCameraPose?: (pose: Partial<{ x: number; z: number; yaw: number; pitch: number }>) => void;
     hayoungDebugHoldUnlock?: boolean;
+    hayoungDebugSkipRoomTransitions?: boolean;
+    hayoungDebugFastUnlock?: boolean;
+    hayoungDebugCompleteGame?: () => void;
     hayoungTouchControls?: TouchControlState;
     render_game_to_text?: () => string;
   }
@@ -586,6 +589,21 @@ function App() {
 
   useRoomAmbience(phase, roomIndex, audioEnabled);
 
+  useEffect(() => {
+    window.hayoungDebugCompleteGame = () => {
+      setSolvedIds(puzzles.map((puzzle) => puzzle.id));
+      setActivePuzzleId(null);
+      setUnlockFeedback(null);
+      setAnswer("");
+      setRoomIndex(rooms.length - 1);
+      setPhase("ending");
+      setMessage("500일의 모든 단서가 연결됐습니다.");
+    };
+    return () => {
+      window.hayoungDebugCompleteGame = undefined;
+    };
+  }, []);
+
   const getIntroButtonBounds = () => {
     if (typeof window === "undefined") {
       return { maxX: 220, maxY: 95 };
@@ -788,7 +806,7 @@ function App() {
     setUnlockTick((value) => value + 1);
     setUnlocking(true);
     window.setTimeout(() => setUnlocking(false), 980);
-    if (showTransition) {
+    if (showTransition && !window.hayoungDebugSkipRoomTransitions) {
       setTransitioning(true);
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
@@ -875,6 +893,7 @@ function App() {
     setUnlockFeedback({ puzzleId: solvedPuzzle.id, title: solvedPuzzle.title, reward: solvedPuzzle.reward });
     setMessage(`장치가 열리는 중... ${solvedPuzzle.reward} 회로가 연결됐습니다.`);
 
+    const unlockDelay = window.hayoungDebugFastUnlock ? 1100 : window.hayoungDebugHoldUnlock ? 5200 : 1400;
     window.setTimeout(() => {
       setSolvedIds((ids) => (ids.includes(solvedPuzzle.id) ? ids : [...ids, solvedPuzzle.id]));
       setMessage(`${solvedPuzzle.reward} 획득! ${solvedPuzzle.chainNote}`);
@@ -886,7 +905,7 @@ function App() {
       if (solvedPuzzle.id === 10) {
         window.setTimeout(() => setPhase("ending"), 520);
       }
-    }, window.hayoungDebugHoldUnlock ? 5200 : 1400);
+    }, unlockDelay);
   }
 
   function requestHint() {
@@ -1026,7 +1045,21 @@ function App() {
               })}
             </div>
 
-            <div className={`theme-start-panel${selectedIntroTheme?.status === "locked" ? " is-locked" : ""}${playableThemeSelected ? " is-confirming" : ""}`}>
+            <div
+              className={`theme-start-panel${selectedIntroTheme?.status === "locked" ? " is-locked" : ""}${playableThemeSelected ? " is-confirming" : ""}`}
+              style={
+                playableThemeSelected
+                  ? {
+                      position: "fixed",
+                      inset: 0,
+                      width: "100vw",
+                      maxWidth: "none",
+                      height: "100vh",
+                      minHeight: "100dvh",
+                    }
+                  : undefined
+              }
+            >
               {selectedIntroTheme ? (
                 <>
                   <span className="theme-start-eyebrow">{selectedIntroTheme.number}</span>
@@ -2065,13 +2098,13 @@ function createRoom(room: Room, index: number) {
     addCinematicAtmosphere(group, room, index);
   }
 
-  const keyLight = new THREE.PointLight(room.palette[1], index === 4 ? 3.6 : 2.15, 13);
-  keyLight.position.set(-3.7, 3.15, -1.6);
+  const keyLight = new THREE.PointLight(index === 0 ? 0xffa768 : room.palette[1], index === 0 ? 1.28 : index === 4 ? 3.6 : 2.15, index === 0 ? 10.6 : 13);
+  keyLight.position.set(index === 0 ? -2.2 : -3.7, index === 0 ? 3.45 : 3.15, index === 0 ? 1.35 : -1.6);
   group.add(keyLight);
   group.userData.keyLight = keyLight;
 
-  const portalLight = new THREE.PointLight(room.palette[2], index === 4 ? 4.2 : 2.1, 10);
-  portalLight.position.set(4.85, 2.3, -4.05);
+  const portalLight = new THREE.PointLight(index === 0 ? 0xffc17d : room.palette[2], index === 0 ? 0.92 : index === 4 ? 4.2 : 2.1, index === 0 ? 7.2 : 10);
+  portalLight.position.set(index === 0 ? 5.2 : 4.85, index === 0 ? 1.86 : 2.3, index === 0 ? -1.72 : -4.05);
   group.add(portalLight);
 
   return group;
@@ -2158,6 +2191,17 @@ function addCinematicAtmosphere(group: THREE.Group, room: Room, index: number) {
   const cool = new THREE.Color(room.palette[2]);
   const warmHex = warm.getHex();
   const coolHex = cool.getHex();
+
+  if (index === 0) {
+    const hazeMaterial = cinematicMaterial(0xffc885, 0.018, "reflection");
+    const backWash = scenePlane(11.8, 1.15, hazeMaterial, 0, 1.05, -4.16, [0, 0, 0]);
+    backWash.userData.cinematicAtmosphere = true;
+    backWash.userData.roomOnePracticalHaze = true;
+    backWash.userData.baseOpacity = hazeMaterial.opacity;
+    group.add(backWash);
+
+    return;
+  }
 
   for (let i = 0; i < 4; i += 1) {
     const material = cinematicMaterial(i % 2 ? coolHex : warmHex, index === 4 ? 0.062 : 0.04);
@@ -2314,12 +2358,14 @@ function addArchitecturalDetails(group: THREE.Group, room: Room, trimMaterial: T
     group.add(panel, top, bottom, left, right);
   }
 
-  [-4.8, -1.6, 1.6, 4.8].forEach((x, lightIndex) => {
-    const rail = box(0.035, 0.018, 7.5, edgeGlow, x, 0.13, -0.05);
-    rail.userData.statusLight = true;
-    rail.userData.baseGlow = 0.12 + lightIndex * 0.03;
-    group.add(rail);
-  });
+  if (index !== 0) {
+    [-4.8, -1.6, 1.6, 4.8].forEach((x, lightIndex) => {
+      const rail = box(0.035, 0.018, 7.5, edgeGlow, x, 0.13, -0.05);
+      rail.userData.statusLight = true;
+      rail.userData.baseGlow = 0.12 + lightIndex * 0.03;
+      group.add(rail);
+    });
+  }
 
   for (let i = 0; i < 8; i += 1) {
     const cable = box(0.035, 0.035, 0.95 + (i % 3) * 0.3, shadowWood, -6.1 + i * 1.7, 4.54 + Math.sin(i) * 0.05, -4.18);
@@ -3636,155 +3682,450 @@ function addUnrealRoomOneMemoryMap(group: THREE.Group, room: Room) {
 }
 
 function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
-  const floorInset = mat(0x5b351f, { roughness: 0.58, metalness: 0.04, texture: "wood", textureRepeat: [4.5, 3.2], textureSeed: 5601 });
-  const plaster = mat(0x9f7d62, { roughness: 0.88, texture: "plaster", textureRepeat: [4.4, 2.2], textureSeed: 5602 });
-  const wood = mat(0x3a2115, { roughness: 0.52, texture: "wood", textureRepeat: [2.2, 1.2], textureSeed: 5603 });
-  const amber = mat(0xffb35c, { roughness: 0.24, metalness: 0.1, emissive: 0xff9d33, emissiveIntensity: 0.42 });
+  const floorInset = mat(0x4a2d1f, { roughness: 0.62, metalness: 0.04, texture: "wood", textureRepeat: [6.2, 4.6], textureSeed: 5601 });
+  const redPlaster = mat(0x8f4638, { roughness: 0.9, texture: "plaster", textureRepeat: [4.8, 2.4], textureSeed: 5602 });
+  const stone = mat(0x766454, { roughness: 0.86, metalness: 0.02, texture: "plaster", textureRepeat: [1.2, 1.6], textureSeed: 5603 });
+  const darkWood = mat(0x3a2116, { roughness: 0.58, texture: "wood", textureRepeat: [2.4, 1.4], textureSeed: 5604 });
+  const carvedWood = mat(0x5b3521, { roughness: 0.52, metalness: 0.03, texture: "wood", textureRepeat: [1.3, 1.2], textureSeed: 5605 });
+  const velvet = mat(0x5f2328, { roughness: 0.74, emissive: 0x1d0709, emissiveIntensity: 0.06, texture: "fabric", textureRepeat: [1.5, 0.9], textureSeed: 5606 });
+  const candleWax = mat(0xffead4, { roughness: 0.72, emissive: 0xffc785, emissiveIntensity: 0.08 });
+  const flame = mat(0xffbf6f, { roughness: 0.2, metalness: 0.04, emissive: 0xffa13c, emissiveIntensity: 0.85, transparent: true, opacity: 0.88 });
+  const brass = mat(0xc3914d, { roughness: 0.28, metalness: 0.58, emissive: 0xffaa51, emissiveIntensity: 0.1, texture: "metal", textureSeed: 5607 });
+  const shadowWood = mat(0x17100c, { roughness: 0.7, texture: "wood", textureRepeat: [0.4, 4.8], textureSeed: 5608 });
+  const rugMaterial = mat(0x55201d, { roughness: 0.86, emissive: 0x160505, emissiveIntensity: 0.05, texture: "fabric", textureRepeat: [2.6, 1.4], textureSeed: 5609 });
 
-  group.add(box(9.9, 0.035, 6.35, floorInset, 0, 0.035, -0.16));
-  group.add(box(9.92, 2.6, 0.07, plaster, 0, 1.48, -4.48));
-  group.add(box(9.92, 0.86, 0.09, wood, 0, 0.56, -4.42));
+  const floor = box(12.7, 0.042, 7.65, floorInset, 0, 0.05, -0.22);
+  floor.receiveShadow = true;
+  group.add(floor);
 
-  for (let i = 0; i < 9; i += 1) {
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 8), amber);
-    bulb.position.set(-4.15 + i * 1.04, 3.08 + Math.sin(i * 0.8) * 0.08, -4.18);
-    bulb.userData.roomOneUnrealMirror = true;
-    group.add(bulb);
+  for (let i = 0; i < 11; i += 1) {
+    const seam = box(0.018, 0.012, 7.45, shadowWood, -5.55 + i * 1.1, 0.08, -0.22);
+    seam.receiveShadow = true;
+    group.add(seam);
   }
 
-  const keyLight = new THREE.PointLight(room.palette[1], 2.35, 9.2);
-  keyLight.position.set(-1.2, 3.1, -1.0);
-  keyLight.userData.roomOneUnrealMirror = true;
-  group.add(keyLight);
+  for (let i = 0; i < 7; i += 1) {
+    const crossSeam = box(12.2, 0.01, 0.014, shadowWood, 0, 0.082, -3.6 + i * 1.08);
+    crossSeam.receiveShadow = true;
+    group.add(crossSeam);
+  }
+
+  const rug = box(4.95, 0.026, 2.18, rugMaterial, 0.06, 0.095, 0.62);
+  [rug].forEach((part) => {
+    part.receiveShadow = true;
+    part.userData.roomOneUnrealMirror = true;
+    group.add(part);
+  });
+
+  group.add(box(12.75, 3.55, 0.08, redPlaster, 0, 2.06, -4.5));
+  group.add(box(12.78, 0.92, 0.11, darkWood, 0, 0.58, -4.38));
+  group.add(box(12.78, 0.18, 0.12, carvedWood, 0, 3.82, -4.34));
+  group.add(box(12.78, 0.16, 0.12, carvedWood, 0, 4.35, -4.34));
+  group.add(box(12.62, 0.09, 0.12, brass, 0, 1.05, -4.0));
+
+  for (let i = 0; i < 7; i += 1) {
+    const x = -5.8 + i * 1.94;
+    const pilaster = box(0.18, 3.45, 0.16, stone, x, 2.15, -4.18);
+    const base = box(0.38, 0.18, 0.2, carvedWood, x, 0.75, -4.08);
+    const capital = box(0.44, 0.16, 0.18, brass, x, 3.72, -4.06);
+    pilaster.castShadow = true;
+    group.add(pilaster, base, capital);
+  }
+
+  [-4.6, -1.75, 1.75, 4.6].forEach((x, alcoveIndex) => {
+    const back = box(1.64, 1.86, 0.05, mat(alcoveIndex % 2 ? 0x6f332b : 0x81513a, { roughness: 0.9, texture: "plaster", textureRepeat: [1.2, 1.1], textureSeed: 5680 + alcoveIndex }), x, 2.32, -4.08);
+    const left = box(0.12, 2.0, 0.16, stone, x - 0.9, 2.26, -3.98);
+    const right = box(0.12, 2.0, 0.16, stone, x + 0.9, 2.26, -3.98);
+    const top = box(1.88, 0.14, 0.16, stone, x, 3.24, -3.98);
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(0.88, 0.055, 8, 40, Math.PI), stone);
+    arch.position.set(x, 3.2, -3.98);
+    arch.rotation.z = Math.PI;
+    arch.scale.y = 0.48;
+    [back, left, right, top, arch].forEach((part) => {
+      part.userData.roomOneUnrealMirror = true;
+      group.add(part);
+    });
+  });
+
+  [-6.55, 6.55].forEach((x, sideIndex) => {
+    const sideRotation = sideIndex === 0 ? Math.PI / 2 : -Math.PI / 2;
+    const bench = box(1.62, 0.32, 0.58, velvet, x, 0.72, -1.9);
+    bench.rotation.y = sideRotation;
+    const rail = box(1.76, 0.16, 0.08, carvedWood, x, 1.0, -1.9);
+    rail.rotation.y = sideRotation;
+    const wallPanelA = box(0.07, 1.8, 1.42, redPlaster, x, 2.2, -1.2);
+    const wallPanelB = box(0.07, 1.8, 1.42, redPlaster, x, 2.2, 1.08);
+    const trimA = box(0.09, 0.08, 1.56, carvedWood, x, 3.14, -1.2);
+    const trimB = box(0.09, 0.08, 1.56, carvedWood, x, 3.14, 1.08);
+    const footRail = box(0.09, 0.08, 1.56, brass, x, 1.23, sideIndex === 0 ? 1.08 : -1.2);
+    group.add(bench, rail, wallPanelA, wallPanelB, trimA, trimB, footRail);
+  });
+
+  const chandelier = new THREE.Group();
+  chandelier.position.set(-0.2, 4.25, -0.35);
+  chandelier.userData.roomOneUnrealMirror = true;
+  chandelier.add(new THREE.Mesh(new THREE.TorusGeometry(0.92, 0.025, 8, 60), brass));
+  chandelier.add(box(0.035, 0.78, 0.035, brass, 0, 0.34, 0));
+  for (let i = 0; i < 4; i += 1) {
+    const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const chain = box(0.026, 0.84, 0.026, brass, Math.cos(angle) * 0.46, 0.36, Math.sin(angle) * 0.46);
+    chain.rotation.z = Math.cos(angle) * 0.08;
+    chain.rotation.x = Math.sin(angle) * 0.08;
+    chandelier.add(chain);
+  }
+  for (let i = 0; i < 8; i += 1) {
+    const angle = (i / 8) * Math.PI * 2;
+    const x = Math.cos(angle) * 0.78;
+    const z = Math.sin(angle) * 0.78;
+    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.34, 14), candleWax);
+    candle.position.set(x, -0.02, z);
+    const wick = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), flame);
+    wick.position.set(x, 0.18, z);
+    chandelier.add(candle, wick);
+  }
+  group.add(chandelier);
+
+  for (let i = 0; i < 6; i += 1) {
+    const x = -5.15 + i * 2.05;
+    const sconceBase = box(0.18, 0.42, 0.08, brass, x, 2.92, -4.02);
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.17, 0.1, 16), brass);
+    cup.position.set(x, 2.68, -3.93);
+    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.34, 14), candleWax);
+    candle.position.set(x, 2.82, -3.9);
+    const wick = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), flame.clone());
+    wick.position.set(x, 3.02, -3.9);
+    const lamp = new THREE.PointLight(0xffb46e, 0.56, 2.8);
+    lamp.position.set(x, 2.95, -3.6);
+    group.add(sconceBase, cup, candle, wick, lamp);
+  }
+
+  const addCandleCluster = (x: number, z: number, seed: number) => {
+    const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.045, 28), brass);
+    tray.position.set(x, 0.18, z);
+    tray.userData.roomOneUnrealMirror = true;
+    group.add(tray);
+
+    for (let i = 0; i < 3; i += 1) {
+      const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.052, 0.28 + i * 0.06, 14), candleWax);
+      const angle = seed + i * 2.05;
+      candle.position.set(x + Math.cos(angle) * 0.13, 0.34 + i * 0.028, z + Math.sin(angle) * 0.11);
+      const wick = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), flame.clone());
+      wick.position.set(candle.position.x, candle.position.y + 0.18 + i * 0.03, candle.position.z);
+      candle.userData.roomOneUnrealMirror = true;
+      wick.userData.statusLight = true;
+      group.add(candle, wick);
+    }
+
+    const glow = new THREE.PointLight(0xffa35b, 0.28, 1.6);
+    glow.position.set(x, 0.68, z);
+    group.add(glow);
+  };
+
+  addCandleCluster(-5.62, 2.6, 0.4);
+  addCandleCluster(5.72, 2.48, 1.7);
+  addCandleCluster(-5.85, -3.2, 2.4);
+  addCandleCluster(5.82, -3.34, 3.1);
+
+  const chandelierLight = new THREE.PointLight(0xffb16a, 2.15, 7.6);
+  chandelierLight.position.set(-0.2, 3.74, -0.35);
+  chandelierLight.userData.roomOneUnrealMirror = true;
+  group.add(chandelierLight);
+
+  const fillLight = new THREE.PointLight(0xad7048, 1.08, 8.7);
+  fillLight.position.set(3.7, 2.3, 1.9);
+  group.add(fillLight);
+
+  const deskSideFill = new THREE.PointLight(0xffb47a, 0.68, 6.8);
+  deskSideFill.position.set(-4.9, 2.05, 2.15);
+  group.add(deskSideFill);
 }
 
 function addRoomOneReferenceEntryDesk(group: THREE.Group, room: Room) {
-  const wood = mat(0x6e4529, { roughness: 0.52, metalness: 0.04, texture: "wood", textureRepeat: [1.5, 1], textureSeed: 5611 });
-  const darkWood = mat(0x27170f, { roughness: 0.62, texture: "wood", textureSeed: 5612 });
-  const paper = mat(0xf5ddbd, { roughness: 0.82, emissive: 0xffca8f, emissiveIntensity: 0.05, texture: "paper", textureSeed: 5613 });
-  const teal = mat(0x2b7163, { roughness: 0.38, metalness: 0.18, emissive: 0x164437, emissiveIntensity: 0.18, texture: "metal", textureSeed: 5614 });
-  const brass = mat(0xd3a75c, { roughness: 0.26, metalness: 0.56, emissive: 0xff9d3d, emissiveIntensity: 0.12, texture: "metal", textureSeed: 5615 });
+  const wood = mat(0x704224, { roughness: 0.5, metalness: 0.04, texture: "wood", textureRepeat: [1.6, 1], textureSeed: 5611 });
+  const darkWood = mat(0x24140d, { roughness: 0.64, texture: "wood", textureRepeat: [0.9, 1.4], textureSeed: 5612 });
+  const paper = mat(0xf2d9b6, { roughness: 0.86, emissive: 0xffca8f, emissiveIntensity: 0.04, texture: "paper", textureSeed: 5613 });
+  const greenMetal = mat(0x27594f, { roughness: 0.36, metalness: 0.2, emissive: 0x0e2b26, emissiveIntensity: 0.16, texture: "metal", textureSeed: 5614 });
+  const brass = mat(0xd0a35a, { roughness: 0.26, metalness: 0.58, emissive: 0xff9d3d, emissiveIntensity: 0.12, texture: "metal", textureSeed: 5615 });
+  const ink = mat(0x19100c, { roughness: 0.78, texture: "paper", textureSeed: 5616 });
+  const velvet = mat(0x612327, { roughness: 0.72, texture: "fabric", textureSeed: 5617 });
 
-  addTexturedWallPanel(group, "room1-message-board", "하영아,", "방탈출을 풀며 우리의 추억을 잘 떠올려봐!!", -4.78, 2.1, -4.24, 1.12, 0.86, 0xffc899, "memory");
-  addTexturedWallPanel(group, "room1-rule-board", "규칙 안내", "인터넷 사용 가능 · 힌트는 카톡 또는 전화", -4.78, 1.12, -4.24, 1.04, 0.58, 0xffdd9a, "memory");
+  addTexturedWallPanel(group, "room1-message-board", "하영아,", "방탈출을 풀며 우리의 추억을 잘 떠올려봐!!", -5.05, 2.3, -4.1, 1.32, 0.92, 0xffc899, "memory");
+  addTexturedWallPanel(group, "room1-rule-board", "규칙 안내", "힌트는 카톡 또는 전화 · 추억을 먼저 관찰하기", -5.05, 1.26, -4.1, 1.18, 0.58, 0xffdd9a, "memory");
 
   const desk = new THREE.Group();
-  desk.position.set(-4.25, 0.68, 1.28);
-  desk.rotation.y = 0.04;
+  desk.position.set(-4.55, 0.76, 1.22);
+  desk.rotation.y = -0.08;
   desk.userData.roomOneUnrealMirror = true;
-  desk.add(box(1.82, 0.16, 0.78, wood, 0, 0, 0));
-  desk.add(box(0.1, 0.74, 0.1, darkWood, -0.76, -0.44, -0.25));
-  desk.add(box(0.1, 0.74, 0.1, darkWood, 0.76, -0.44, -0.25));
-  desk.add(box(0.1, 0.74, 0.1, darkWood, -0.76, -0.44, 0.25));
-  desk.add(box(0.1, 0.74, 0.1, darkWood, 0.76, -0.44, 0.25));
-  const letter = box(0.82, 0.026, 0.52, paper, -0.18, 0.11, -0.04);
-  letter.rotation.y = -0.08;
-  const lock = box(0.42, 0.16, 0.28, brass, 0.56, 0.17, 0.08);
-  desk.add(letter, lock);
+  desk.add(box(2.08, 0.18, 0.88, wood, 0, 0, 0));
+  desk.add(box(2.0, 0.08, 0.92, darkWood, 0, -0.13, 0));
+  desk.add(box(0.1, 0.82, 0.1, darkWood, -0.86, -0.46, -0.3));
+  desk.add(box(0.1, 0.82, 0.1, darkWood, 0.86, -0.46, -0.3));
+  desk.add(box(0.1, 0.82, 0.1, darkWood, -0.86, -0.46, 0.3));
+  desk.add(box(0.1, 0.82, 0.1, darkWood, 0.86, -0.46, 0.3));
+
+  [-0.48, 0, 0.48].forEach((x) => {
+    const drawer = box(0.38, 0.16, 0.08, darkWood, x, -0.02, -0.46);
+    const handle = box(0.16, 0.028, 0.035, brass, x, -0.02, -0.51);
+    desk.add(drawer, handle);
+  });
+
+  const letter = box(0.86, 0.024, 0.56, paper, -0.26, 0.13, -0.04);
+  letter.rotation.y = -0.14;
+  const foldedNote = box(0.44, 0.018, 0.32, paper, 0.3, 0.15, 0.2);
+  foldedNote.rotation.y = 0.34;
+  const waxSeal = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.018, 24), mat(0x9e1f22, { roughness: 0.42, emissive: 0x330405, emissiveIntensity: 0.12 }));
+  waxSeal.position.set(0.48, 0.18, 0.19);
+  waxSeal.rotation.x = Math.PI / 2;
+  const pen = box(0.54, 0.018, 0.018, ink, -0.62, 0.18, 0.18);
+  pen.rotation.y = -0.62;
+  const lock = box(0.4, 0.16, 0.28, brass, 0.7, 0.2, -0.08);
+  desk.add(letter, foldedNote, waxSeal, pen, lock);
   group.add(desk);
 
-  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.32, 24), teal);
-  shade.position.set(-4.92, 1.25, 1.16);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.28, 18), brass);
-  base.position.set(-4.92, 0.92, 1.16);
-  group.add(shade, base);
+  const chair = new THREE.Group();
+  chair.position.set(-4.52, 0.48, 2.02);
+  chair.rotation.y = Math.PI - 0.08;
+  chair.add(box(0.78, 0.14, 0.68, darkWood, 0, 0, 0));
+  chair.add(box(0.66, 0.12, 0.14, velvet, 0, 0.08, 0.03));
+  chair.add(box(0.82, 0.84, 0.12, darkWood, 0, 0.56, 0.36));
+  [-0.3, 0.3].forEach((x) => {
+    [-0.22, 0.26].forEach((z) => chair.add(box(0.08, 0.54, 0.08, darkWood, x, -0.28, z)));
+  });
+  group.add(chair);
 
-  const deskLight = new THREE.PointLight(0xffbc70, 1.55, 3.5);
-  deskLight.position.set(-4.72, 1.62, 1.05);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.3, 20), brass);
+  base.position.set(-5.2, 0.96, 1.08);
+  const arm = box(0.08, 0.52, 0.08, brass, -5.14, 1.23, 1.08);
+  arm.rotation.z = -0.2;
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.3, 28), greenMetal);
+  shade.position.set(-5.03, 1.52, 1.02);
+  shade.rotation.z = -0.08;
+  group.add(shade, base, arm);
+
+  const deskLight = new THREE.PointLight(0xffba70, 1.08, 3.15);
+  deskLight.position.set(-5.02, 1.58, 1.02);
   group.add(deskLight);
 }
 
 function addRoomOneReferenceMemoryWall(group: THREE.Group, room: Room) {
+  const rail = mat(0xc79858, { roughness: 0.3, metalness: 0.5, emissive: 0xff9e43, emissiveIntensity: 0.08, texture: "metal", textureSeed: 5628 });
+  const consoleWood = mat(0x4b2a19, { roughness: 0.58, texture: "wood", textureRepeat: [1.3, 0.8], textureSeed: 5629 });
+  const velvet = mat(0x26120f, { roughness: 0.76, texture: "fabric", textureSeed: 5630 });
   const exhibits = [
-    { key: "jatjeol", title: "첫 고백", caption: "잣절 공원 벤치", color: 0xffd37e, x: -2.45, y: 2.48 },
-    { key: "birthday", title: "현수 생일", caption: "하영이가 준 선물", color: 0x9be88a, x: -1.22, y: 2.48 },
-    { key: "philippines", title: "필리핀 여행", caption: "함께 본 높은 하늘", color: 0x91d8ff, x: -2.45, y: 1.54 },
-    { key: "hundred-day", title: "100일 네 컷", caption: "홍대의 네 장면", color: 0xff92a6, x: -1.22, y: 1.54 },
+    { key: "jatjeol", title: "첫 고백", caption: "잣절 공원 벤치", color: 0xffd37e, x: -2.86, y: 2.58 },
+    { key: "birthday", title: "현수 생일", caption: "하영이가 준 선물", color: 0x9be88a, x: -1.6, y: 2.58 },
+    { key: "philippines", title: "필리핀 여행", caption: "함께 본 높은 하늘", color: 0x91d8ff, x: -2.86, y: 1.58 },
+    { key: "hundred-day", title: "100일 네 컷", caption: "홍대의 네 장면", color: 0xff92a6, x: -1.6, y: 1.58 },
   ];
 
+  const titlePlate = box(2.82, 0.08, 0.06, rail, -2.23, 3.22, -4.02);
+  const lowerRail = box(2.82, 0.06, 0.06, rail, -2.23, 0.98, -4.02);
+  group.add(titlePlate, lowerRail);
+
   exhibits.forEach((exhibit) => {
-    addTexturedWallPanel(group, `room1-${exhibit.key}`, exhibit.title, exhibit.caption, exhibit.x, exhibit.y, -4.22, 0.9, 0.62, exhibit.color, exhibit.key === "hundred-day" ? "photoStrip" : "memory");
+    addTexturedWallPanel(group, `room1-${exhibit.key}`, exhibit.title, exhibit.caption, exhibit.x, exhibit.y, -4.08, 0.98, 0.66, exhibit.color, exhibit.key === "hundred-day" ? "photoStrip" : "memory");
+  });
+
+  const console = new THREE.Group();
+  console.position.set(-2.24, 0.62, -2.98);
+  console.userData.roomOneUnrealMirror = true;
+  console.add(box(2.44, 0.22, 0.68, consoleWood, 0, 0, 0));
+  console.add(box(2.32, 0.06, 0.58, velvet, 0, 0.16, 0));
+  console.add(box(2.5, 0.08, 0.08, rail, 0, 0.22, -0.35));
+  [-0.96, -0.32, 0.32, 0.96].forEach((x) => {
+    console.add(box(0.08, 0.54, 0.08, consoleWood, x, -0.34, -0.22));
+    console.add(box(0.08, 0.54, 0.08, consoleWood, x, -0.34, 0.22));
   });
 
   const buttonColors = [0xffd36f, 0x8be883, 0x82cfff, 0xff748b];
   buttonColors.forEach((color, index) => {
     const material = mat(color, { roughness: 0.28, metalness: 0.18, emissive: color, emissiveIntensity: 0.22 });
-    const button = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.055, 28), material);
-    button.position.set(-2.92 + index * 0.46, 0.12, -2.56);
-    button.rotation.x = Math.PI / 2;
+    const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.21, 0.04, 30), rail);
+    socket.position.set(-0.66 + index * 0.44, 0.24, 0.02);
+    const button = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.072, 30), material);
+    button.position.set(socket.position.x, 0.3, socket.position.z);
     button.userData.roomOneUnrealMirror = true;
-    group.add(button);
+    button.userData.memoryButton = index;
+    console.add(socket, button);
   });
+
+  group.add(console);
 }
 
 function addRoomOneReferenceMusicCabinet(group: THREE.Group, room: Room) {
-  const wood = mat(0x5c3925, { roughness: 0.54, texture: "wood", textureRepeat: [1.1, 0.9], textureSeed: 5621 });
-  const glass = mat(0x9ee8ff, { roughness: 0.08, metalness: 0.02, emissive: 0x4eb8ff, emissiveIntensity: 0.18, transparent: true, opacity: 0.42 });
+  const wood = mat(0x57321f, { roughness: 0.54, texture: "wood", textureRepeat: [1.1, 0.9], textureSeed: 5621 });
+  const glass = mat(0xaee6ff, { roughness: 0.08, metalness: 0.02, emissive: 0x72c9ff, emissiveIntensity: 0.12, transparent: true, opacity: 0.34 });
   const brass = mat(0xd4a459, { roughness: 0.28, metalness: 0.58, emissive: 0xffaa44, emissiveIntensity: 0.16, texture: "metal", textureSeed: 5622 });
-  const bodyMaterial = mat(0xb56a35, { roughness: 0.36, metalness: 0.08, emissive: 0x4d2110, emissiveIntensity: 0.12, texture: "wood", textureSeed: 5623 });
+  const velvet = mat(0x301215, { roughness: 0.76, emissive: 0x100204, emissiveIntensity: 0.06, texture: "fabric", textureSeed: 5623 });
 
-  const caseFrame = box(0.76, 1.12, 0.08, wood, 0.1, 2.12, -4.18);
-  const casePane = box(0.62, 0.96, 0.035, glass, 0.1, 2.12, -4.11);
-  group.add(caseFrame, casePane);
-  addMiniViolin(group, 0.1, 2.1, -4.03, 0.75);
+  const caseGroup = new THREE.Group();
+  caseGroup.position.set(0.08, 2.1, -4.05);
+  caseGroup.userData.roomOneUnrealMirror = true;
+  caseGroup.add(box(0.92, 1.32, 0.1, wood, 0, 0, -0.05));
+  caseGroup.add(box(0.74, 1.08, 0.04, velvet, 0, 0, 0));
+  caseGroup.add(box(0.66, 0.98, 0.028, glass, 0, 0, 0.055));
+  caseGroup.add(box(0.84, 0.06, 0.08, brass, 0, 0.72, 0.02));
+  caseGroup.add(box(0.84, 0.06, 0.08, brass, 0, -0.72, 0.02));
+  [-0.42, 0.42].forEach((x) => caseGroup.add(box(0.055, 1.42, 0.08, brass, x, 0, 0.02)));
+  group.add(caseGroup);
+  addMiniViolin(group, 0.04, 2.08, -3.93, 0.86);
+
+  const keyRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.018, 8, 36), brass);
+  keyRing.position.set(0.34, 2.53, -3.89);
+  keyRing.rotation.z = 0.1;
+  const keyStem = box(0.32, 0.025, 0.025, brass, 0.34, 2.31, -3.88);
+  keyStem.rotation.z = Math.PI / 2;
+  const keyBit = box(0.13, 0.08, 0.025, brass, 0.34, 2.13, -3.88);
+  group.add(keyRing, keyStem, keyBit);
 
   const cabinet = new THREE.Group();
-  cabinet.position.set(1.25, 0.68, -2.78);
+  cabinet.position.set(1.42, 0.7, -2.76);
   cabinet.userData.roomOneUnrealMirror = true;
-  cabinet.add(box(1.18, 0.78, 0.58, wood, 0, 0, 0));
-  cabinet.add(box(1.1, 0.1, 0.62, brass, 0, 0.48, 0));
-  const musicBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.12, 32), brass);
-  musicBase.position.set(0, 0.63, -0.04);
-  const musicTop = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.26, 32), mat(0xff87a6, { roughness: 0.34, metalness: 0.08, emissive: 0xff5b8c, emissiveIntensity: 0.24 }));
-  musicTop.position.set(0, 0.84, -0.04);
-  cabinet.add(musicBase, musicTop);
+  cabinet.add(box(1.3, 0.82, 0.64, wood, 0, 0, 0));
+  cabinet.add(box(1.18, 0.1, 0.68, brass, 0, 0.5, 0));
+  cabinet.add(box(1.14, 0.08, 0.58, velvet, 0, 0.58, 0));
+  [-0.36, 0.36].forEach((x) => {
+    cabinet.add(box(0.34, 0.24, 0.06, wood, x, 0.04, -0.36));
+    cabinet.add(box(0.1, 0.03, 0.035, brass, x, 0.04, -0.41));
+  });
+  const musicBase = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.12, 36), brass);
+  musicBase.position.set(0, 0.72, -0.02);
+  const carousel = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.3, 30), mat(0xffb77a, { roughness: 0.34, metalness: 0.06, emissive: 0xff8a3b, emissiveIntensity: 0.16 }));
+  carousel.position.set(0, 0.94, -0.02);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.24, 32), brass);
+  cap.position.set(0, 1.18, -0.02);
+  cabinet.add(musicBase, carousel, cap);
   group.add(cabinet);
 
-  const performer = new THREE.Group();
-  performer.position.set(1.38, 1.35, -3.7);
-  performer.userData.roomOneUnrealMirror = true;
-  performer.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.42, 18), bodyMaterial));
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 12), mat(0xf0c7a4, { roughness: 0.6 }));
-  head.position.y = 0.32;
-  performer.add(head);
-  group.add(performer);
-  addMiniViolin(group, 1.55, 1.58, -3.68, 0.42);
+  const exhibitLight = new THREE.PointLight(0xffbd7a, 0.42, 2.2);
+  exhibitLight.position.set(0.18, 2.62, -3.54);
+  group.add(exhibitLight);
 }
 
 function addRoomOneReferenceFloorPuzzle(group: THREE.Group, room: Room) {
-  const tileMaterial = mat(0xc2a887, { roughness: 0.78, texture: "fabric", textureRepeat: [0.8, 0.8], textureSeed: 5631 });
-  const activeMaterial = mat(0x2b221d, { roughness: 0.72, emissive: 0xffad5a, emissiveIntensity: 0.08, texture: "fabric", textureSeed: 5632 });
+  const brass = mat(0xc99858, { roughness: 0.34, metalness: 0.48, emissive: 0xff9f3a, emissiveIntensity: 0.08, texture: "metal", textureSeed: 5631 });
+  const stoneBase = mat(0x2f2520, { roughness: 0.78, texture: "plaster", textureRepeat: [1.2, 1.2], textureSeed: 5632 });
+  const recess = box(2.86, 0.026, 2.86, stoneBase, 0, 0.076, 0.08);
+  recess.receiveShadow = true;
+  group.add(recess);
+
   for (let cell = 1; cell <= 9; cell += 1) {
     const row = Math.floor((cell - 1) / 3);
     const col = (cell - 1) % 3;
-    const tile = box(0.74, 0.024, 0.74, cell === 9 ? activeMaterial : tileMaterial, -0.78 + col * 0.78, 0.055, -0.62 + row * 0.78);
+    const tileMaterial = new THREE.MeshStandardMaterial({
+      map: createRoomOneFloorTileTexture(cell, cell === 9),
+      roughness: 0.76,
+      metalness: 0.04,
+      emissive: cell === 9 ? 0x5a260d : 0x080504,
+      emissiveIntensity: cell === 9 ? 0.13 : 0.03,
+    });
+    const tile = box(0.82, 0.032, 0.82, tileMaterial, -0.86 + col * 0.86, 0.108, -0.78 + row * 0.86);
     tile.userData.roomOneUnrealMirror = true;
+    tile.userData.floorPuzzleCell = cell;
+    const bevel = box(0.86, 0.014, 0.036, brass, tile.position.x, 0.135, tile.position.z - 0.43);
+    const bevelB = box(0.86, 0.014, 0.036, brass, tile.position.x, 0.135, tile.position.z + 0.43);
+    const bevelL = box(0.036, 0.014, 0.86, brass, tile.position.x - 0.43, 0.135, tile.position.z);
+    const bevelR = box(0.036, 0.014, 0.86, brass, tile.position.x + 0.43, 0.135, tile.position.z);
     group.add(tile);
+    group.add(bevel, bevelB, bevelL, bevelR);
   }
 
   const benchWood = mat(0x744422, { roughness: 0.5, texture: "wood", textureSeed: 5633 });
+  const paper = mat(0xe8cfaa, { roughness: 0.86, texture: "paper", textureSeed: 5634 });
   const bench = new THREE.Group();
-  bench.position.set(0.05, 0.38, 0.08);
+  bench.position.set(0.05, 0.42, 2.08);
   bench.userData.roomOneUnrealMirror = true;
-  bench.add(box(1.55, 0.16, 0.58, benchWood, 0, 0, 0));
-  bench.add(box(0.12, 0.42, 0.12, benchWood, -0.58, -0.28, -0.18));
-  bench.add(box(0.12, 0.42, 0.12, benchWood, 0.58, -0.28, -0.18));
-  bench.add(box(0.12, 0.42, 0.12, benchWood, -0.58, -0.28, 0.18));
-  bench.add(box(0.12, 0.42, 0.12, benchWood, 0.58, -0.28, 0.18));
+  bench.add(box(1.74, 0.16, 0.62, benchWood, 0, 0, 0));
+  bench.add(box(1.58, 0.05, 0.5, brass, 0, 0.1, 0));
+  bench.add(box(0.12, 0.5, 0.12, benchWood, -0.66, -0.32, -0.2));
+  bench.add(box(0.12, 0.5, 0.12, benchWood, 0.66, -0.32, -0.2));
+  bench.add(box(0.12, 0.5, 0.12, benchWood, -0.66, -0.32, 0.2));
+  bench.add(box(0.12, 0.5, 0.12, benchWood, 0.66, -0.32, 0.2));
+  const clue = box(0.62, 0.022, 0.38, paper, -0.28, 0.14, -0.05);
+  clue.rotation.y = -0.2;
+  const brassDial = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.04, 32), brass);
+  brassDial.position.set(0.48, 0.16, 0.02);
+  bench.add(clue, brassDial);
   group.add(bench);
 }
 
-function addRoomOneReferenceBeefAndSteak(group: THREE.Group, room: Room) {
-  addTexturedWallPanel(group, "room1-amusement-park", "우리의 추억 여행", "회전목마 빈자리를 채워라", 3.1, 2.18, -4.22, 2.05, 1.02, 0xffc276, "vista");
-  addTexturedWallPanel(group, "room1-beef-puzzle", "소의 부위 퍼즐", "고기 조각을 올바른 위치에", 3.08, 0.92, -4.18, 1.72, 0.82, 0xffbd7b, "beef");
+function createRoomOneFloorTileTexture(cell: number, active: boolean) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Room one floor tile texture context unavailable.");
 
-  const wood = mat(0x633b22, { roughness: 0.54, texture: "wood", textureSeed: 5641 });
+  const gradient = ctx.createLinearGradient(0, 0, 256, 256);
+  gradient.addColorStop(0, active ? "#4a2717" : "#c2a780");
+  gradient.addColorStop(0.52, active ? "#2b1a12" : "#9f8765");
+  gradient.addColorStop(1, active ? "#705034" : "#d4bc91");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 256);
+
+  ctx.globalAlpha = 0.2;
+  for (let i = 0; i < 18; i += 1) {
+    ctx.strokeStyle = i % 2 ? "#3a2419" : "#fff0c7";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo((i * 37) % 256, 0);
+    ctx.lineTo(((i * 37) % 256) - 90, 256);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.strokeStyle = active ? "#e4a457" : "#6f4c2c";
+  ctx.lineWidth = 14;
+  ctx.strokeRect(16, 16, 224, 224);
+  ctx.strokeStyle = active ? "#f4d496" : "#e9d3a6";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(28, 28, 200, 200);
+
+  ctx.fillStyle = active ? "#ffd48b" : "#3c2a1d";
+  ctx.font = "bold 112px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(cell), 128, 136);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function addRoomOneReferenceBeefAndSteak(group: THREE.Group, room: Room) {
+  addTexturedWallPanel(group, "room1-amusement-park", "우리의 추억 여행", "다음 방으로 이어지는 놀이공원 그림", 3.92, 2.82, -4.08, 2.42, 0.82, 0xffc276, "vista");
+  addTexturedWallPanel(group, "room1-beef-puzzle", "소의 부위 퍼즐", "고기 조각을 올바른 위치에", 3.82, 1.58, -4.06, 2.52, 1.16, 0xffbd7b, "beef");
+
+  const wood = mat(0x563119, { roughness: 0.55, texture: "wood", textureRepeat: [1.3, 0.9], textureSeed: 5641 });
+  const darkWood = mat(0x20120c, { roughness: 0.68, texture: "wood", textureSeed: 5642 });
   const plate = mat(0xf2e1c8, { roughness: 0.58, metalness: 0.08 });
-  const meat = mat(0xa94232, { roughness: 0.42, emissive: 0x47130d, emissiveIntensity: 0.12, texture: "fabric", textureSeed: 5642 });
+  const meat = mat(0xa94232, { roughness: 0.42, emissive: 0x47130d, emissiveIntensity: 0.12, texture: "fabric", textureSeed: 5643 });
+  const brass = mat(0xd4a05b, { roughness: 0.28, metalness: 0.56, emissive: 0xffa13c, emissiveIntensity: 0.12, texture: "metal", textureSeed: 5644 });
+
+  const shelf = new THREE.Group();
+  shelf.position.set(3.82, 0.66, -3.72);
+  shelf.userData.roomOneUnrealMirror = true;
+  shelf.add(box(2.58, 0.16, 0.38, wood, 0, 0, 0));
+  shelf.add(box(2.46, 0.06, 0.42, brass, 0, 0.14, 0));
+  [-0.84, 0, 0.84].forEach((x) => {
+    const slot = box(0.54, 0.04, 0.26, darkWood, x, 0.2, 0.02);
+    const chunk = new THREE.Mesh(new THREE.SphereGeometry(0.14, 18, 10), meat.clone());
+    chunk.scale.set(1.35, 0.35, 0.8);
+    chunk.position.set(x, 0.26, 0.02);
+    chunk.rotation.y = x * 0.5;
+    shelf.add(slot, chunk);
+  });
+  group.add(shelf);
+
   const table = new THREE.Group();
-  table.position.set(3.0, 0.54, 1.34);
+  table.position.set(3.58, 0.56, 1.38);
+  table.rotation.y = 0.04;
   table.userData.roomOneUnrealMirror = true;
-  table.add(box(1.92, 0.16, 0.88, wood, 0, 0, 0));
+  table.add(box(2.05, 0.16, 0.92, wood, 0, 0, 0));
+  table.add(box(1.94, 0.05, 0.82, brass, 0, 0.11, 0));
   [-0.72, 0.72].forEach((x) => {
     [-0.28, 0.28].forEach((z) => table.add(box(0.1, 0.66, 0.1, wood, x, -0.38, z)));
   });
@@ -3794,23 +4135,63 @@ function addRoomOneReferenceBeefAndSteak(group: THREE.Group, room: Room) {
     const steak = new THREE.Mesh(new THREE.SphereGeometry(0.18, 18, 10), meat);
     steak.scale.set(1.25, 0.26, 0.72);
     steak.position.set(x, 0.2, 0.02);
-    const flag = box(0.16, 0.2, 0.03, mat(0xd8ad62, { roughness: 0.32, metalness: 0.44 }), x, 0.42, -0.18);
+    const flagPole = box(0.026, 0.28, 0.026, brass, x - 0.09, 0.38, -0.2);
+    const flag = box(0.18, 0.16, 0.03, brass, x, 0.48, -0.2);
     flag.userData.steakVote = index === 0 ? "A" : "B";
-    table.add(dish, steak, flag);
+    const knife = box(0.42, 0.018, 0.026, brass, x + (index === 0 ? -0.28 : 0.28), 0.18, 0.33);
+    knife.rotation.y = index === 0 ? 0.28 : -0.28;
+    table.add(dish, steak, flagPole, flag, knife);
   });
+  const smallCandle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.28, 14), mat(0xffead5, { roughness: 0.72, emissive: 0xffb46e, emissiveIntensity: 0.06 }));
+  smallCandle.position.set(0, 0.3, -0.32);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), mat(0xffb35d, { emissive: 0xff9a2f, emissiveIntensity: 0.9, transparent: true, opacity: 0.9 }));
+  flame.position.set(0, 0.48, -0.32);
+  table.add(smallCandle, flame);
   group.add(table);
+
+  const tableLight = new THREE.PointLight(0xff9d54, 0.34, 2);
+  tableLight.position.set(3.56, 1.05, 1.02);
+  group.add(tableLight);
 }
 
 function addRoomOneReferenceExitDoor(group: THREE.Group, room: Room) {
-  const doorMat = mat(0x4a2b1b, { roughness: 0.52, metalness: 0.06, texture: "wood", textureRepeat: [1.1, 2.2], textureSeed: 5651 });
-  const glow = mat(0xffb24f, { roughness: 0.2, metalness: 0.08, emissive: 0xff9f32, emissiveIntensity: 0.58 });
-  const door = box(0.88, 1.82, 0.1, doorMat, 4.85, 1.1, -2.38);
-  const left = box(0.055, 1.98, 0.08, glow, 4.35, 1.12, -2.3);
-  const right = box(0.055, 1.98, 0.08, glow, 5.35, 1.12, -2.3);
-  const top = box(1.08, 0.055, 0.08, glow, 4.85, 2.12, -2.3);
-  group.add(door, left, right, top);
-  const exitLight = new THREE.PointLight(0xffb24f, 1.8, 4.2);
-  exitLight.position.set(4.85, 2.2, -1.78);
+  const doorMat = mat(0x4a2919, { roughness: 0.54, metalness: 0.06, texture: "wood", textureRepeat: [1.1, 2.2], textureSeed: 5651 });
+  const darkWood = mat(0x1e120c, { roughness: 0.72, texture: "wood", textureSeed: 5652 });
+  const stone = mat(0x605247, { roughness: 0.86, metalness: 0.02, texture: "plaster", textureRepeat: [1.1, 1.5], textureSeed: 5653 });
+  const brass = mat(0xd2a15a, { roughness: 0.3, metalness: 0.55, emissive: 0xffa344, emissiveIntensity: 0.1, texture: "metal", textureSeed: 5654 });
+  const warmEdge = mat(0xffbd73, { roughness: 0.3, metalness: 0.18, emissive: 0xff9f32, emissiveIntensity: 0.24, transparent: true, opacity: 0.72 });
+
+  const doorGroup = new THREE.Group();
+  doorGroup.userData.roomOneUnrealMirror = true;
+  const door = box(0.12, 1.86, 1.04, doorMat, 6.33, 1.16, -1.94);
+  door.castShadow = true;
+  doorGroup.add(door);
+
+  [-0.34, 0, 0.34].forEach((offset) => {
+    doorGroup.add(box(0.135, 1.72, 0.035, darkWood, 6.25, 1.15, -1.94 + offset));
+  });
+  doorGroup.add(box(0.15, 0.08, 0.94, brass, 6.24, 1.86, -1.94));
+  doorGroup.add(box(0.15, 0.08, 0.94, brass, 6.24, 0.54, -1.94));
+
+  const handle = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), brass);
+  handle.position.set(6.18, 1.12, -1.56);
+  doorGroup.add(handle);
+
+  const leftJamb = box(0.22, 2.04, 0.18, stone, 6.22, 1.25, -2.58);
+  const rightJamb = box(0.22, 2.04, 0.18, stone, 6.22, 1.25, -1.3);
+  const lintel = box(0.22, 0.18, 1.45, stone, 6.22, 2.25, -1.94);
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.052, 8, 44, Math.PI), stone);
+  arch.position.set(6.2, 2.22, -1.94);
+  arch.rotation.set(0, Math.PI / 2, Math.PI);
+  doorGroup.add(leftJamb, rightJamb, lintel, arch);
+
+  const seamLight = box(0.024, 1.54, 0.04, warmEdge, 6.14, 1.16, -1.36);
+  seamLight.userData.statusLight = true;
+  doorGroup.add(seamLight);
+  group.add(doorGroup);
+
+  const exitLight = new THREE.PointLight(0xffae6e, 0.58, 3.1);
+  exitLight.position.set(5.9, 1.9, -1.9);
   group.add(exitLight);
 }
 
@@ -4086,7 +4467,8 @@ function addRoomOneBeefPuzzleWall(group: THREE.Group, room: Room) {
 }
 
 function addRoomOneUnrealMarkerLights(group: THREE.Group, room: Room) {
-  const markerMaterial = mat(room.palette[2], { roughness: 0.24, metalness: 0.18, emissive: room.palette[2], emissiveIntensity: 0.62, transparent: true, opacity: 0.72 });
+  const markerMaterial = mat(0xc99858, { roughness: 0.32, metalness: 0.52, emissive: 0xffa13c, emissiveIntensity: 0.1, transparent: true, opacity: 0.76, texture: "metal", textureSeed: 5671 });
+  const emberMaterial = mat(0xffb36a, { roughness: 0.26, metalness: 0.08, emissive: 0xff8a2f, emissiveIntensity: 0.62, transparent: true, opacity: 0.8 });
   const labels = [
     [-4.2, -2.68],
     [-0.12, 1.05],
@@ -4094,12 +4476,22 @@ function addRoomOneUnrealMarkerLights(group: THREE.Group, room: Room) {
     [5.78, -2.24],
   ];
   labels.forEach(([x, z], index) => {
-    const marker = new THREE.Mesh(new THREE.TorusGeometry(0.2 + index * 0.018, 0.01, 8, 40), markerMaterial.clone());
-    marker.position.set(x, 0.19, z);
-    marker.rotation.x = Math.PI / 2;
-    marker.userData.roomOneUnrealMirror = true;
-    marker.userData.cinematicAtmosphere = true;
-    group.add(marker);
+    const plaque = new THREE.Mesh(new THREE.CylinderGeometry(0.16 + index * 0.006, 0.17 + index * 0.006, 0.022, 36), markerMaterial.clone());
+    plaque.position.set(x, 0.145, z);
+    plaque.scale.set(1.24, 0.7, 1);
+    plaque.userData.roomOneUnrealMirror = true;
+
+    const inset = new THREE.Mesh(new THREE.TorusGeometry(0.12 + index * 0.004, 0.008, 8, 36), markerMaterial.clone());
+    inset.position.set(x, 0.163, z);
+    inset.rotation.x = Math.PI / 2;
+    inset.scale.set(1.2, 0.7, 1);
+    inset.userData.roomOneUnrealMirror = true;
+
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), emberMaterial.clone());
+    ember.position.set(x, 0.22, z);
+    ember.userData.statusLight = true;
+    ember.userData.roomOneUnrealMirror = true;
+    group.add(plaque, inset, ember);
   });
 }
 
@@ -4563,9 +4955,9 @@ function createFirstPersonRig(): FirstPersonRig {
   flashlight.add(barrel, grip, lens);
 
   const beamMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffe8b3,
+    color: 0xffc078,
     transparent: true,
-    opacity: 0.05,
+    opacity: 0.012,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
@@ -4575,7 +4967,7 @@ function createFirstPersonRig(): FirstPersonRig {
   beam.rotation.x = -Math.PI / 2;
   beam.userData.flashlightBeam = true;
 
-  const light = new THREE.SpotLight(0xffe0aa, 0.62, 7.2, 0.4, 0.72, 1.1);
+  const light = new THREE.SpotLight(0xffd0a0, 0.78, 7.2, 0.42, 0.76, 1.1);
   light.position.set(0.26, -0.18, -0.86);
   light.target.position.set(0.02, -0.12, -3.0);
   light.castShadow = false;

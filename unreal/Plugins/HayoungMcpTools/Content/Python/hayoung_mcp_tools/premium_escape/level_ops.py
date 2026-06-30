@@ -52,6 +52,7 @@ LABEL_PREFIXES: Final[tuple[str, ...]] = (
     "PE_Hint_",
     "PE_Timer_",
     "PE_Transition_",
+    "R01_",
 )
 
 

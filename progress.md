@@ -189,9 +189,17 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - Updated the browser Room 01 mirror to drop generic clutter for the first room and show the same reference-led stations as the Unreal MCP map.
 - `npm run build`, `npm run verify:game`, and `npm audit --omit=dev` passed after the Room 01 Unreal MCP cleanup and web mirror pass.
 
+### 2026-07-01 Room 01 Interior Refinement
+
+- Reworked the browser Room 01 interior toward a wider candle-lit manor escape-room set: dark wood, red plaster, stone pilasters, chandelier/sconces, detailed memory wall, violin display, beef puzzle board, steak vote table, and heavier side exit door.
+- Removed the 1번 방 floor glow rails/reflection planes that were reading as strange pink lighting instead of believable interior lighting.
+- Captured final browser room shots under `output/environment-report/` and a gameplay harness capture under `output/web-game-current/shot-0.png`.
+- `npm run build` and `npm audit --omit=dev` passed. `npm run verify:game` reached the browser flow but hung in Playwright/Chromium screenshot shutdown; direct hint UX observation and the web-game harness passed.
+- Local UE 5.8 install and `unreal/Hayoung500.uproject` exist, but `http://127.0.0.1:8000/mcp` was not active during this pass, so these visuals are the web mirror, not a live Unreal MCP scene mutation.
+
 ## Known Limitations
 
-- Visual quality is improved and now backed by a real UE 5.8 MCP-generated level, but final paid-game quality still depends on authored meshes, higher-end materials, and cinematic art direction passes beyond the current procedural/blockout assets.
+- Visual quality is improved in the browser mirror, but final paid-game quality still depends on a live UE MCP session, authored meshes, higher-end materials, and cinematic art direction passes beyond the current procedural/blockout assets.
 - Real couple photos are inserted into the Unreal Room 01 wall assets; the web mirror still uses procedural canvas panels rather than bundling the full-resolution private photo files.
 - Puzzle prompts and answers are placeholders awaiting user-provided content.
 - BGM is procedural oscillator ambience; replace with authored or open-licensed loops later if desired.

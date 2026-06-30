@@ -6,6 +6,7 @@ import unreal
 from hayoung_mcp_tools.premium_escape.builder import create_legendary_escape_cafe
 from hayoung_mcp_tools.premium_escape.inspection import inspect_runtime_escape_cafe
 from hayoung_mcp_tools.premium_escape.lighting_build_fix import inspect_dynamic_lighting_policy
+from hayoung_mcp_tools.premium_escape.room01_hayoung500 import build_room01_hayoung500, inspect_room01_hayoung500_plan
 from hayoung_mcp_tools.premium_escape.room1_memory_inspection import inspect_room1_memory_prototype
 from hayoung_mcp_tools.premium_escape.runtime_escape_cafe_prop_simulation import simulate_runtime_escape_cafe_props
 from hayoung_mcp_tools.premium_escape.runtime_footstep_simulation import simulate_runtime_footstep_surfaces
@@ -38,6 +39,16 @@ class HayoungEscapeCafePremiumTools(unreal.ToolsetDefinition):
     @staticmethod
     def inspect_dynamic_lighting_policy() -> str:
         return inspect_dynamic_lighting_policy()
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def create_room01_hayoung500_premium(enable_audio: bool = True) -> str:
+        return build_room01_hayoung500(enable_audio)
+
+    @toolset_registry.tool_call
+    @staticmethod
+    def inspect_room01_hayoung500_plan() -> str:
+        return inspect_room01_hayoung500_plan()
 
     @toolset_registry.tool_call
     @staticmethod
