@@ -167,14 +167,51 @@ async function enterGame(page, isMobile = false) {
   if (lockedThemeCount !== 2) throw new Error(`Expected 2 locked theme cards, got ${lockedThemeCount}`);
   const initialRunawayCount = await page.locator(".runaway-button").count();
   if (initialRunawayCount !== 0) throw new Error("Runaway button should not appear before Theme 01 is selected");
+  const playablePosterFit = await page.evaluate(() => {
+    const posterImage = document.querySelector(".theme-card:not(.is-locked) .theme-poster-frame img");
+    if (!(posterImage instanceof HTMLImageElement)) return null;
+    return getComputedStyle(posterImage).objectFit;
+  });
+  if (playablePosterFit !== "contain") throw new Error(`Playable theme poster should be contain-fit, got ${playablePosterFit}`);
 
   await clickSelector(page, ".theme-card:not(.is-locked)");
   await waitForElement(page, ".runaway-button");
-  await page.waitForFunction(
-    () => JSON.parse(window.render_game_to_text()).introRunawayButtonScope?.includes("Theme 01"),
-    null,
-    { timeout: 15000 },
-  );
+  await page.waitForTimeout(1200);
+  const introConfirmCheck = await page.evaluate(() => {
+    const state = JSON.parse(window.render_game_to_text());
+    const panel = document.querySelector(".theme-start-panel.is-confirming");
+    if (!(panel instanceof HTMLElement)) {
+      return { ok: false, state, panelExists: false };
+    }
+    const rect = panel.getBoundingClientRect();
+    const panelStyle = getComputedStyle(panel);
+    const result = {
+      ok: Boolean(
+        state.introRunawayButtonScope?.includes("Theme 01") &&
+          state.introPosterPresentation?.includes("uncropped") &&
+          state.introStartConfirmation?.includes("fullscreen animated") &&
+          panelStyle.position === "fixed" &&
+          rect.width >= window.innerWidth * 0.9 &&
+          rect.height >= window.innerHeight * 0.9,
+      ),
+      state,
+      panelExists: true,
+      panelPosition: panelStyle.position,
+      panelInset: panelStyle.inset,
+      rect: {
+        width: rect.width,
+        height: rect.height,
+      },
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+    };
+    return result;
+  });
+  if (!introConfirmCheck.ok) {
+    throw new Error(`Intro confirm panel did not settle fullscreen: ${JSON.stringify(introConfirmCheck, null, 2)}`);
+  }
 
   if (!isMobile) {
     const button = page.locator(".runaway-button");
@@ -184,16 +221,43 @@ async function enterGame(page, isMobile = false) {
     if (moved < 35) throw new Error(`Runaway button did not move enough: ${moved}`);
   }
 
-  await page.waitForFunction(
-    () => document.querySelector(".runaway-button")?.classList.contains("is-ready"),
-    null,
-    { timeout: 15000 },
-  );
+  let runawayReady = false;
+  const readyDeadline = Date.now() + 25000;
+  while (!runawayReady && Date.now() < readyDeadline) {
+    runawayReady = await page.evaluate(() => document.querySelector(".runaway-button")?.classList.contains("is-ready") ?? false);
+    if (!runawayReady) {
+      await page.waitForTimeout(500);
+    }
+  }
+  if (!runawayReady) {
+    const buttonState = await page.evaluate(() => ({
+      className: document.querySelector(".runaway-button")?.className ?? null,
+      introState: JSON.parse(window.render_game_to_text()),
+    }));
+    throw new Error(`Runaway button did not become ready: ${JSON.stringify(buttonState, null, 2)}`);
+  }
   await dispatchMouseClick(page, ".runaway-button");
   log(`start clicked ${isMobile ? "mobile" : "desktop"}`);
-  await page.waitForFunction(() => Boolean(document.querySelector("canvas")), null, { timeout: 30000 });
+  let gameAttached = false;
+  const gameDeadline = Date.now() + 45000;
+  while (!gameAttached && Date.now() < gameDeadline) {
+    gameAttached = await page.evaluate(() => {
+      const state = JSON.parse(window.render_game_to_text());
+      return state.phase === "game" && Boolean(document.querySelector("canvas"));
+    });
+    if (!gameAttached) {
+      await page.waitForTimeout(500);
+    }
+  }
+  if (!gameAttached) {
+    const startState = await page.evaluate(() => ({
+      hasCanvas: Boolean(document.querySelector("canvas")),
+      state: JSON.parse(window.render_game_to_text()),
+      buttonClass: document.querySelector(".runaway-button")?.className ?? null,
+    }));
+    throw new Error(`Game did not attach after intro start: ${JSON.stringify(startState, null, 2)}`);
+  }
   log(`canvas attached ${isMobile ? "mobile" : "desktop"}`);
-  await waitForPhase(page, "game");
   await page.waitForTimeout(900);
   log(`entered ${isMobile ? "mobile" : "desktop"}`);
 }
@@ -509,30 +573,30 @@ async function main() {
     const ending = await solveAll(desktop);
     if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
     if (!ending.endingExperience?.includes("heavenly finale")) throw new Error(`Ending experience metadata missing: ${JSON.stringify(ending)}`);
-    await desktop.waitForFunction(() => {
+    await desktop.waitForTimeout(650);
+    const endingHudCheck = await desktop.evaluate(() => {
       const screen = document.querySelector(".game-screen");
       const topHud = document.querySelector(".top-hud");
       const inventory = document.querySelector(".inventory-dock");
-      return Boolean(
-        screen?.classList.contains("is-ending") &&
-          topHud &&
-          inventory &&
-          Number.parseFloat(getComputedStyle(topHud).opacity) < 0.05 &&
-          Number.parseFloat(getComputedStyle(inventory).opacity) < 0.05,
-      );
-    }, null, { timeout: 20000 });
-    const endingHudHidden = await desktop.evaluate(() => {
-      const topHud = document.querySelector(".top-hud");
-      const inventory = document.querySelector(".inventory-dock");
-      return Boolean(
-        topHud &&
-          inventory &&
-          Number.parseFloat(getComputedStyle(topHud).opacity) < 0.05 &&
-          Number.parseFloat(getComputedStyle(inventory).opacity) < 0.05,
-      );
+      const topOpacity = topHud ? Number.parseFloat(getComputedStyle(topHud).opacity) : null;
+      const inventoryOpacity = inventory ? Number.parseFloat(getComputedStyle(inventory).opacity) : null;
+      return {
+        ok: Boolean(
+          screen?.classList.contains("is-ending") &&
+            (!topHud || (topOpacity !== null && topOpacity < 0.05)) &&
+            (!inventory || (inventoryOpacity !== null && inventoryOpacity < 0.05)),
+        ),
+        screenClass: screen?.className ?? null,
+        topOpacity,
+        inventoryOpacity,
+      };
     });
-    if (!endingHudHidden) throw new Error("Ending HUD chrome is still visible.");
-    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-clean.png", timeout: 45000 });
+    if (!endingHudCheck.ok) throw new Error(`Ending HUD chrome is still visible: ${JSON.stringify(endingHudCheck, null, 2)}`);
+    await desktop.screenshot({
+      path: "output/playwright/500-ending-heavenly-finale-clean.png",
+      animations: "disabled",
+      timeout: 120000,
+    });
     await desktop.evaluate(() => {
       if (document.fullscreenElement) {
         return document.exitFullscreen();
@@ -542,7 +606,11 @@ async function main() {
     await desktop.waitForTimeout(320);
     await desktop.setViewportSize({ width: 390, height: 844 });
     await desktop.waitForTimeout(320);
-    await desktop.screenshot({ path: "output/playwright/500-ending-heavenly-finale-mobile-hudless.png", timeout: 45000 });
+    await desktop.screenshot({
+      path: "output/playwright/500-ending-heavenly-finale-mobile-hudless.png",
+      animations: "disabled",
+      timeout: 120000,
+    });
 
     log("park desktop");
     await desktop.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);

@@ -2,6 +2,8 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 
 ## Progress
 
+- 2026-06-30: Started a new Lazyweb design-improve report for the current theme-select screenshot and implemented the requested intro redesign: poster cards now keep the full artwork visible with contain-fit imagery and separated metadata, Theme 01 selection transitions into a fullscreen animated 500-day start confirmation, and the existing evasive Yes interaction now lives inside that confirmation screen.
+
 - 2026-06-30: Started a Lazyweb improve report for the current intro screen via presigned screenshot upload, then redesigned the first screen into a three-poster theme selector. Theme 01 `연애 일대기` is the only playable theme; Theme 02 `현수 하영 커플의 기괴한 이야기` and Theme 03 `긴급사건! 헬로키티가 사라졌다!` show locked/coming-soon states.
 - 2026-06-30: Moved the evasive `네` start button so it appears only after Theme 01 is selected, preserving the surprise without revealing the timing. Added optimized public poster JPEGs under `public/theme-posters` for Vercel-safe loading.
 - 2026-06-30: Added a web-visible Unreal Room 01 mirror pass so Vercel now shows the MCP room concept instead of only storing Unreal `.umap` files. Room 01 now includes a Jatjeol confession bench garden, symbolic birthday gift table, violin keyring prop, Philippines vista, 100-day four-cut strip, and a large beef-cuts puzzle wall in the first-person Three.js scene.

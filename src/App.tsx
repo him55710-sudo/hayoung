@@ -45,6 +45,7 @@ type IntroTheme = {
   posterHeight: number;
   meta: string[];
 };
+type PosterCardStyle = CSSProperties & { readonly "--poster-aspect": string };
 
 type Room = {
   id: number;
@@ -530,6 +531,7 @@ function App() {
   const skipIntroForHarness = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("play") === "1";
   const [phase, setPhase] = useState<Phase>(skipIntroForHarness ? "game" : "intro");
   const [introUnlocked, setIntroUnlocked] = useState(skipIntroForHarness);
+  const [introEntering, setIntroEntering] = useState(false);
   const introSecondsRef = useRef(skipIntroForHarness ? 6 : 0);
   const [buttonOffset, setButtonOffset] = useState({ x: 0, y: 0 });
   const [selectedIntroThemeId, setSelectedIntroThemeId] = useState<IntroTheme["id"] | null>(
@@ -597,12 +599,21 @@ function App() {
   const selectIntroTheme = (theme: IntroTheme) => {
     setSelectedIntroThemeId(theme.id);
     setButtonOffset({ x: 0, y: 0 });
+    setIntroEntering(false);
     if (theme.status === "open") {
       introSecondsRef.current = 0;
       setIntroUnlocked(false);
       return;
     }
     setIntroUnlocked(false);
+  };
+
+  const resetIntroSelection = () => {
+    setSelectedIntroThemeId(null);
+    setButtonOffset({ x: 0, y: 0 });
+    setIntroUnlocked(false);
+    setIntroEntering(false);
+    introSecondsRef.current = 0;
   };
 
   useEffect(() => {
@@ -675,6 +686,11 @@ function App() {
         selectedIntroTheme: selectedIntroTheme?.title ?? null,
         playableIntroTheme: playableIntroThemeId,
         introRunawayButtonScope: "the moving Yes button appears only after Theme 01 is selected",
+        introPosterPresentation: "theme posters are shown uncropped with contain-fit art and separated title metadata below the image",
+        introStartConfirmation: playableThemeSelected
+          ? "Theme 01 selection transitions to a fullscreen animated 500-day start confirmation before entering the first-person room"
+          : "theme selection shows the complete poster gallery before any start prompt appears",
+        introEntering,
         room: currentRoom.title,
         roomIndex: roomIndex + 1,
         solvedPuzzles: solvedIds.length,
@@ -758,6 +774,8 @@ function App() {
     nearInteractable,
     nextRoomTitle,
     phase,
+    playableThemeSelected,
+    introEntering,
     selectedIntroTheme,
     roomIndex,
     roomClearVisible,
@@ -808,10 +826,11 @@ function App() {
       evadeButton();
       return;
     }
-    document.documentElement.requestFullscreen?.().catch(() => undefined);
-    setPhase("game");
     setAudioEnabled(true);
     setMessage("하영이가 첫 번째 방에 들어왔어요. 중앙의 잠금 장치가 첫 단서를 기다립니다.");
+    setIntroEntering(true);
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+    window.setTimeout(() => setPhase("game"), 820);
   };
 
   function openNextPuzzle() {
@@ -936,7 +955,9 @@ function App() {
       )}
 
       {phase === "intro" && (
-        <section className={`intro-screen${introUnlocked ? " is-open" : ""}${playableThemeSelected ? " has-playable-theme" : ""}`}>
+        <section
+          className={`intro-screen${introUnlocked ? " is-open" : ""}${playableThemeSelected ? " has-playable-theme" : ""}${introEntering ? " is-entering" : ""}`}
+        >
           <div className="intro-backdrop" />
           <div className="intro-stage" aria-hidden="true">
             <span className="intro-veil intro-veil-left" />
@@ -962,11 +983,13 @@ function App() {
               {introThemes.map((theme) => {
                 const selected = selectedIntroThemeId === theme.id;
                 const locked = theme.status === "locked";
+                const posterStyle: PosterCardStyle = { "--poster-aspect": `${theme.posterWidth} / ${theme.posterHeight}` };
                 return (
                   <button
                     key={theme.id}
                     type="button"
                     className={`theme-card${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}`}
+                    style={posterStyle}
                     aria-pressed={selected}
                     aria-label={`${theme.title} ${locked ? "잠금, 곧 출시 예정" : "선택 가능"}`}
                     onClick={() => selectIntroTheme(theme)}
@@ -1003,18 +1026,18 @@ function App() {
               })}
             </div>
 
-            <div className={`theme-start-panel${selectedIntroTheme?.status === "locked" ? " is-locked" : ""}`}>
+            <div className={`theme-start-panel${selectedIntroTheme?.status === "locked" ? " is-locked" : ""}${playableThemeSelected ? " is-confirming" : ""}`}>
               {selectedIntroTheme ? (
                 <>
                   <span className="theme-start-eyebrow">{selectedIntroTheme.number}</span>
                   <h2>
                     {selectedIntroTheme.status === "open"
-                      ? "500일 기념으로 게임을 시작할까요?"
+                      ? "500일 기념으로 게임을 시작하시겠습니까?"
                       : "이 테마는 아직 문이 잠겨 있어요"}
                   </h2>
                   <p>
                     {selectedIntroTheme.status === "open"
-                      ? "선택한 테마는 연애 일대기입니다. 첫 번째 방에서 우리의 시작을 찾아보세요."
+                      ? "연애 일대기의 첫 문이 열리고 있어요. 잠시 뒤 조명이 켜지면 첫 번째 기억의 방으로 들어갑니다."
                       : `${selectedIntroTheme.title}는 곧 출시 예정입니다. 오늘은 연애 일대기부터 열어볼 수 있어요.`}
                   </p>
                 </>
@@ -1027,23 +1050,28 @@ function App() {
               )}
 
               {playableThemeSelected && (
-                <button
-                  className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
-                  style={{ translate: `${buttonOffset.x}px ${buttonOffset.y}px` }}
-                  aria-label="네, 500일 방탈출 시작하기"
-                  onClick={startGame}
-                  onMouseEnter={evadeButton}
-                  onMouseMove={evadeButton}
-                  onMouseOver={evadeButton}
-                  onFocus={evadeButton}
-                  onPointerEnter={evadeButton}
-                  onPointerMove={evadeButton}
-                  onTouchStart={evadeButton}
-                  type="button"
-                >
-                  <Heart aria-hidden="true" />
-                  <span>네</span>
-                </button>
+                <div className="theme-confirm-actions">
+                  <button
+                    className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
+                    style={{ translate: `${buttonOffset.x}px ${buttonOffset.y}px` }}
+                    aria-label="네, 500일 방탈출 시작하기"
+                    onClick={startGame}
+                    onMouseEnter={evadeButton}
+                    onMouseMove={evadeButton}
+                    onMouseOver={evadeButton}
+                    onFocus={evadeButton}
+                    onPointerEnter={evadeButton}
+                    onPointerMove={evadeButton}
+                    onTouchStart={evadeButton}
+                    type="button"
+                  >
+                    <Heart aria-hidden="true" />
+                    <span>네</span>
+                  </button>
+                  <button className="theme-back-button" type="button" onClick={resetIntroSelection}>
+                    연애 일대기 포스터 다시 보기
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1067,42 +1095,44 @@ function App() {
             onInteractFocusChange={handleInteractFocusChange}
           />
 
-          <div className={`center-reticle${nearInteractable ? " is-focused" : ""}`} aria-hidden="true" />
+          {phase === "game" && (
+            <>
+              <div className={`center-reticle${nearInteractable ? " is-focused" : ""}`} aria-hidden="true" />
 
-          <header className="hud top-hud">
-            <div className="hud-cluster brand-chip">
-              <Heart aria-hidden="true" />
-              <span>500일의 방</span>
-            </div>
-            <div className="hud-cluster progress-chip">
-              <span>Room {roomProgress}</span>
-              <span>Puzzle {puzzleProgress}</span>
-              <span>Hints {hintsLeft}</span>
-            </div>
-            <div className="hud-cluster icon-actions">
-              <button type="button" onClick={requestHint} title="힌트 사용" aria-label="힌트 사용">
-                <HelpCircle aria-hidden="true" />
-              </button>
-              <button type="button" onClick={() => setAudioEnabled((value) => !value)} title="배경음 전환" aria-label="배경음 전환">
-                {audioEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
-              </button>
-              <button
-                type="button"
-                onClick={cycleGraphicsQuality}
-                title={`그래픽 품질: ${graphicsQualitySetting.label}`}
-                aria-label={`그래픽 품질: ${graphicsQualitySetting.label}`}
-                data-quality={graphicsQuality}
-              >
-                <Sparkles aria-hidden="true" />
-              </button>
-              <button type="button" onClick={toggleFullscreen} title="전체화면" aria-label="전체화면">
-                <Expand aria-hidden="true" />
-              </button>
-              <button type="button" onClick={() => window.location.reload()} title="처음부터" aria-label="처음부터">
-                <RotateCcw aria-hidden="true" />
-              </button>
-            </div>
-          </header>
+              <header className="hud top-hud">
+                <div className="hud-cluster brand-chip">
+                  <Heart aria-hidden="true" />
+                  <span>500일의 방</span>
+                </div>
+                <div className="hud-cluster progress-chip">
+                  <span>Room {roomProgress}</span>
+                  <span>Puzzle {puzzleProgress}</span>
+                  <span>Hints {hintsLeft}</span>
+                </div>
+                <div className="hud-cluster icon-actions">
+                  <button type="button" onClick={requestHint} title="힌트 사용" aria-label="힌트 사용">
+                    <HelpCircle aria-hidden="true" />
+                  </button>
+                  <button type="button" onClick={() => setAudioEnabled((value) => !value)} title="배경음 전환" aria-label="배경음 전환">
+                    {audioEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cycleGraphicsQuality}
+                    title={`그래픽 품질: ${graphicsQualitySetting.label}`}
+                    aria-label={`그래픽 품질: ${graphicsQualitySetting.label}`}
+                    data-quality={graphicsQuality}
+                  >
+                    <Sparkles aria-hidden="true" />
+                  </button>
+                  <button type="button" onClick={toggleFullscreen} title="전체화면" aria-label="전체화면">
+                    <Expand aria-hidden="true" />
+                  </button>
+                  <button type="button" onClick={() => window.location.reload()} title="처음부터" aria-label="처음부터">
+                    <RotateCcw aria-hidden="true" />
+                  </button>
+                </div>
+              </header>
 
           <aside className="objective-panel">
             <span>{currentRoom.days}</span>
@@ -1200,32 +1230,34 @@ function App() {
             </>
           )}
 
-          {hintCount > 0 && (
-            <aside className={`penalty-card penalty-card--${activeHintPenalty?.tone ?? "banana"}`} aria-label="힌트 벌칙 계약서">
-              <div className="penalty-card-header">
-                <span>Hint Contract</span>
-                <b>{hintCount}/3</b>
-              </div>
-              <div className="penalty-current">
-                <span>{activeHintPenalty?.detail}</span>
-                <strong>{activeHintPenalty?.label}</strong>
-              </div>
-              <div className="penalty-ticket-list" aria-label="힌트 벌칙 단계">
-                {hintPenalties.map((penalty, index) => {
-                  const used = index < hintCount;
-                  const active = index === hintCount - 1;
-                  return (
-                    <span
-                      className={`penalty-ticket${used ? " is-used" : ""}${active ? " is-active" : ""}`}
-                      key={penalty.id}
-                    >
-                      <i>{index + 1}</i>
-                      <b>{penalty.shortLabel}</b>
-                    </span>
-                  );
-                })}
-              </div>
-            </aside>
+              {hintCount > 0 && (
+                <aside className={`penalty-card penalty-card--${activeHintPenalty?.tone ?? "banana"}`} aria-label="힌트 벌칙 계약서">
+                  <div className="penalty-card-header">
+                    <span>Hint Contract</span>
+                    <b>{hintCount}/3</b>
+                  </div>
+                  <div className="penalty-current">
+                    <span>{activeHintPenalty?.detail}</span>
+                    <strong>{activeHintPenalty?.label}</strong>
+                  </div>
+                  <div className="penalty-ticket-list" aria-label="힌트 벌칙 단계">
+                    {hintPenalties.map((penalty, index) => {
+                      const used = index < hintCount;
+                      const active = index === hintCount - 1;
+                      return (
+                        <span
+                          className={`penalty-ticket${used ? " is-used" : ""}${active ? " is-active" : ""}`}
+                          key={penalty.id}
+                        >
+                          <i>{index + 1}</i>
+                          <b>{penalty.shortLabel}</b>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </aside>
+              )}
+            </>
           )}
 
           {roomClearVisible && (
