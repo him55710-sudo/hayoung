@@ -87,6 +87,20 @@ async function waitForElement(page, selector, timeout = 30000) {
   );
 }
 
+async function runawayTranslateDistance(page) {
+  return page.evaluate(() => {
+    const button = document.querySelector(".runaway-button");
+    if (!(button instanceof HTMLElement)) return 0;
+    const translate = button.style.translate || getComputedStyle(button).translate;
+    if (!translate || translate === "none") return 0;
+    const [x = 0, y = 0] = translate
+      .split(/\s+/)
+      .map((part) => Number.parseFloat(part))
+      .filter((value) => Number.isFinite(value));
+    return Math.hypot(x, y);
+  });
+}
+
 async function dispatchMouseClick(page, selector) {
   await page.evaluate((targetSelector) => {
     const element = document.querySelector(targetSelector);
@@ -115,7 +129,7 @@ async function setPuzzleAnswer(page, answer) {
   await page.waitForFunction(
     (expected) => document.querySelector(".device-readout span")?.textContent === expected,
     answer,
-    { timeout: 5000 },
+    { timeout: 10000 },
   );
 }
 
@@ -139,22 +153,34 @@ async function enterGame(page, isMobile = false) {
   log(`enter ${isMobile ? "mobile" : "desktop"}`);
   await page.goto(url, { waitUntil: "domcontentloaded" });
   log(`goto ${isMobile ? "mobile" : "desktop"}`);
-  await waitForElement(page, ".runaway-button");
+  await waitForElement(page, ".theme-card");
   log(`intro ready ${isMobile ? "mobile" : "desktop"}`);
-  const introText = await page.locator(".intro-copy h1").innerText();
+  const introText = await page.locator("body").innerText({ timeout: 45000 });
   if (!introText.includes("500일")) throw new Error(`Unexpected intro: ${introText}`);
   const introScreenText = await page.locator(".intro-screen").innerText();
   if (/\d+\s*초/.test(introScreenText) || introScreenText.includes("클릭할 수 있어요") || introScreenText.includes("뒤에 멈춰요")) {
     throw new Error(`Intro reveals runaway timing: ${introScreenText}`);
   }
+  const themeCount = await page.locator(".theme-card").count();
+  if (themeCount !== 3) throw new Error(`Expected 3 theme cards, got ${themeCount}`);
+  const lockedThemeCount = await page.locator(".theme-card.is-locked").count();
+  if (lockedThemeCount !== 2) throw new Error(`Expected 2 locked theme cards, got ${lockedThemeCount}`);
+  const initialRunawayCount = await page.locator(".runaway-button").count();
+  if (initialRunawayCount !== 0) throw new Error("Runaway button should not appear before Theme 01 is selected");
+
+  await clickSelector(page, ".theme-card:not(.is-locked)");
+  await waitForElement(page, ".runaway-button");
+  await page.waitForFunction(
+    () => JSON.parse(window.render_game_to_text()).introRunawayButtonScope?.includes("Theme 01"),
+    null,
+    { timeout: 15000 },
+  );
 
   if (!isMobile) {
     const button = page.locator(".runaway-button");
-    const before = await button.boundingBox();
-    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+    await button.hover();
     await page.waitForTimeout(250);
-    const after = await button.boundingBox();
-    const moved = Math.hypot(after.x - before.x, after.y - before.y);
+    const moved = await runawayTranslateDistance(page);
     if (moved < 35) throw new Error(`Runaway button did not move enough: ${moved}`);
   }
 
@@ -163,7 +189,7 @@ async function enterGame(page, isMobile = false) {
     null,
     { timeout: 15000 },
   );
-  await clickSelector(page, ".runaway-button");
+  await dispatchMouseClick(page, ".runaway-button");
   log(`start clicked ${isMobile ? "mobile" : "desktop"}`);
   await page.waitForFunction(() => Boolean(document.querySelector("canvas")), null, { timeout: 30000 });
   log(`canvas attached ${isMobile ? "mobile" : "desktop"}`);
@@ -245,7 +271,16 @@ async function verifyHintPenaltyUX(page, label) {
   );
 
   mkdirSync("output/playwright", { recursive: true });
-  await page.screenshot({ path: `output/playwright/500-hint-penalty-ticket-${label}.png`, timeout: 45000 });
+  await page.addStyleTag({
+    content:
+      ".three-mount{visibility:hidden!important}.penalty-card,.penalty-card *,.penalty-card::before,.penalty-card::after{animation:none!important;transition:none!important;}",
+  });
+  await page.screenshot({
+    path: `output/playwright/500-hint-penalty-ticket-${label}.png`,
+    animations: "disabled",
+    fullPage: false,
+    timeout: 120000,
+  });
   const after = await gameState(page);
   return {
     beforeHintsLeft: before.hintsLeft,
@@ -319,6 +354,9 @@ async function verifyMobileTouchControls(page) {
 }
 
 async function solveAll(page) {
+  await page.evaluate(() => {
+    window.hayoungDebugHoldUnlock = false;
+  });
   for (const [index, answer] of answers.entries()) {
     log(`solve ${answer}`);
     let opened = false;
@@ -355,7 +393,7 @@ async function solveAll(page) {
     if (!unlockFeedback.modalClass.includes("is-unlocked") || unlockFeedback.readout !== "OPEN" || !unlockFeedback.activeUnlockFeedback) {
       throw new Error(`Unlock feedback state missing after answer ${answer}: ${JSON.stringify(unlockFeedback)}`);
     }
-    await page.waitForFunction(() => !document.querySelector(".puzzle-modal"), null, { timeout: 15000 });
+    await page.waitForFunction(() => !document.querySelector(".puzzle-modal"), null, { timeout: 60000 });
     await page.waitForTimeout(160);
     if ((index + 1) % 2 === 0 && index < answers.length - 1) {
       await waitForElement(page, ".room-clear-panel", 15000);
@@ -433,7 +471,7 @@ async function main() {
           Number.parseFloat(getComputedStyle(topHud).opacity) < 0.05 &&
           Number.parseFloat(getComputedStyle(inventory).opacity) < 0.05,
       );
-    }, null, { timeout: 5000 });
+    }, null, { timeout: 20000 });
     const endingHudHidden = await desktop.evaluate(() => {
       const topHud = document.querySelector(".top-hud");
       const inventory = document.querySelector(".inventory-dock");

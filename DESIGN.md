@@ -97,6 +97,14 @@ All spacing derives from a base of 4px.
 - **Accessibility**: keyboard movement and button controls remain available.
 - **Motion**: first-person bob, focus pull, unlock flash, room transition veil.
 
+### Poster Theme Select
+- **Structure**: cinematic intro background, three poster cards, one start-confirm panel.
+- **Variants**: playable theme, selected theme, locked coming-soon themes.
+- **Spacing**: --space-3 to --space-6 inside poster cards; --space-8 around the theme rail on desktop.
+- **States**: idle, selected, locked, hover/focus, ready-to-start.
+- **Accessibility**: theme cards are real buttons with pressed state and descriptive labels.
+- **Motion**: poster scale, card lift, and the evasive Yes button only after Theme 01 is selected.
+
 ### Puzzle Device Modal
 - **Structure**: case panel, prompt, answer input, device readout, action row.
 - **Variants**: locked, active, solved feedback.
@@ -106,12 +114,12 @@ All spacing derives from a base of 4px.
 - **Motion**: short transform/opacity transitions only.
 
 ### Unreal Room Mirror Set
-- **Structure**: symbolic 3D memory props, large wall puzzle, floor trail, room title markers.
-- **Variants**: Room1 memory archive, later room expansions.
-- **Spacing**: fixed 3D world units, kept clear of the first-person collision path.
+- **Structure**: reference-led Room 01 stations: left notice/desk, 2x2 memory wall, violin glass case, music cabinet, 3x3 floor puzzle, beef board, steak table, and glowing exit door.
+- **Variants**: Room 01 UE 5.8 MCP mirror, later room expansions.
+- **Spacing**: fixed 3D world units with a clear central first-person path and no generic clutter in the first room.
 - **States**: passive, focus glow, unlocked glow.
 - **Accessibility**: represented in `window.render_game_to_text` for automated inspection.
-- **Motion**: subtle breathing lights and lock response.
+- **Motion**: subtle practical-light breathing, lock response, and exit-door glow.
 
 ## 6. Motion & Interaction
 
@@ -141,4 +149,3 @@ Mixed, because this is a game UI: tonal-shift for HUD glass, cinematic colored g
 | Subtle glow | 0 0 18px rgba(255, 216, 122, 0.22) | Passive memory cues |
 | Device shadow | 0 18px 60px rgba(0, 0, 0, 0.38) | Puzzle modal and intro threshold |
 | Unlock glow | 0 0 72px rgba(255, 125, 142, 0.38) | Correct answer and door motion |
-

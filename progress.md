@@ -2,6 +2,8 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 
 ## Progress
 
+- 2026-06-30: Started a Lazyweb improve report for the current intro screen via presigned screenshot upload, then redesigned the first screen into a three-poster theme selector. Theme 01 `연애 일대기` is the only playable theme; Theme 02 `현수 하영 커플의 기괴한 이야기` and Theme 03 `긴급사건! 헬로키티가 사라졌다!` show locked/coming-soon states.
+- 2026-06-30: Moved the evasive `네` start button so it appears only after Theme 01 is selected, preserving the surprise without revealing the timing. Added optimized public poster JPEGs under `public/theme-posters` for Vercel-safe loading.
 - 2026-06-30: Added a web-visible Unreal Room 01 mirror pass so Vercel now shows the MCP room concept instead of only storing Unreal `.umap` files. Room 01 now includes a Jatjeol confession bench garden, symbolic birthday gift table, violin keyring prop, Philippines vista, 100-day four-cut strip, and a large beef-cuts puzzle wall in the first-person Three.js scene.
 - 2026-06-30: Added `DESIGN.md` to lock the premium romantic escape-cafe art direction, installed dev-only React Grab/React Scan plus React Doctor, fixed `index.html` 500-day metadata, and updated `window.render_game_to_text` with `unrealMcpWebMirror`/`roomOneUnrealLandmarks` inspection data.
 - 2026-06-30: Visual QA captured `output/lazyweb/current-room1-after-adjust.png` and `output/web-game-current/shot-0.png`; after review, moved the gift table and violin keyring left so the default first-person view stays open.
@@ -177,11 +179,18 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 - `python -m py_compile` passes for the new `escape_cafe_masterplan.py` toolset and toolset package registration.
 - `npm run build` passed after the Unreal MCP masterplan/documentation pass. Vite still reports the existing large JS chunk warning.
 - `powershell -ExecutionPolicy Bypass -File .\scripts\setup-unreal-58.ps1` now reports `EpicInstallerExists: True`, `UnrealProjectExists: True`, and no active Epic install process, but Epic Launcher and Unreal Editor are still absent.
+- Used the live Unreal Engine 5.8 MCP server on `127.0.0.1:8000` to run `HayoungEscapeCafePremiumTools.create_legendary_500_escape_cafe`; the level saved to `/Game/Maps/Hayoung500EscapeCafe_Legendary`.
+- Rebuilt Room 01 around the user's reference layout: left message/rule boards and desk, 2x2 memory photo wall, violin keyring glass case, violin performer and carousel music box, 3x3 floor puzzle with pyeongsang bench, amusement-park painting, beef-cuts board, A/B steak table, and glowing Room 2 door.
+- Imported the user's Room 01 source photos into Unreal as Room1 texture/material assets for Jatjeol confession, birthday gift, Philippines trip, 100-day four-cut, and violin keyring references.
+- `HayoungEscapeCafePremiumTools.inspect_room1_memory_prototype` returned `ready: true`, `actor_count: 163`, `runtime_lock_count: 2`, `runtime_prop_count: 10`, `room2_door_count: 1`, `missing_labels: []`, and `static_component_count: 0`.
+- The Unreal generation result reported `static_lighting_rebuild_component_count: 0`, so the prior massive static lighting rebuild warning is addressed by the dynamic-lighting policy.
+- Updated the browser Room 01 mirror to drop generic clutter for the first room and show the same reference-led stations as the Unreal MCP map.
+- `npm run build`, `npm run verify:game`, and `npm audit --omit=dev` passed after the Room 01 Unreal MCP cleanup and web mirror pass.
 
 ## Known Limitations
 
-- Visual quality is improved but still not final paid-game quality. It is now a richer procedural prototype, not a real asset-authored Unreal/Steam-level scene.
-- Real couple photos are not inserted yet; replace the six `public/memories/memory-*.svg` placeholders when photos arrive.
+- Visual quality is improved and now backed by a real UE 5.8 MCP-generated level, but final paid-game quality still depends on authored meshes, higher-end materials, and cinematic art direction passes beyond the current procedural/blockout assets.
+- Real couple photos are inserted into the Unreal Room 01 wall assets; the web mirror still uses procedural canvas panels rather than bundling the full-resolution private photo files.
 - Puzzle prompts and answers are placeholders awaiting user-provided content.
 - BGM is procedural oscillator ambience; replace with authored or open-licensed loops later if desired.
 - High-end GLB room props, hand/flashlight model, compressed textures, and better collision are still future art/tech passes.
@@ -190,9 +199,9 @@ Original prompt: 여자친구와의 기념일 웹 방탈출 게임을 만들고,
 ## Next TODOs
 
 - Replace placeholder puzzle prompts and answers with user-provided real puzzle content.
-- Replace placeholder photo frames with actual couple photos when the user sends them.
+- Mirror the Unreal Room 01 imported photo textures in the web version if the private photo files should be bundled for browser delivery.
 - Add authored GLB assets and use Draco/KTX2 compression for high detail without heavy load.
-- Install Epic Games Launcher from `C:\Users\임현수\Downloads\EpicInstaller-20.1.0.msi`, then install UE 5.8 and run `ModelContextProtocol.GenerateClientConfig Codex`.
+- Keep UE 5.8 MCP running with `ModelContextProtocolPort=8000` when asking Codex to edit live Unreal scenes.
 - Consider `howler` if real music loops replace Web Audio ambience.
 - Consider `three-mesh-bvh` if raycasting/collision with imported rooms becomes heavy.
 - Run `npm run build`, `npm run verify:game`, and deployed `GAME_URL` verification before each production deploy.

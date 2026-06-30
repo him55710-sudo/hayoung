@@ -32,6 +32,19 @@ type MovementState = { forward: boolean; back: boolean; left: boolean; right: bo
 type LookInput = { yawDelta: number; pitchDelta: number; active: boolean; tick: number };
 type TouchControlState = MovementState & { yawDelta: number; pitchDelta: number; lookActive: boolean; tick: number };
 type HintPenalty = { id: string; label: string; shortLabel: string; detail: string; tone: string };
+type IntroThemeStatus = "open" | "locked";
+type IntroTheme = {
+  id: "love-timeline" | "strange-story" | "hello-kitty";
+  number: string;
+  status: IntroThemeStatus;
+  title: string;
+  subtitle: string;
+  description: string;
+  poster: string;
+  posterWidth: number;
+  posterHeight: number;
+  meta: string[];
+};
 
 type Room = {
   id: number;
@@ -99,6 +112,45 @@ const graphicsQualitySettings: Record<
 };
 
 const graphicsQualityCycle: GraphicsQuality[] = ["cinematic", "balanced", "performance"];
+const playableIntroThemeId: IntroTheme["id"] = "love-timeline";
+const introThemes: IntroTheme[] = [
+  {
+    id: "love-timeline",
+    number: "Theme 01",
+    status: "open",
+    title: "연애 일대기",
+    subtitle: "1일부터 500일까지, 우리가 지나온 다섯 개의 방",
+    description: "1~100, 101~200, 201~300, 301~400, 401~500일의 기억을 따라가는 메인 테마입니다.",
+    poster: "/theme-posters/theme-1-love-timeline.jpg",
+    posterWidth: 900,
+    posterHeight: 1350,
+    meta: ["5 rooms", "10 locks", "500 days"],
+  },
+  {
+    id: "strange-story",
+    number: "Theme 02",
+    status: "locked",
+    title: "현수 하영 커플의 기괴한 이야기",
+    subtitle: "가설로 시작된 공포 연애 미스터리",
+    description: "왜 현실은 가설보다 더 기괴했는지 추적하는 공포 테마입니다.",
+    poster: "/theme-posters/theme-2-strange-story.jpg",
+    posterWidth: 900,
+    posterHeight: 1272,
+    meta: ["horror", "mystery", "coming soon"],
+  },
+  {
+    id: "hello-kitty",
+    number: "Theme 03",
+    status: "locked",
+    title: "긴급사건! 헬로키티가 사라졌다!",
+    subtitle: "사라진 헬로키티를 되찾는 초특급 미션",
+    description: "마지막 문을 열면 실제 헬로키티 인형이 기다리는 추리 어드벤처 테마입니다.",
+    poster: "/theme-posters/theme-3-hello-kitty.jpg",
+    posterWidth: 900,
+    posterHeight: 1272,
+    meta: ["cute case", "reward", "coming soon"],
+  },
+];
 const defaultTouchControls: TouchControlState = {
   forward: false,
   back: false,
@@ -477,8 +529,11 @@ function App() {
   const skipIntroForHarness = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("play") === "1";
   const [phase, setPhase] = useState<Phase>(skipIntroForHarness ? "game" : "intro");
   const [introUnlocked, setIntroUnlocked] = useState(skipIntroForHarness);
-  const [introSeconds, setIntroSeconds] = useState(skipIntroForHarness ? 6 : 0);
+  const introSecondsRef = useRef(skipIntroForHarness ? 6 : 0);
   const [buttonOffset, setButtonOffset] = useState({ x: 0, y: 0 });
+  const [selectedIntroThemeId, setSelectedIntroThemeId] = useState<IntroTheme["id"] | null>(
+    skipIntroForHarness ? playableIntroThemeId : null,
+  );
   const [roomIndex, setRoomIndex] = useState(0);
   const [solvedIds, setSolvedIds] = useState<number[]>([]);
   const [activePuzzleId, setActivePuzzleId] = useState<number | null>(null);
@@ -516,6 +571,8 @@ function App() {
   const canAdvanceRoom = currentRoomPuzzles.every((puzzle) => solvedSet.has(puzzle.id));
   const roomClearVisible = phase === "game" && canAdvanceRoom && roomIndex < rooms.length - 1 && !activePuzzle;
   const nextRoomTitle = rooms[roomIndex + 1]?.title ?? "엔딩";
+  const selectedIntroTheme = introThemes.find((theme) => theme.id === selectedIntroThemeId) ?? null;
+  const playableThemeSelected = selectedIntroThemeId === playableIntroThemeId;
 
   const handleNearObject = useCallback((label: string) => {
     setMessage((current) => (current === label ? current : label));
@@ -536,22 +593,30 @@ function App() {
     };
   };
 
+  const selectIntroTheme = (theme: IntroTheme) => {
+    setSelectedIntroThemeId(theme.id);
+    setButtonOffset({ x: 0, y: 0 });
+    if (theme.status === "open") {
+      introSecondsRef.current = 0;
+      setIntroUnlocked(false);
+      return;
+    }
+    setIntroUnlocked(false);
+  };
+
   useEffect(() => {
-    if (phase !== "intro") {
+    if (phase !== "intro" || !playableThemeSelected) {
       return;
     }
     const timer = window.setInterval(() => {
-      setIntroSeconds((value) => {
-        const next = value + 1;
-        if (next >= 6) {
-          setIntroUnlocked(true);
-          setButtonOffset({ x: 0, y: 0 });
-        }
-        return next;
-      });
+      introSecondsRef.current += 1;
+      if (introSecondsRef.current >= 6) {
+        setIntroUnlocked(true);
+        setButtonOffset({ x: 0, y: 0 });
+      }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [phase]);
+  }, [phase, playableThemeSelected]);
 
   useEffect(() => {
     if (phase !== "intro") {
@@ -605,6 +670,10 @@ function App() {
     window.render_game_to_text = () =>
       JSON.stringify({
         phase,
+        introThemeSelect: "poster-led three-theme selector: Theme 01 playable, Theme 02 and Theme 03 locked as coming soon",
+        selectedIntroTheme: selectedIntroTheme?.title ?? null,
+        playableIntroTheme: playableIntroThemeId,
+        introRunawayButtonScope: "the moving Yes button appears only after Theme 01 is selected",
         room: currentRoom.title,
         roomIndex: roomIndex + 1,
         solvedPuzzles: solvedIds.length,
@@ -645,10 +714,19 @@ function App() {
         endingExperience: "heavenly finale with vow stats, cloud-step memory timeline, photo placeholders, and replay action",
         prologueSetDressing: "cinematic intro splash plus first-room prologue arches, photo garland, and floor light path",
         unrealMcpWebMirror:
-          "Room 01 visibly mirrors the UE 5.8 MCP map in the browser: Jatjeol confession bench garden, violin keyring, birthday gift table, Philippines vista, 100-day four-cut strip, and a large beef-cuts wall puzzle.",
+          "Room 01 visibly mirrors the UE 5.8 MCP map in the browser: left notice desk, 2x2 memory wall, violin keyring glass case, music cabinet, 3x3 floor puzzle, beef-cuts board, steak vote table, and glowing Room 2 door.",
         roomOneUnrealLandmarks:
           roomIndex === 0
-            ? ["Jatjeol park confession bench", "violin keyring prop", "birthday gift table", "Philippines vista", "100-day photo strip", "large beef-cuts puzzle wall"]
+            ? [
+                "left notice desk",
+                "2x2 memory photo wall",
+                "violin keyring glass case",
+                "carousel music cabinet",
+                "3x3 pyeongsang floor puzzle",
+                "beef-cuts board",
+                "A/B steak vote table",
+                "glowing Room 2 door",
+              ]
             : [],
         lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, tactile lock console, and short unlocked success state",
         unlockFeedbackUX: "correct answers briefly hold the device modal in an OPEN readout state before the 3D latch, sparks, flash, and door motion fire",
@@ -679,6 +757,7 @@ function App() {
     nearInteractable,
     nextRoomTitle,
     phase,
+    selectedIntroTheme,
     roomIndex,
     roomClearVisible,
     solvedIds.length,
@@ -708,7 +787,7 @@ function App() {
   };
 
   const evadeButton = () => {
-    if (introUnlocked) {
+    if (introUnlocked || !playableThemeSelected) {
       return;
     }
     const direction = Math.random() > 0.5 ? 1 : -1;
@@ -720,6 +799,10 @@ function App() {
   };
 
   const startGame = () => {
+    if (!playableThemeSelected) {
+      setButtonOffset({ x: 0, y: 0 });
+      return;
+    }
     if (!introUnlocked) {
       evadeButton();
       return;
@@ -852,7 +935,7 @@ function App() {
       )}
 
       {phase === "intro" && (
-        <section className={`intro-screen${introUnlocked ? " is-open" : ""}`}>
+        <section className={`intro-screen${introUnlocked ? " is-open" : ""}${playableThemeSelected ? " has-playable-theme" : ""}`}>
           <div className="intro-backdrop" />
           <div className="intro-stage" aria-hidden="true">
             <span className="intro-veil intro-veil-left" />
@@ -867,33 +950,101 @@ function App() {
             <span className="intro-sidewall intro-sidewall-left" />
             <span className="intro-sidewall intro-sidewall-right" />
           </div>
-          <div className="intro-copy">
-            <p className="couple-mark">HYUNSU × HAYOUNG / 500 DAYS</p>
-            <h1>임현수와의 500일을 함께하실 준비가 되셨나요?</h1>
-            <div className="intro-memory-line" aria-label="500일의 기억">
-              <span>1-100</span>
-              <span>101-200</span>
-              <span>201-300</span>
-              <span>301-400</span>
-              <span>401-500</span>
+          <div className="intro-copy theme-select-shell">
+            <div className="theme-select-heading">
+              <p className="couple-mark">HYUNSU × HAYOUNG / 500 DAYS</p>
+              <h1>500일 기념 방탈출 테마를 골라주세요</h1>
+              <p>오늘 열 수 있는 문은 하나예요. 나머지 사건은 더 귀엽고 무섭게 준비 중입니다.</p>
             </div>
-            <p>닫힌 문 뒤에는 우리가 지나온 계절과 아직 열지 않은 마음이 놓여 있어요.</p>
-            <button
-              className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
-              style={{ translate: `${buttonOffset.x}px ${buttonOffset.y}px` }}
-              aria-label="네, 500일 방탈출 시작하기"
-              onClick={startGame}
-              onMouseEnter={evadeButton}
-              onMouseMove={evadeButton}
-              onMouseOver={evadeButton}
-              onPointerEnter={evadeButton}
-              onPointerMove={evadeButton}
-              onTouchStart={evadeButton}
-              type="button"
-            >
-              <Heart aria-hidden="true" />
-              <span>네</span>
-            </button>
+
+            <div className="theme-grid" aria-label="500일 방탈출 테마 선택">
+              {introThemes.map((theme) => {
+                const selected = selectedIntroThemeId === theme.id;
+                const locked = theme.status === "locked";
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    className={`theme-card${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}`}
+                    aria-pressed={selected}
+                    aria-label={`${theme.title} ${locked ? "잠금, 곧 출시 예정" : "선택 가능"}`}
+                    onClick={() => selectIntroTheme(theme)}
+                  >
+                    <span className="theme-poster-frame">
+                      <img
+                        src={theme.poster}
+                        alt={`${theme.title} 테마 포스터`}
+                        width={theme.posterWidth}
+                        height={theme.posterHeight}
+                      />
+                      {locked && (
+                        <span className="theme-lock" aria-hidden="true">
+                          <LockKeyhole />
+                        </span>
+                      )}
+                    </span>
+                    <span className="theme-card-body">
+                      <span className="theme-kicker">
+                        <b>{theme.number}</b>
+                        <i>{locked ? "곧 출시 예정" : "지금 플레이 가능"}</i>
+                      </span>
+                      <strong>{theme.title}</strong>
+                      <em>{theme.subtitle}</em>
+                      <span className="theme-description">{theme.description}</span>
+                      <span className="theme-meta">
+                        {theme.meta.map((item) => (
+                          <small key={item}>{item}</small>
+                        ))}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={`theme-start-panel${selectedIntroTheme?.status === "locked" ? " is-locked" : ""}`}>
+              {selectedIntroTheme ? (
+                <>
+                  <span className="theme-start-eyebrow">{selectedIntroTheme.number}</span>
+                  <h2>
+                    {selectedIntroTheme.status === "open"
+                      ? "500일 기념으로 게임을 시작할까요?"
+                      : "이 테마는 아직 문이 잠겨 있어요"}
+                  </h2>
+                  <p>
+                    {selectedIntroTheme.status === "open"
+                      ? "선택한 테마는 연애 일대기입니다. 첫 번째 방에서 우리의 시작을 찾아보세요."
+                      : `${selectedIntroTheme.title}는 곧 출시 예정입니다. 오늘은 연애 일대기부터 열어볼 수 있어요.`}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="theme-start-eyebrow">SELECT THEME</span>
+                  <h2>먼저 1번 테마를 선택해주세요</h2>
+                  <p>테마 포스터를 고르면 입구의 문이 반응합니다.</p>
+                </>
+              )}
+
+              {playableThemeSelected && (
+                <button
+                  className={`runaway-button${introUnlocked ? " is-ready" : ""}`}
+                  style={{ translate: `${buttonOffset.x}px ${buttonOffset.y}px` }}
+                  aria-label="네, 500일 방탈출 시작하기"
+                  onClick={startGame}
+                  onMouseEnter={evadeButton}
+                  onMouseMove={evadeButton}
+                  onMouseOver={evadeButton}
+                  onFocus={evadeButton}
+                  onPointerEnter={evadeButton}
+                  onPointerMove={evadeButton}
+                  onTouchStart={evadeButton}
+                  type="button"
+                >
+                  <Heart aria-hidden="true" />
+                  <span>네</span>
+                </button>
+              )}
+            </div>
           </div>
         </section>
       )}
@@ -1258,8 +1409,8 @@ function LockPreview({ kind, answer }: { kind: PuzzleKind; answer: string }) {
   if (kind === "symbol" || kind === "final") {
     return (
       <div className="lock-preview symbol-preview" aria-hidden="true">
-        {answer.split("").map((letter) => (
-          <b key={letter}>{letter}</b>
+        {answer.split("").map((letter, index) => (
+          <b key={`${letter}-${index}`}>{letter}</b>
         ))}
       </div>
     );
@@ -1857,14 +2008,20 @@ function createRoom(room: Room, index: number) {
   const glowMaterial = mat(room.palette[2], { roughness: 0.18, metalness: 0.12, emissive: room.palette[2], emissiveIntensity: 0.46 });
 
   addRoomShell(group, room, floorMaterial, wallMaterial, trimMaterial, index);
-  addPhotoWall(group, room, index);
-  addPuzzleDesk(group, room, accentMaterial, glowMaterial);
-  addDoorAssembly(group, room, accentMaterial, glowMaterial);
-  addEscapeVista(group, room, index);
-  addRoomSpecifics(group, room, index);
-  addLivedInEscapeRoomDetails(group, room, index);
-  addPhysicalClueNetwork(group, room, index);
-  addCinematicAtmosphere(group, room, index);
+
+  if (index === 0) {
+    addUnrealRoomOneMemoryMap(group, room);
+    addCinematicAtmosphere(group, room, index);
+  } else {
+    addPhotoWall(group, room, index);
+    addPuzzleDesk(group, room, accentMaterial, glowMaterial);
+    addDoorAssembly(group, room, accentMaterial, glowMaterial);
+    addEscapeVista(group, room, index);
+    addRoomSpecifics(group, room, index);
+    addLivedInEscapeRoomDetails(group, room, index);
+    addPhysicalClueNetwork(group, room, index);
+    addCinematicAtmosphere(group, room, index);
+  }
 
   const keyLight = new THREE.PointLight(room.palette[1], index === 4 ? 3.6 : 2.15, 13);
   keyLight.position.set(-3.7, 3.15, -1.6);
@@ -3426,12 +3583,238 @@ function addPrologueMemoryStage(group: THREE.Group, room: Room) {
 
 function addUnrealRoomOneMemoryMap(group: THREE.Group, room: Room) {
   group.userData.unrealRoomOneMirror = true;
-  addRoomOneParkConfessionSet(group, room);
-  addRoomOneBirthdayGiftTable(group, room);
-  addRoomOneViolinKeyring(group, room);
-  addRoomOneMemoryInstallations(group, room);
-  addRoomOneBeefPuzzleWall(group, room);
+  addRoomOneReferenceArchitecture(group, room);
+  addRoomOneReferenceEntryDesk(group, room);
+  addRoomOneReferenceMemoryWall(group, room);
+  addRoomOneReferenceMusicCabinet(group, room);
+  addRoomOneReferenceFloorPuzzle(group, room);
+  addRoomOneReferenceBeefAndSteak(group, room);
+  addRoomOneReferenceExitDoor(group, room);
   addRoomOneUnrealMarkerLights(group, room);
+}
+
+function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
+  const floorInset = mat(0x5b351f, { roughness: 0.58, metalness: 0.04, texture: "wood", textureRepeat: [4.5, 3.2], textureSeed: 5601 });
+  const plaster = mat(0x9f7d62, { roughness: 0.88, texture: "plaster", textureRepeat: [4.4, 2.2], textureSeed: 5602 });
+  const wood = mat(0x3a2115, { roughness: 0.52, texture: "wood", textureRepeat: [2.2, 1.2], textureSeed: 5603 });
+  const amber = mat(0xffb35c, { roughness: 0.24, metalness: 0.1, emissive: 0xff9d33, emissiveIntensity: 0.42 });
+
+  group.add(box(9.9, 0.035, 6.35, floorInset, 0, 0.035, -0.16));
+  group.add(box(9.92, 2.6, 0.07, plaster, 0, 1.48, -4.48));
+  group.add(box(9.92, 0.86, 0.09, wood, 0, 0.56, -4.42));
+
+  for (let i = 0; i < 9; i += 1) {
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 8), amber);
+    bulb.position.set(-4.15 + i * 1.04, 3.08 + Math.sin(i * 0.8) * 0.08, -4.18);
+    bulb.userData.roomOneUnrealMirror = true;
+    group.add(bulb);
+  }
+
+  const keyLight = new THREE.PointLight(room.palette[1], 2.35, 9.2);
+  keyLight.position.set(-1.2, 3.1, -1.0);
+  keyLight.userData.roomOneUnrealMirror = true;
+  group.add(keyLight);
+}
+
+function addRoomOneReferenceEntryDesk(group: THREE.Group, room: Room) {
+  const wood = mat(0x6e4529, { roughness: 0.52, metalness: 0.04, texture: "wood", textureRepeat: [1.5, 1], textureSeed: 5611 });
+  const darkWood = mat(0x27170f, { roughness: 0.62, texture: "wood", textureSeed: 5612 });
+  const paper = mat(0xf5ddbd, { roughness: 0.82, emissive: 0xffca8f, emissiveIntensity: 0.05, texture: "paper", textureSeed: 5613 });
+  const teal = mat(0x2b7163, { roughness: 0.38, metalness: 0.18, emissive: 0x164437, emissiveIntensity: 0.18, texture: "metal", textureSeed: 5614 });
+  const brass = mat(0xd3a75c, { roughness: 0.26, metalness: 0.56, emissive: 0xff9d3d, emissiveIntensity: 0.12, texture: "metal", textureSeed: 5615 });
+
+  addTexturedWallPanel(group, "room1-message-board", "하영아,", "방탈출을 풀며 우리의 추억을 잘 떠올려봐!!", -4.78, 2.1, -4.24, 1.12, 0.86, 0xffc899, "memory");
+  addTexturedWallPanel(group, "room1-rule-board", "규칙 안내", "인터넷 사용 가능 · 힌트는 카톡 또는 전화", -4.78, 1.12, -4.24, 1.04, 0.58, 0xffdd9a, "memory");
+
+  const desk = new THREE.Group();
+  desk.position.set(-4.25, 0.68, 1.28);
+  desk.rotation.y = 0.04;
+  desk.userData.roomOneUnrealMirror = true;
+  desk.add(box(1.82, 0.16, 0.78, wood, 0, 0, 0));
+  desk.add(box(0.1, 0.74, 0.1, darkWood, -0.76, -0.44, -0.25));
+  desk.add(box(0.1, 0.74, 0.1, darkWood, 0.76, -0.44, -0.25));
+  desk.add(box(0.1, 0.74, 0.1, darkWood, -0.76, -0.44, 0.25));
+  desk.add(box(0.1, 0.74, 0.1, darkWood, 0.76, -0.44, 0.25));
+  const letter = box(0.82, 0.026, 0.52, paper, -0.18, 0.11, -0.04);
+  letter.rotation.y = -0.08;
+  const lock = box(0.42, 0.16, 0.28, brass, 0.56, 0.17, 0.08);
+  desk.add(letter, lock);
+  group.add(desk);
+
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.32, 24), teal);
+  shade.position.set(-4.92, 1.25, 1.16);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.28, 18), brass);
+  base.position.set(-4.92, 0.92, 1.16);
+  group.add(shade, base);
+
+  const deskLight = new THREE.PointLight(0xffbc70, 1.55, 3.5);
+  deskLight.position.set(-4.72, 1.62, 1.05);
+  group.add(deskLight);
+}
+
+function addRoomOneReferenceMemoryWall(group: THREE.Group, room: Room) {
+  const exhibits = [
+    { key: "jatjeol", title: "첫 고백", caption: "잣절 공원 벤치", color: 0xffd37e, x: -2.45, y: 2.48 },
+    { key: "birthday", title: "현수 생일", caption: "하영이가 준 선물", color: 0x9be88a, x: -1.22, y: 2.48 },
+    { key: "philippines", title: "필리핀 여행", caption: "함께 본 높은 하늘", color: 0x91d8ff, x: -2.45, y: 1.54 },
+    { key: "hundred-day", title: "100일 네 컷", caption: "홍대의 네 장면", color: 0xff92a6, x: -1.22, y: 1.54 },
+  ];
+
+  exhibits.forEach((exhibit) => {
+    addTexturedWallPanel(group, `room1-${exhibit.key}`, exhibit.title, exhibit.caption, exhibit.x, exhibit.y, -4.22, 0.9, 0.62, exhibit.color, exhibit.key === "hundred-day" ? "photoStrip" : "memory");
+  });
+
+  const buttonColors = [0xffd36f, 0x8be883, 0x82cfff, 0xff748b];
+  buttonColors.forEach((color, index) => {
+    const material = mat(color, { roughness: 0.28, metalness: 0.18, emissive: color, emissiveIntensity: 0.22 });
+    const button = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.055, 28), material);
+    button.position.set(-2.92 + index * 0.46, 0.12, -2.56);
+    button.rotation.x = Math.PI / 2;
+    button.userData.roomOneUnrealMirror = true;
+    group.add(button);
+  });
+}
+
+function addRoomOneReferenceMusicCabinet(group: THREE.Group, room: Room) {
+  const wood = mat(0x5c3925, { roughness: 0.54, texture: "wood", textureRepeat: [1.1, 0.9], textureSeed: 5621 });
+  const glass = mat(0x9ee8ff, { roughness: 0.08, metalness: 0.02, emissive: 0x4eb8ff, emissiveIntensity: 0.18, transparent: true, opacity: 0.42 });
+  const brass = mat(0xd4a459, { roughness: 0.28, metalness: 0.58, emissive: 0xffaa44, emissiveIntensity: 0.16, texture: "metal", textureSeed: 5622 });
+  const bodyMaterial = mat(0xb56a35, { roughness: 0.36, metalness: 0.08, emissive: 0x4d2110, emissiveIntensity: 0.12, texture: "wood", textureSeed: 5623 });
+
+  const caseFrame = box(0.76, 1.12, 0.08, wood, 0.1, 2.12, -4.18);
+  const casePane = box(0.62, 0.96, 0.035, glass, 0.1, 2.12, -4.11);
+  group.add(caseFrame, casePane);
+  addMiniViolin(group, 0.1, 2.1, -4.03, 0.75);
+
+  const cabinet = new THREE.Group();
+  cabinet.position.set(1.25, 0.68, -2.78);
+  cabinet.userData.roomOneUnrealMirror = true;
+  cabinet.add(box(1.18, 0.78, 0.58, wood, 0, 0, 0));
+  cabinet.add(box(1.1, 0.1, 0.62, brass, 0, 0.48, 0));
+  const musicBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.12, 32), brass);
+  musicBase.position.set(0, 0.63, -0.04);
+  const musicTop = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.26, 32), mat(0xff87a6, { roughness: 0.34, metalness: 0.08, emissive: 0xff5b8c, emissiveIntensity: 0.24 }));
+  musicTop.position.set(0, 0.84, -0.04);
+  cabinet.add(musicBase, musicTop);
+  group.add(cabinet);
+
+  const performer = new THREE.Group();
+  performer.position.set(1.38, 1.35, -3.7);
+  performer.userData.roomOneUnrealMirror = true;
+  performer.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.42, 18), bodyMaterial));
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 12), mat(0xf0c7a4, { roughness: 0.6 }));
+  head.position.y = 0.32;
+  performer.add(head);
+  group.add(performer);
+  addMiniViolin(group, 1.55, 1.58, -3.68, 0.42);
+}
+
+function addRoomOneReferenceFloorPuzzle(group: THREE.Group, room: Room) {
+  const tileMaterial = mat(0xc2a887, { roughness: 0.78, texture: "fabric", textureRepeat: [0.8, 0.8], textureSeed: 5631 });
+  const activeMaterial = mat(0x2b221d, { roughness: 0.72, emissive: 0xffad5a, emissiveIntensity: 0.08, texture: "fabric", textureSeed: 5632 });
+  for (let cell = 1; cell <= 9; cell += 1) {
+    const row = Math.floor((cell - 1) / 3);
+    const col = (cell - 1) % 3;
+    const tile = box(0.74, 0.024, 0.74, cell === 9 ? activeMaterial : tileMaterial, -0.78 + col * 0.78, 0.055, -0.62 + row * 0.78);
+    tile.userData.roomOneUnrealMirror = true;
+    group.add(tile);
+  }
+
+  const benchWood = mat(0x744422, { roughness: 0.5, texture: "wood", textureSeed: 5633 });
+  const bench = new THREE.Group();
+  bench.position.set(0.05, 0.38, 0.08);
+  bench.userData.roomOneUnrealMirror = true;
+  bench.add(box(1.55, 0.16, 0.58, benchWood, 0, 0, 0));
+  bench.add(box(0.12, 0.42, 0.12, benchWood, -0.58, -0.28, -0.18));
+  bench.add(box(0.12, 0.42, 0.12, benchWood, 0.58, -0.28, -0.18));
+  bench.add(box(0.12, 0.42, 0.12, benchWood, -0.58, -0.28, 0.18));
+  bench.add(box(0.12, 0.42, 0.12, benchWood, 0.58, -0.28, 0.18));
+  group.add(bench);
+}
+
+function addRoomOneReferenceBeefAndSteak(group: THREE.Group, room: Room) {
+  addTexturedWallPanel(group, "room1-amusement-park", "우리의 추억 여행", "회전목마 빈자리를 채워라", 3.1, 2.18, -4.22, 2.05, 1.02, 0xffc276, "vista");
+  addTexturedWallPanel(group, "room1-beef-puzzle", "소의 부위 퍼즐", "고기 조각을 올바른 위치에", 3.08, 0.92, -4.18, 1.72, 0.82, 0xffbd7b, "beef");
+
+  const wood = mat(0x633b22, { roughness: 0.54, texture: "wood", textureSeed: 5641 });
+  const plate = mat(0xf2e1c8, { roughness: 0.58, metalness: 0.08 });
+  const meat = mat(0xa94232, { roughness: 0.42, emissive: 0x47130d, emissiveIntensity: 0.12, texture: "fabric", textureSeed: 5642 });
+  const table = new THREE.Group();
+  table.position.set(3.0, 0.54, 1.34);
+  table.userData.roomOneUnrealMirror = true;
+  table.add(box(1.92, 0.16, 0.88, wood, 0, 0, 0));
+  [-0.72, 0.72].forEach((x) => {
+    [-0.28, 0.28].forEach((z) => table.add(box(0.1, 0.66, 0.1, wood, x, -0.38, z)));
+  });
+  [-0.46, 0.46].forEach((x, index) => {
+    const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.29, 0.035, 32), plate);
+    dish.position.set(x, 0.14, 0);
+    const steak = new THREE.Mesh(new THREE.SphereGeometry(0.18, 18, 10), meat);
+    steak.scale.set(1.25, 0.26, 0.72);
+    steak.position.set(x, 0.2, 0.02);
+    const flag = box(0.16, 0.2, 0.03, mat(0xd8ad62, { roughness: 0.32, metalness: 0.44 }), x, 0.42, -0.18);
+    flag.userData.steakVote = index === 0 ? "A" : "B";
+    table.add(dish, steak, flag);
+  });
+  group.add(table);
+}
+
+function addRoomOneReferenceExitDoor(group: THREE.Group, room: Room) {
+  const doorMat = mat(0x4a2b1b, { roughness: 0.52, metalness: 0.06, texture: "wood", textureRepeat: [1.1, 2.2], textureSeed: 5651 });
+  const glow = mat(0xffb24f, { roughness: 0.2, metalness: 0.08, emissive: 0xff9f32, emissiveIntensity: 0.58 });
+  const door = box(0.88, 1.82, 0.1, doorMat, 4.85, 1.1, -2.38);
+  const left = box(0.055, 1.98, 0.08, glow, 4.35, 1.12, -2.3);
+  const right = box(0.055, 1.98, 0.08, glow, 5.35, 1.12, -2.3);
+  const top = box(1.08, 0.055, 0.08, glow, 4.85, 2.12, -2.3);
+  group.add(door, left, right, top);
+  const exitLight = new THREE.PointLight(0xffb24f, 1.8, 4.2);
+  exitLight.position.set(4.85, 2.2, -1.78);
+  group.add(exitLight);
+}
+
+function addTexturedWallPanel(
+  group: THREE.Group,
+  key: string,
+  title: string,
+  caption: string,
+  x: number,
+  y: number,
+  z: number,
+  width: number,
+  height: number,
+  accent: number,
+  kind: "memory" | "beef" | "vista" | "photoStrip",
+) {
+  const frameMaterial = mat(0x49301f, { roughness: 0.5, metalness: 0.08, texture: "wood", textureSeed: width * 100 + height * 10 });
+  const texture = createRoomOneMemoryTexture(key, title, caption, accent, kind);
+  const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.72, metalness: 0.02, emissive: accent, emissiveIntensity: 0.06 });
+  const frame = box(width + 0.14, height + 0.14, 0.08, frameMaterial, x, y, z - 0.04);
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  plane.position.set(x, y, z + 0.015);
+  plane.userData.roomOneUnrealMirror = true;
+  frame.userData.roomOneUnrealMirror = true;
+  group.add(frame, plane);
+}
+
+function addMiniViolin(group: THREE.Group, x: number, y: number, z: number, scale: number) {
+  const body = mat(0xa65a2e, { roughness: 0.34, metalness: 0.08, emissive: 0x3a150a, emissiveIntensity: 0.1, texture: "wood", textureSeed: 5661 });
+  const dark = mat(0x12100e, { roughness: 0.42, metalness: 0.32 });
+  const stringMaterial = mat(0xead6a5, { roughness: 0.2, metalness: 0.58, emissive: 0xffc56f, emissiveIntensity: 0.12 });
+  const violin = new THREE.Group();
+  violin.position.set(x, y, z);
+  violin.scale.setScalar(scale);
+  violin.rotation.z = -0.12;
+  violin.userData.roomOneUnrealMirror = true;
+  const lower = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 10), body);
+  lower.scale.set(1.15, 0.7, 0.26);
+  const upper = lower.clone();
+  upper.scale.set(0.9, 0.55, 0.22);
+  upper.position.y = 0.22;
+  violin.add(lower, upper, box(0.08, 0.52, 0.045, dark, 0, 0.52, 0.02), box(0.22, 0.035, 0.035, stringMaterial, 0, 0.12, 0.07));
+  for (let i = 0; i < 4; i += 1) {
+    violin.add(box(0.01, 0.78, 0.01, stringMaterial, -0.036 + i * 0.024, 0.24, 0.09));
+  }
+  group.add(violin);
 }
 
 function addRoomOneParkConfessionSet(group: THREE.Group, room: Room) {
