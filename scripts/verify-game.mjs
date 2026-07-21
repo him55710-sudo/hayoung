@@ -492,6 +492,13 @@ async function main() {
     await sleep(300);
     state = await gameState(desktop);
     expect(state.graphicsQuality === "cinematic", "20. 그래픽 품질 모드 순환 (performance → cinematic)", failures);
+    // 엔딩과 모바일 패스가 소프트웨어 렌더러에서 감당 가능하도록 저부하 모드로 되돌린다.
+    await clickSelector(desktop, '.icon-actions button[data-quality]');
+    await sleep(200);
+    await clickSelector(desktop, '.icon-actions button[data-quality]');
+    await sleep(200);
+    state = await gameState(desktop);
+    expect(state.graphicsQuality === "performance", "20b. 품질 순환 후 performance 복귀", failures);
 
     // 21. 엔딩
     await ev(desktop, () => window.hayoungDebugCompleteGame(), undefined, "complete game");
@@ -520,21 +527,24 @@ async function main() {
     desktop = null;
     log("desktop context closed");
 
-    const mobileContext = await Promise.race([
-      browser.newContext({
-        viewport: { width: 390, height: 844 },
-        isMobile: true,
-        hasTouch: true,
-        userAgent:
-          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-      }),
-      sleep(30000).then(() => {
-        throw new Error("mobile context creation timed out");
+    mobile = await Promise.race([
+      (async () => {
+        const mobileContext = await browser.newContext({
+          viewport: { width: 390, height: 844 },
+          isMobile: true,
+          hasTouch: true,
+          userAgent:
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        });
+        const page = await mobileContext.newPage();
+        page.on("pageerror", (error) => pageErrors.push(`mobile: ${error.message}`));
+        await page.goto(`${url}?play=1&gfx=performance`, { waitUntil: "domcontentloaded", timeout: 30000 });
+        return page;
+      })(),
+      sleep(60000).then(() => {
+        throw new Error("mobile page bring-up timed out");
       }),
     ]);
-    mobile = await mobileContext.newPage();
-    mobile.on("pageerror", (error) => pageErrors.push(`mobile: ${error.message}`));
-    await mobile.goto(`${url}?play=1&gfx=performance`, { waitUntil: "domcontentloaded" });
     await waitForPhase(mobile, "game");
     await sleep(900);
     await ev(mobile, () => window.advanceTime?.(300), undefined, "advanceTime mobile", 60000);
