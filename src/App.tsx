@@ -1449,6 +1449,25 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
     const firstPersonRig = createFirstPersonRig();
     camera.add(firstPersonRig.group);
 
+    // 숨겨진 보상 오브젝트(케이스 키링, 그림 속 회전목마, 살치살 마커 등)가
+    // 나중에 나타날 때 셰이더 컴파일 스톨이 생기지 않도록 시작 시 전부 미리 컴파일한다.
+    // 소프트웨어 WebGL(SwiftShader)에서는 지연 컴파일이 프레임을 수십 초까지 막을 수 있다.
+    try {
+      const hiddenForCompile: THREE.Object3D[] = [];
+      root.traverse((object) => {
+        if (!object.visible) {
+          object.visible = true;
+          hiddenForCompile.push(object);
+        }
+      });
+      renderer.compile(scene, camera);
+      hiddenForCompile.forEach((object) => {
+        object.visible = false;
+      });
+    } catch {
+      // 사전 컴파일은 순수 최적화라 실패해도 게임 진행에는 영향이 없다.
+    }
+
     const player = {
       position: new THREE.Vector3(roomIndexRef.current * 24, 1.65, 3.25),
       yaw: 0,

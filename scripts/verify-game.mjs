@@ -523,13 +523,20 @@ async function main() {
     if (failures.length > 0) {
       throw new Error(`verification failed: ${failures.join(" | ")}`);
     }
-  } finally {
-    await Promise.all(
-      [desktop, mobile]
-        .filter(Boolean)
-        .map((page) => page.close({ runBeforeUnload: false }).catch(() => undefined)),
+  } catch (error) {
+    // 렌더러가 웨지되면 브라우저 close가 매달릴 수 있으므로 정리 전에 에러부터 기록한다.
+    console.error("verification error:", error?.message ?? error);
+    mkdirSync("output/playwright", { recursive: true });
+    writeFileSync(
+      "output/playwright/verify-result.json",
+      JSON.stringify({ ok: false, error: String(error?.message ?? error), failures, pageErrors }, null, 2),
     );
-    await browser.close().catch(() => undefined);
+    throw error;
+  } finally {
+    const capped = (promise) =>
+      Promise.race([promise.catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 8000))]);
+    await capped(Promise.all([desktop, mobile].filter(Boolean).map((page) => page.close({ runBeforeUnload: false }))));
+    await capped(browser.close());
     stopDevServer();
   }
 }
