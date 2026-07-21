@@ -507,14 +507,31 @@ async function main() {
       failures,
     );
 
-    // 22. 모바일
-    const mobileContext = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      isMobile: true,
-      hasTouch: true,
-      userAgent:
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-    });
+    // 22. 모바일 — 시네마틱 엔딩을 렌더 중인 데스크톱 페이지가 소프트웨어
+    // 래스터라이저를 독점하지 않도록 먼저 닫고 나서 모바일 패스를 연다.
+    log("closing desktop context before mobile pass");
+    await Promise.race([
+      (async () => {
+        await desktop.close({ runBeforeUnload: false }).catch(() => undefined);
+        await context.close().catch(() => undefined);
+      })(),
+      sleep(10000),
+    ]);
+    desktop = null;
+    log("desktop context closed");
+
+    const mobileContext = await Promise.race([
+      browser.newContext({
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        userAgent:
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      }),
+      sleep(30000).then(() => {
+        throw new Error("mobile context creation timed out");
+      }),
+    ]);
     mobile = await mobileContext.newPage();
     mobile.on("pageerror", (error) => pageErrors.push(`mobile: ${error.message}`));
     await mobile.goto(`${url}?play=1&gfx=performance`, { waitUntil: "domcontentloaded" });
