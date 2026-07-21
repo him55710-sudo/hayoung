@@ -4,34 +4,57 @@ import {
   ArrowRight,
   ArrowUp,
   Backpack,
-  Check,
-  Delete,
   DoorOpen,
   Expand,
   Heart,
   HelpCircle,
   KeyRound,
   LockKeyhole,
+  Play,
   RotateCcw,
   Sparkles,
   Volume2,
   VolumeX,
-  X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { AnimationEvent, CSSProperties } from "react";
 import * as THREE from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { HintSheet } from "./components/HintSheet";
+import { Room1PuzzleModal } from "./components/Room1PuzzleModal";
+import {
+  comingSoonLine,
+  endingLetterBody,
+  endingLetterTitle,
+  openingVoiceLines,
+  room1ClearLine,
+} from "./game/data/dialogue";
+import { hintPenalties } from "./game/data/hints";
+import { clueRecords, inventoryItems, memorySlots } from "./game/data/memories";
+import type { MemorySlot } from "./game/data/memories";
+import {
+  getPuzzleById,
+  getStationById,
+  isRoom1Complete,
+  room1Puzzles,
+  room1Stations,
+} from "./game/data/room1Puzzles";
+import type { PuzzleDefinition, Room1Station } from "./game/data/room1Puzzles";
+import { rooms } from "./game/data/rooms";
+import type { Room } from "./game/data/rooms";
+import { room1Visual, resetRoom1Visual, syncRoom1Visual } from "./game/scenes/room1SceneState";
+import { gameReducer } from "./game/state/gameReducer";
+import { createInitialGameState } from "./game/state/gameState";
+import type { GamePhase, GameState, GraphicsQuality } from "./game/state/gameState";
+import { clearSavedGame, loadSavedGame, saveGame } from "./game/state/saveGame";
+import { audioManager } from "./game/systems/AudioManager";
 
-type Phase = "intro" | "game" | "ending";
-type PuzzleKind = "code" | "direction" | "symbol" | "memory" | "device" | "final";
-type GraphicsQuality = "cinematic" | "balanced" | "performance";
+type Phase = GamePhase;
 type MovementState = { forward: boolean; back: boolean; left: boolean; right: boolean };
 type LookInput = { yawDelta: number; pitchDelta: number; active: boolean; tick: number };
 type TouchControlState = MovementState & { yawDelta: number; pitchDelta: number; lookActive: boolean; tick: number };
-type HintPenalty = { id: string; label: string; shortLabel: string; detail: string; tone: string };
 type IntroThemeStatus = "open" | "locked";
 type IntroTheme = {
   id: "love-timeline" | "strange-story" | "hello-kitty";
@@ -46,48 +69,6 @@ type IntroTheme = {
   meta: string[];
 };
 type PosterCardStyle = CSSProperties & { readonly "--poster-aspect": string };
-
-type Room = {
-  id: number;
-  days: string;
-  title: string;
-  subtitle: string;
-  mood: string;
-  palette: [number, number, number, number];
-  accent: string;
-  ambience: {
-    label: string;
-    base: number;
-    harmony: number;
-    pulse: number;
-  };
-};
-
-type Puzzle = {
-  id: number;
-  roomId: number;
-  kind: PuzzleKind;
-  title: string;
-  prompt: string;
-  answer: string;
-  reward: string;
-  requires?: number[];
-  chainNote: string;
-};
-
-type UnlockFeedback = {
-  puzzleId: number;
-  title: string;
-  reward: string;
-};
-
-type MemorySlot = {
-  id: string;
-  dayRange: string;
-  title: string;
-  caption: string;
-  image: string;
-};
 
 type ProceduralTextureKind = "wood" | "plaster" | "fabric" | "paper" | "metal";
 
@@ -273,266 +254,26 @@ declare global {
     hayoungDebugSkipRoomTransitions?: boolean;
     hayoungDebugFastUnlock?: boolean;
     hayoungDebugCompleteGame?: () => void;
+    hayoungDebugState?: () => string;
+    hayoungDebugOpenStation?: (stationId: string) => void;
+    hayoungDebugGoToRoom?: (roomId: number) => void;
+    hayoungDebugClearSave?: () => void;
     hayoungTouchControls?: TouchControlState;
     render_game_to_text?: () => string;
   }
 }
 
-const rooms: Room[] = [
-  {
-    id: 1,
-    days: "1-100일",
-    title: "풋풋한 시작의 방",
-    subtitle: "처음이라 더 환했고, 작은 말에도 설렜던 시간",
-    mood: "밝은 햇살, 다이어리, 첫 사진, 작은 자물쇠",
-    palette: [0xffc36f, 0xff6f7c, 0x8fd7ff, 0x2a1c15],
-    accent: "#ffcf7c",
-    ambience: { label: "warm morning piano pad", base: 261.63, harmony: 329.63, pulse: 0.52 },
-  },
-  {
-    id: 2,
-    days: "101-200일",
-    title: "조금 더 가까워진 방",
-    subtitle: "익숙해졌지만 더 소중해진 약속들",
-    mood: "카페 조명, 두 개의 의자, 방향 패널, 초록빛 단서",
-    palette: [0xffa75f, 0x6ee7b7, 0x8dc8ff, 0x17251f],
-    accent: "#7ee1bd",
-    ambience: { label: "soft cafe marimba loop", base: 293.66, harmony: 392.0, pulse: 0.62 },
-  },
-  {
-    id: 3,
-    days: "201-300일",
-    title: "고난과 화해의 방",
-    subtitle: "많이 싸웠지만 끝내 다시 손을 잡았던 날들",
-    mood: "비, 갈라진 유리, 번개, 이어 붙인 사진",
-    palette: [0x405b86, 0xff7a72, 0xc8d4ff, 0x101622],
-    accent: "#91a8ff",
-    ambience: { label: "rainy low strings", base: 196.0, harmony: 246.94, pulse: 0.35 },
-  },
-  {
-    id: 4,
-    days: "301-400일",
-    title: "다사다난한 밤의 방",
-    subtitle: "각자의 문제로 지쳤지만 서로를 놓지 않았던 시간",
-    mood: "밤 도시, 열린 창문, 흔들리는 불빛, 오래 버틴 마음",
-    palette: [0x20384d, 0xffa36c, 0xffd6ad, 0x090d14],
-    accent: "#ffb172",
-    ambience: { label: "night city heartbeat pad", base: 174.61, harmony: 261.63, pulse: 0.44 },
-  },
-  {
-    id: 5,
-    days: "401-500일",
-    title: "500일의 문",
-    subtitle: "구름 위 사진 길을 지나 섬광 속 편지로",
-    mood: "하늘, 구름길, 시간순 사진 프레임, 천국 같은 빛",
-    palette: [0xf8fbff, 0xffd87a, 0x92c7ff, 0xdfefff],
-    accent: "#f9dc8c",
-    ambience: { label: "celestial choir shimmer", base: 329.63, harmony: 493.88, pulse: 0.72 },
-  },
-];
-
-const memorySlots: MemorySlot[] = [
-  {
-    id: "memory-01",
-    dayRange: "1-100일",
-    title: "처음 설렌 날들",
-    caption: "밝은 마음으로 서로를 알아가던 시작",
-    image: "/memories/memory-01.svg",
-  },
-  {
-    id: "memory-02",
-    dayRange: "101-200일",
-    title: "조금 더 가까이",
-    caption: "약속과 일상이 편안해지던 시간",
-    image: "/memories/memory-02.svg",
-  },
-  {
-    id: "memory-03",
-    dayRange: "201-300일",
-    title: "비 온 뒤의 마음",
-    caption: "싸움 뒤에도 다시 서로를 고르던 날들",
-    image: "/memories/memory-03.svg",
-  },
-  {
-    id: "memory-04",
-    dayRange: "301-400일",
-    title: "지친 밤의 편",
-    caption: "각자의 문제 속에서도 놓지 않았던 손",
-    image: "/memories/memory-04.svg",
-  },
-  {
-    id: "memory-05",
-    dayRange: "401-500일",
-    title: "구름길",
-    caption: "다시 환하게 걸어온 기념의 복도",
-    image: "/memories/memory-05.svg",
-  },
-  {
-    id: "memory-06",
-    dayRange: "500일 이후",
-    title: "다음 방",
-    caption: "앞으로 같이 만들 새로운 장면",
-    image: "/memories/memory-06.svg",
-  },
-];
-
-const puzzles: Puzzle[] = [
-  {
-    id: 1,
-    roomId: 1,
-    kind: "code",
-    title: "첫 자물쇠",
-    prompt: "다이어리의 첫 페이지와 사진 프레임의 숫자를 연결해 네 자리 코드를 만든다는 구조입니다.",
-    answer: "0100",
-    reward: "첫 설렘 열쇠",
-    chainNote: "이 열쇠가 2번 사진 장치의 전원을 켭니다.",
-  },
-  {
-    id: 2,
-    roomId: 1,
-    kind: "memory",
-    title: "첫 사진 프레임",
-    prompt: "방 안의 사진 후보 중 가장 먼저 빛나는 프레임을 고르는 기억형 문제입니다.",
-    answer: "1",
-    reward: "밝은 사진 조각",
-    requires: [1],
-    chainNote: "사진 조각 뒷면의 색이 2번째 방 방향 패널의 시작 색입니다.",
-  },
-  {
-    id: 3,
-    roomId: 2,
-    kind: "direction",
-    title: "카페 방향 패널",
-    prompt: "테이블 위 컵받침, 의자 방향, 벽 조명 순서를 합쳐 방향 자물쇠를 푸는 구조입니다.",
-    answer: "URDL",
-    reward: "초록 방향 토큰",
-    requires: [2],
-    chainNote: "방향 토큰을 약속 시계에 끼워 4번 문제를 엽니다.",
-  },
-  {
-    id: 4,
-    roomId: 2,
-    kind: "symbol",
-    title: "약속의 별",
-    prompt: "두 사람이 자주 했던 말과 별 모양 장식을 매칭하는 상징 문제입니다.",
-    answer: "STAR",
-    reward: "약속 배지",
-    requires: [3],
-    chainNote: "배지의 금속 무늬가 3번째 방의 갈라진 유리 패턴과 이어집니다.",
-  },
-  {
-    id: 5,
-    roomId: 3,
-    kind: "code",
-    title: "비 오는 날의 금고",
-    prompt: "싸운 날, 다시 만난 날, 화해 메시지의 순서를 숫자로 바꾸는 코드 문제입니다.",
-    answer: "0300",
-    reward: "화해의 조각",
-    requires: [4],
-    chainNote: "조각을 맞추면 깨진 소리 장치의 방향 힌트가 들립니다.",
-  },
-  {
-    id: 6,
-    roomId: 3,
-    kind: "direction",
-    title: "깨진 소리 방향",
-    prompt: "비와 번개 소리가 들리는 순서대로 방향 패널을 누르는 장치형 문제입니다.",
-    answer: "LURD",
-    reward: "이어 붙인 리본",
-    requires: [5],
-    chainNote: "리본이 4번째 방 창문 장치의 손잡이가 됩니다.",
-  },
-  {
-    id: 7,
-    roomId: 4,
-    kind: "memory",
-    title: "지친 밤의 선택",
-    prompt: "힘들었던 날 서로에게 보낸 말 중 가장 오래 남은 선택지를 고르는 기억형 문제입니다.",
-    answer: "2",
-    reward: "밤 도시 티켓",
-    requires: [6],
-    chainNote: "티켓 번호가 달빛 신호 장치의 첫 번째 좌표입니다.",
-  },
-  {
-    id: 8,
-    roomId: 4,
-    kind: "symbol",
-    title: "열린 창문의 신호",
-    prompt: "창밖 네온, 달, 방 안 촛불의 순서를 조합해 마지막 방의 문양을 만듭니다.",
-    answer: "MOON",
-    reward: "달빛 실마리",
-    requires: [7],
-    chainNote: "달빛 실마리가 500일 하늘문에 들어가는 마지막 장치입니다.",
-  },
-  {
-    id: 9,
-    roomId: 5,
-    kind: "code",
-    title: "500일 하늘문",
-    prompt: "사진 길의 순서와 하늘문에 새겨진 숫자를 연결하는 최종 코드 문제입니다.",
-    answer: "0500",
-    reward: "하늘문 열쇠",
-    requires: [8],
-    chainNote: "하늘문 열쇠가 편지 장치를 열어 마지막 확인을 보여줍니다.",
-  },
-  {
-    id: 10,
-    roomId: 5,
-    kind: "final",
-    title: "편지의 마지막 문장",
-    prompt: "500일부터 더 다정하게 같이 걷자는 마음을 담은 최종 확인입니다.",
-    answer: "YES",
-    reward: "500일 엔딩 편지",
-    requires: [9],
-    chainNote: "모든 방의 단서가 끝나고 엔딩 편지가 열립니다.",
-  },
-];
-
-const hintPenalties: HintPenalty[] = [
-  {
-    id: "banana",
-    label: "현수한테 바나나우유 사주기",
-    shortLabel: "바나나우유",
-    detail: "첫 힌트 영수증",
-    tone: "banana",
-  },
-  {
-    id: "bingsu",
-    label: "현수한테 설빙 사주기",
-    shortLabel: "설빙",
-    detail: "두 번째 힌트 계약",
-    tone: "bingsu",
-  },
-  {
-    id: "escape",
-    label: "현수랑 방탈출 하러가기",
-    shortLabel: "방탈출 데이트",
-    detail: "최종 벌칙 예약권",
-    tone: "escape",
-  },
-];
-
-function normalizePuzzleAnswer(puzzle: Puzzle, value: string) {
-  const compact = value.toUpperCase().replace(/\s+/g, "");
-
-  if (puzzle.kind === "code" || puzzle.kind === "memory") {
-    return compact.replace(/\D/g, "").slice(0, puzzle.answer.length);
-  }
-
-  if (puzzle.kind === "direction") {
-    return compact.replace(/[^UDLR]/g, "").slice(0, puzzle.answer.length);
-  }
-
-  if (puzzle.kind === "device") {
-    return compact.replace(/[^A-Z0-9]/g, "").slice(0, puzzle.answer.length);
-  }
-
-  return compact.replace(/[^A-Z]/g, "").slice(0, puzzle.answer.length);
-}
-
 function App() {
   const skipIntroForHarness = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("play") === "1";
-  const [phase, setPhase] = useState<Phase>(skipIntroForHarness ? "game" : "intro");
+
+  const [state, dispatch] = useReducer(gameReducer, undefined, () =>
+    createInitialGameState(skipIntroForHarness ? { phase: "game", selectedTheme: playableIntroThemeId } : {}),
+  );
+
+  const phase = state.phase;
+  const roomIndex = Math.min(rooms.length - 1, Math.max(0, state.currentRoomId - 1));
+  const currentRoom = rooms[roomIndex];
+
   const [introUnlocked, setIntroUnlocked] = useState(skipIntroForHarness);
   const [introEntering, setIntroEntering] = useState(false);
   const introSecondsRef = useRef(skipIntroForHarness ? 6 : 0);
@@ -540,45 +281,39 @@ function App() {
   const [selectedIntroThemeId, setSelectedIntroThemeId] = useState<IntroTheme["id"] | null>(
     skipIntroForHarness ? playableIntroThemeId : null,
   );
-  const [roomIndex, setRoomIndex] = useState(0);
-  const [solvedIds, setSolvedIds] = useState<number[]>([]);
-  const [activePuzzleId, setActivePuzzleId] = useState<number | null>(null);
-  const [answer, setAnswer] = useState("");
-  const [unlockFeedback, setUnlockFeedback] = useState<UnlockFeedback | null>(null);
+  const [savedGame, setSavedGame] = useState<GameState | null>(() => (skipIntroForHarness ? null : loadSavedGame()));
+  const [voiceLineIndex, setVoiceLineIndex] = useState<number | null>(null);
+  const [activePuzzleId, setActivePuzzleId] = useState<string | null>(null);
+  const [hintSheetOpen, setHintSheetOpen] = useState(false);
+  const [nearStationId, setNearStationId] = useState<string | null>(null);
   const [message, setMessage] = useState(
-    skipIntroForHarness ? "하영이가 첫 번째 방에 들어왔어요. 중앙의 잠금 장치가 첫 단서를 기다립니다." : "빛나는 장치가 조용히 반응하고 있어요.",
+    skipIntroForHarness
+      ? "하영이가 낯선 방에서 눈을 떴다. 문은 잠겨 있고, 익숙한 물건들이 촛불 아래 놓여 있다."
+      : "빛나는 장치가 조용히 반응하고 있어요.",
   );
-  const [hintCount, setHintCount] = useState(0);
   const [movement, setMovement] = useState<MovementState>({ forward: false, back: false, left: false, right: false });
-  const [lookInput, setLookInput] = useState<LookInput>({ yawDelta: 0, pitchDelta: 0, active: false, tick: 0 });
+  const [lookInput] = useState<LookInput>({ yawDelta: 0, pitchDelta: 0, active: false, tick: 0 });
   const [unlockTick, setUnlockTick] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(true);
   const [nearInteractable, setNearInteractable] = useState(false);
-  const [graphicsQuality, setGraphicsQuality] = useState<GraphicsQuality>("cinematic");
 
-  const currentRoom = rooms[roomIndex];
+  const audioEnabled = state.audioEnabled;
+  const graphicsQuality = state.graphicsQuality;
   const graphicsQualitySetting = graphicsQualitySettings[graphicsQuality];
-  const solvedSet = useMemo(() => new Set(solvedIds), [solvedIds]);
-  const currentRoomPuzzles = puzzles.filter((puzzle) => puzzle.roomId === currentRoom.id);
-  const availablePuzzle = currentRoomPuzzles.find((puzzle) => {
-    if (solvedSet.has(puzzle.id)) {
-      return false;
-    }
-    return (puzzle.requires ?? []).every((id) => solvedSet.has(id));
-  });
-  const blockedPuzzle = currentRoomPuzzles.find((puzzle) => !solvedSet.has(puzzle.id));
-  const nextPuzzle = availablePuzzle ?? blockedPuzzle;
-  const activePuzzle = puzzles.find((puzzle) => puzzle.id === activePuzzleId) ?? null;
-  const hintsLeft = Math.max(0, 3 - hintCount);
-  const activeHintPenalty = hintPenalties[hintCount - 1] ?? null;
-  const inventory = puzzles.filter((puzzle) => solvedSet.has(puzzle.id)).map((puzzle) => puzzle.reward);
-  const canAdvanceRoom = currentRoomPuzzles.every((puzzle) => solvedSet.has(puzzle.id));
-  const roomClearVisible = phase === "game" && canAdvanceRoom && roomIndex < rooms.length - 1 && !activePuzzle;
-  const nextRoomTitle = rooms[roomIndex + 1]?.title ?? "엔딩";
+  const solvedCount = state.completedPuzzleIds.length;
+  const hintsLeft = Math.max(0, 3 - state.hintsUsed);
+  const activeHintPenalty = hintPenalties[state.hintsUsed - 1] ?? null;
+  const activePuzzle = getPuzzleById(activePuzzleId);
+  const nextPuzzle = room1Puzzles.find((puzzle) => state.availablePuzzleIds.includes(puzzle.id)) ?? null;
+  const hintTargetPuzzle = activePuzzle ?? nextPuzzle;
+  const room1Complete = isRoom1Complete(state.completedPuzzleIds);
+  const roomClearVisible = phase === "game" && roomIndex === 0 && room1Complete && !activePuzzleId && !hintSheetOpen;
+  const nearStation = getStationById(nearStationId);
   const selectedIntroTheme = introThemes.find((theme) => theme.id === selectedIntroThemeId) ?? null;
   const playableThemeSelected = selectedIntroThemeId === playableIntroThemeId;
+  const inventoryLabels = state.inventoryItemIds.map((id) => inventoryItems[id]?.label ?? id);
+  const clueLabels = state.inspectedClueIds.map((id) => clueRecords[id]?.label ?? id);
 
   const handleNearObject = useCallback((label: string) => {
     setMessage((current) => (current === label ? current : label));
@@ -586,23 +321,25 @@ function App() {
   const handleInteractFocusChange = useCallback((active: boolean) => {
     setNearInteractable((current) => (current === active ? current : active));
   }, []);
+  const handleNearStation = useCallback((stationId: string | null) => {
+    setNearStationId((current) => (current === stationId ? current : stationId));
+  }, []);
 
   useRoomAmbience(phase, roomIndex, audioEnabled);
 
   useEffect(() => {
-    window.hayoungDebugCompleteGame = () => {
-      setSolvedIds(puzzles.map((puzzle) => puzzle.id));
-      setActivePuzzleId(null);
-      setUnlockFeedback(null);
-      setAnswer("");
-      setRoomIndex(rooms.length - 1);
-      setPhase("ending");
-      setMessage("500일의 모든 단서가 연결됐습니다.");
-    };
-    return () => {
-      window.hayoungDebugCompleteGame = undefined;
-    };
-  }, []);
+    audioManager.setEnabled(audioEnabled);
+  }, [audioEnabled]);
+
+  useEffect(() => {
+    syncRoom1Visual(state.completedPuzzleIds);
+  }, [state.completedPuzzleIds]);
+
+  useEffect(() => {
+    if (phase !== "intro") {
+      saveGame(state);
+    }
+  }, [phase, state]);
 
   const getIntroButtonBounds = () => {
     if (typeof window === "undefined") {
@@ -665,143 +402,6 @@ function App() {
     return () => window.removeEventListener("resize", clampButtonToViewport);
   }, [phase]);
 
-  useEffect(() => {
-    const keyDown = (event: KeyboardEvent) => {
-      if (phase !== "game") {
-        return;
-      }
-      if (event.key.toLowerCase() === "w" || event.key === "ArrowUp") setMovement((v) => ({ ...v, forward: true }));
-      if (event.key.toLowerCase() === "s" || event.key === "ArrowDown") setMovement((v) => ({ ...v, back: true }));
-      if (event.key.toLowerCase() === "a" || event.key === "ArrowLeft") setMovement((v) => ({ ...v, left: true }));
-      if (event.key.toLowerCase() === "d" || event.key === "ArrowRight") setMovement((v) => ({ ...v, right: true }));
-      if (event.key.toLowerCase() === "e") openNextPuzzle();
-      if (event.key.toLowerCase() === "h") requestHint();
-      if (event.key.toLowerCase() === "f") toggleFullscreen();
-    };
-    const keyUp = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === "w" || event.key === "ArrowUp") setMovement((v) => ({ ...v, forward: false }));
-      if (event.key.toLowerCase() === "s" || event.key === "ArrowDown") setMovement((v) => ({ ...v, back: false }));
-      if (event.key.toLowerCase() === "a" || event.key === "ArrowLeft") setMovement((v) => ({ ...v, left: false }));
-      if (event.key.toLowerCase() === "d" || event.key === "ArrowRight") setMovement((v) => ({ ...v, right: false }));
-    };
-    window.addEventListener("keydown", keyDown);
-    window.addEventListener("keyup", keyUp);
-    return () => {
-      window.removeEventListener("keydown", keyDown);
-      window.removeEventListener("keyup", keyUp);
-    };
-  });
-
-  useEffect(() => {
-    if (phase === "game") {
-      installDelegatedTouchControls();
-      publishDelegatedTouchControls();
-    }
-    window.render_game_to_text = () =>
-      JSON.stringify({
-        phase,
-        introThemeSelect: "poster-led three-theme selector: Theme 01 playable, Theme 02 and Theme 03 locked as coming soon",
-        selectedIntroTheme: selectedIntroTheme?.title ?? null,
-        playableIntroTheme: playableIntroThemeId,
-        introRunawayButtonScope: "the moving Yes button appears only after Theme 01 is selected",
-        introPosterPresentation: "theme posters are shown uncropped with contain-fit art and separated title metadata below the image",
-        introStartConfirmation: playableThemeSelected
-          ? "Theme 01 selection transitions to a fullscreen animated 500-day start confirmation before entering the first-person room"
-          : "theme selection shows the complete poster gallery before any start prompt appears",
-        introEntering,
-        room: currentRoom.title,
-        roomIndex: roomIndex + 1,
-        solvedPuzzles: solvedIds.length,
-        totalPuzzles: puzzles.length,
-        memorySlots: memorySlots.length,
-        hintsLeft,
-        penalties: hintPenalties.slice(0, hintCount).map((penalty) => penalty.label),
-        hintPenaltyUX: "three-step penalty contract ticket HUD with stamped hint receipts, active obligation highlight, and non-blocking status copy",
-        activeHintPenalty: activeHintPenalty?.label ?? null,
-        hintPenaltyStage: `${hintCount}/3`,
-        nextPuzzle: availablePuzzle?.title ?? (canAdvanceRoom ? "room clear" : blockedPuzzle?.title ?? "none"),
-        nextPuzzleRequires: availablePuzzle ? [] : blockedPuzzle?.requires?.filter((id) => !solvedSet.has(id)) ?? [],
-        roomClearReady: roomClearVisible,
-        nextRoomTitle,
-        graphicsQuality,
-        graphicsQualityLabel: graphicsQualitySetting.label,
-        renderScaleCap: graphicsQualitySetting.renderScale,
-        performanceMode: graphicsQuality === "performance",
-        cinematicAtmosphere: graphicsQualitySetting.atmosphere
-          ? "volumetric light shafts, floor reflections, room-specific rain/city/heaven light layers"
-          : "reduced in performance mode",
-        cinematicCamera: "dynamic FOV breathing, ACES exposure ramping, movement sway, focus pull, and unlock impact",
-        screenPostFx: "soft vignette, fine film grain, scanline texture, and unlock flash overlay",
-        cameraMode: "first-person",
-        playSurface: "full-viewport first-person Roblox-like room escape surface with keyboard movement, pointer-look, mobile joystick/look pad, and fullscreen request on start",
-        embodiedView: "Hayoung first-person hands with flashlight, heart key, hair strands, skirt silhouette, and name charm",
-        characterDetail: "camera-attached Hayoung avatar cues: hands, sleeves, hair, skirt hem, H/Y charm, flashlight, and heart key",
-        interactableInRange: nearInteractable,
-        interactionFocus: "distance-reactive reticle, floor glyph, lock halo, and focus light around the active puzzle console",
-        unlockDetail: "animated latch lift, sliding bolts, glowing door seam, hinges, handle, and unlock sparks",
-        collisionModel: "room bounds plus solid central puzzle console stop-zone",
-        hudBehavior: "calm HUD dims secondary panels while moving and restores clarity near interactables",
-        environmentDetail: "lived-in escape room wear: floor scuffs, clue tape, shelf props, wall tags, and room-specific residue",
-        transitionVfx: "cinematic room transition veil with letterbox bars, energy slit, and particle sparks",
-        objectiveTracker: "case-file HUD shows current lock status, next clue, room solve meter, and puzzle input progress",
-        escapeVista: "rear-door escape vista uses themed silhouettes, breadcrumb floor lights, and room-specific portal dressing",
-        mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
-        endingExperience: "heavenly finale with vow stats, cloud-step memory timeline, photo placeholders, and replay action",
-        prologueSetDressing: "cinematic intro splash plus first-room prologue arches, photo garland, and floor light path",
-        unrealMcpWebMirror:
-          "Room 01 visibly mirrors the UE 5.8 MCP map in the browser: left notice desk, 2x2 memory wall, violin keyring glass case, music cabinet, 3x3 floor puzzle, beef-cuts board, steak vote table, and glowing Room 2 door.",
-        roomOneUnrealLandmarks:
-          roomIndex === 0
-            ? [
-                "left notice desk",
-                "2x2 memory photo wall",
-                "violin keyring glass case",
-                "carousel music cabinet",
-                "3x3 pyeongsang floor puzzle",
-                "beef-cuts board",
-                "A/B steak vote table",
-                "glowing Room 2 door",
-              ]
-            : [],
-        lockConsoleUX: "two-zone puzzle modal with case file, device readout, answer progress meter, clue chips, tactile lock console, and short unlocked success state",
-        unlockFeedbackUX: "correct answers briefly hold the device modal in an OPEN readout state before the 3D latch, sparks, flash, and door motion fire",
-        roomDeviceKits: "five room-specific physical puzzle kits on the central console: diary/photo slot, cafe token receipt, rain direction rail, note bridge, and finale prism gate",
-        physicalClueNetwork: "in-world evidence boards, pinned clue nodes, glowing string links, and floor cable trails connect room props to the active lock and exit",
-        activeUnlockFeedback: unlockFeedback?.reward ?? null,
-        mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
-        ambience: audioEnabled ? currentRoom.ambience.label : "muted",
-        message,
-        coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
-      });
-  }, [
-    availablePuzzle,
-    activeHintPenalty,
-    audioEnabled,
-    blockedPuzzle,
-    canAdvanceRoom,
-    currentRoom.ambience.label,
-    currentRoom.title,
-    graphicsQuality,
-    graphicsQualitySetting.atmosphere,
-    graphicsQualitySetting.label,
-    graphicsQualitySetting.renderScale,
-    hintCount,
-    hintsLeft,
-    lookInput.active,
-    message,
-    nearInteractable,
-    nextRoomTitle,
-    phase,
-    playableThemeSelected,
-    introEntering,
-    selectedIntroTheme,
-    roomIndex,
-    roomClearVisible,
-    solvedIds.length,
-    solvedSet,
-    unlockFeedback,
-  ]);
-
   const triggerUnlock = (showTransition = false) => {
     setUnlockTick((value) => value + 1);
     setUnlocking(true);
@@ -829,6 +429,7 @@ function App() {
     }
     const direction = Math.random() > 0.5 ? 1 : -1;
     const { maxX, maxY } = getIntroButtonBounds();
+    audioManager.play("runaway-giggle");
     setButtonOffset({
       x: direction * (maxX * (0.58 + Math.random() * 0.42)),
       y: (Math.random() - 0.5) * maxY * 2,
@@ -844,82 +445,124 @@ function App() {
       evadeButton();
       return;
     }
-    setAudioEnabled(true);
-    setMessage("하영이가 첫 번째 방에 들어왔어요. 중앙의 잠금 장치가 첫 단서를 기다립니다.");
+    dispatch({ type: "SELECT_THEME", themeId: playableIntroThemeId });
+    dispatch({ type: "RESET" });
+    dispatch({ type: "SELECT_THEME", themeId: playableIntroThemeId });
+    setMessage("하영이가 낯선 방에서 눈을 떴다. 문은 잠겨 있고, 익숙한 물건들이 촛불 아래 놓여 있다.");
     setIntroEntering(true);
     document.documentElement.requestFullscreen?.().catch(() => undefined);
-    window.setTimeout(() => setPhase("game"), 820);
+    window.setTimeout(() => {
+      dispatch({ type: "SET_PHASE", phase: "game" });
+      setVoiceLineIndex(0);
+    }, 820);
   };
 
-  function openNextPuzzle() {
-    if (phase !== "game") {
+  const continueGame = () => {
+    if (!savedGame) {
       return;
     }
-    if (availablePuzzle) {
-      setActivePuzzleId(availablePuzzle.id);
-      setAnswer("");
-      setUnlockFeedback(null);
-      setMessage(`${availablePuzzle.title} 장치가 열렸습니다. ${availablePuzzle.chainNote}`);
+    setIntroEntering(true);
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+    window.setTimeout(() => {
+      dispatch({ type: "LOAD_STATE", state: savedGame });
+      setMessage("저장된 기억에서 이어서 시작한다.");
+    }, 400);
+  };
+
+  function goToRoom(roomId: number) {
+    const nextRoom = rooms[roomId - 1];
+    if (!nextRoom) {
       return;
     }
-    if (blockedPuzzle) {
-      const missing = blockedPuzzle.requires?.filter((id) => !solvedSet.has(id)).join(", ") || "앞 단서";
-      setMessage(`${blockedPuzzle.title}은 아직 잠겨 있어요. 먼저 ${missing}번 단서를 이어야 합니다.`);
+    dispatch({ type: "ENTER_ROOM", roomId });
+    triggerUnlock(true);
+    setMessage(
+      nextRoom.memoryStatus === "preparing"
+        ? `${nextRoom.title} — ${comingSoonLine}`
+        : nextRoom.memoryStatus === "finale"
+          ? `${nextRoom.title} — 구름길 너머 하늘문이 보인다.`
+          : `${nextRoom.title}으로 들어섰다.`,
+    );
+  }
+
+  function interactAtStation(station: Room1Station) {
+    if (station.id === "station-exit-door") {
+      if (isRoom1Complete(state.completedPuzzleIds)) {
+        audioManager.play("door-bolt");
+        goToRoom(2);
+      } else {
+        setMessage("문이 잠겨 있다. 아직 되찾지 못한 기억이 남아 있다.");
+      }
+      return;
+    }
+    if (!station.puzzleId) {
+      if (station.clueId) {
+        dispatch({ type: "INSPECT_CLUE", clueId: station.clueId });
+        const clue = clueRecords[station.clueId];
+        setMessage(clue ? `${clue.label}: ${clue.description}` : station.focusLine);
+      }
+      return;
+    }
+    const puzzle = getPuzzleById(station.puzzleId);
+    if (!puzzle) {
+      return;
+    }
+    if (state.completedPuzzleIds.includes(puzzle.id)) {
+      setMessage(`${station.label} — 이 기억은 이미 되찾았다.`);
+      return;
+    }
+    if (!state.availablePuzzleIds.includes(puzzle.id)) {
+      setMessage(`${station.label}은(는) 아직 조용하다. 다른 기억이 먼저 필요해 보인다.`);
+      return;
+    }
+    setActivePuzzleId(puzzle.id);
+    setMessage(`${station.label} — ${puzzle.prompt}`);
+  }
+
+  function interact() {
+    if (phase !== "game" || voiceLineIndex !== null || activePuzzleId || hintSheetOpen) {
+      return;
+    }
+    if (roomIndex === 0) {
+      const station = getStationById(nearStationId);
+      if (!station) {
+        setMessage("가까이에서 반응하는 것이 없다. 촛불이 비추는 장치들에 다가가보자.");
+        return;
+      }
+      interactAtStation(station);
       return;
     }
     if (roomIndex < rooms.length - 1) {
-      const nextRoom = rooms[roomIndex + 1];
-      setRoomIndex((value) => value + 1);
-      triggerUnlock(true);
-      setMessage(`${nextRoom.title}으로 문이 열렸습니다. 공기와 음악이 달라졌어요.`);
+      goToRoom(roomIndex + 2);
       return;
     }
-    setPhase("ending");
+    dispatch({ type: "SET_PHASE", phase: "ending" });
   }
 
-  function submitPuzzle() {
-    if (!activePuzzle || unlockFeedback) {
-      return;
+  function handlePuzzleSolved(puzzle: PuzzleDefinition) {
+    dispatch({ type: "SOLVE_PUZZLE", puzzleId: puzzle.id });
+    setActivePuzzleId(null);
+    setMessage(puzzle.successNote);
+    room1Visual.lastSolveAt = performance.now();
+    triggerUnlock(false);
+    audioManager.play("unlock");
+    if (puzzle.id === "room1-hyunsu-steak") {
+      window.setTimeout(() => audioManager.play("door-bolt"), 520);
     }
-    const normalizedAnswer = normalizePuzzleAnswer(activePuzzle, answer);
-    if (normalizedAnswer !== activePuzzle.answer) {
-      setAnswer(normalizedAnswer);
-      setUnlockFeedback(null);
-      setMessage("아직 맞지 않아요. 단서의 순서와 장치의 형태를 다시 맞춰보세요.");
-      return;
-    }
-    const solvedPuzzle = activePuzzle;
-    setAnswer(normalizedAnswer);
-    setUnlockFeedback({ puzzleId: solvedPuzzle.id, title: solvedPuzzle.title, reward: solvedPuzzle.reward });
-    setMessage(`장치가 열리는 중... ${solvedPuzzle.reward} 회로가 연결됐습니다.`);
-
-    const unlockDelay = window.hayoungDebugFastUnlock ? 1100 : window.hayoungDebugHoldUnlock ? 5200 : 1400;
-    window.setTimeout(() => {
-      setSolvedIds((ids) => (ids.includes(solvedPuzzle.id) ? ids : [...ids, solvedPuzzle.id]));
-      setMessage(`${solvedPuzzle.reward} 획득! ${solvedPuzzle.chainNote}`);
-      setActivePuzzleId((current) => (current === solvedPuzzle.id ? null : current));
-      setUnlockFeedback((current) => (current?.puzzleId === solvedPuzzle.id ? null : current));
-      setAnswer("");
-      triggerUnlock(solvedPuzzle.id === 10);
-
-      if (solvedPuzzle.id === 10) {
-        window.setTimeout(() => setPhase("ending"), 520);
-      }
-    }, unlockDelay);
   }
 
-  function requestHint() {
-    if (hintCount >= 3) {
-      setMessage("힌트 계약서가 모두 찍혔어요. 이제 남은 건 하영이의 추리력입니다.");
-      return;
-    }
-    const penalty = hintPenalties[hintCount];
-    setHintCount((count) => count + 1);
-    setMessage(`힌트 계약서 ${hintCount + 1}/3 발급: ${penalty.label}. 현재 장치는 ${availablePuzzle?.title ?? "마지막 문"}입니다.`);
+  function issueHint(puzzle: PuzzleDefinition, stage: number) {
+    dispatch({ type: "USE_HINT", puzzleId: puzzle.id, stage });
+    audioManager.play("hint-stamp");
+    const penalty = hintPenalties[stage - 1];
+    setMessage(`힌트 계약서 ${stage}/3 발급${penalty ? `: ${penalty.label}` : ""}`);
   }
 
   function cycleGraphicsQuality() {
-    setGraphicsQuality((value) => graphicsQualityCycle[(graphicsQualityCycle.indexOf(value) + 1) % graphicsQualityCycle.length]);
+    dispatch({
+      type: "SET_GRAPHICS",
+      quality: graphicsQualityCycle[(graphicsQualityCycle.indexOf(graphicsQuality) + 1) % graphicsQualityCycle.length],
+    });
   }
 
   function toggleFullscreen() {
@@ -930,38 +573,175 @@ function App() {
     document.exitFullscreen().catch(() => undefined);
   }
 
+  function restartFromBeginning() {
+    clearSavedGame();
+    resetRoom1Visual();
+    window.location.reload();
+  }
+
+  useEffect(() => {
+    const keyDown = (event: KeyboardEvent) => {
+      if (phase !== "game") {
+        return;
+      }
+      if (event.key.toLowerCase() === "w" || event.key === "ArrowUp") setMovement((v) => ({ ...v, forward: true }));
+      if (event.key.toLowerCase() === "s" || event.key === "ArrowDown") setMovement((v) => ({ ...v, back: true }));
+      if (event.key.toLowerCase() === "a" || event.key === "ArrowLeft") setMovement((v) => ({ ...v, left: true }));
+      if (event.key.toLowerCase() === "d" || event.key === "ArrowRight") setMovement((v) => ({ ...v, right: true }));
+      if (event.key.toLowerCase() === "e") interact();
+      if (event.key.toLowerCase() === "h" && !activePuzzleId) setHintSheetOpen((open) => !open);
+      if (event.key.toLowerCase() === "f") toggleFullscreen();
+    };
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "w" || event.key === "ArrowUp") setMovement((v) => ({ ...v, forward: false }));
+      if (event.key.toLowerCase() === "s" || event.key === "ArrowDown") setMovement((v) => ({ ...v, back: false }));
+      if (event.key.toLowerCase() === "a" || event.key === "ArrowLeft") setMovement((v) => ({ ...v, left: false }));
+      if (event.key.toLowerCase() === "d" || event.key === "ArrowRight") setMovement((v) => ({ ...v, right: false }));
+    };
+    window.addEventListener("keydown", keyDown);
+    window.addEventListener("keyup", keyUp);
+    return () => {
+      window.removeEventListener("keydown", keyDown);
+      window.removeEventListener("keyup", keyUp);
+    };
+  });
+
+  useEffect(() => {
+    if (phase === "game") {
+      installDelegatedTouchControls();
+      publishDelegatedTouchControls();
+    }
+
+    window.hayoungDebugCompleteGame = () => {
+      room1Puzzles.forEach((puzzle) => dispatch({ type: "SOLVE_PUZZLE", puzzleId: puzzle.id }));
+      dispatch({ type: "ENTER_ROOM", roomId: rooms.length });
+      dispatch({ type: "SET_PHASE", phase: "ending" });
+      setActivePuzzleId(null);
+      setVoiceLineIndex(null);
+      setMessage("500일의 모든 단서가 연결됐습니다.");
+    };
+    window.hayoungDebugState = () =>
+      JSON.stringify({
+        ...state,
+        activePuzzleId,
+        nearStationId,
+        voiceOverlayOpen: voiceLineIndex !== null,
+        roomClearVisible,
+      });
+    window.hayoungDebugOpenStation = (stationId: string) => {
+      const station = getStationById(stationId);
+      if (station && phase === "game") {
+        setVoiceLineIndex(null);
+        interactAtStation(station);
+      }
+    };
+    window.hayoungDebugGoToRoom = (roomId: number) => {
+      if (roomId >= 1 && roomId <= rooms.length) {
+        goToRoom(roomId);
+      }
+    };
+    window.hayoungDebugClearSave = () => clearSavedGame();
+
+    window.render_game_to_text = () =>
+      JSON.stringify({
+        phase,
+        engine: "React + TypeScript + Vite + Three.js web build (no Unreal Engine, no MCP)",
+        introThemeSelect: "poster-led three-theme selector: Theme 01 playable, Theme 02 and Theme 03 locked as coming soon",
+        selectedIntroTheme: selectedIntroTheme?.title ?? null,
+        playableIntroTheme: playableIntroThemeId,
+        introRunawayButtonScope: "the moving Yes button appears only after Theme 01 is selected",
+        introEntering,
+        savedGameAvailable: Boolean(savedGame),
+        room: currentRoom.title,
+        roomIndex: roomIndex + 1,
+        roomMemoryStatus: currentRoom.memoryStatus,
+        comingSoonNotice: currentRoom.memoryStatus === "preparing" ? comingSoonLine : null,
+        puzzleChain: room1Puzzles.map((puzzle) => ({
+          id: puzzle.id,
+          title: puzzle.title,
+          type: puzzle.type,
+          status: state.completedPuzzleIds.includes(puzzle.id)
+            ? "solved"
+            : state.availablePuzzleIds.includes(puzzle.id)
+              ? "available"
+              : "locked",
+        })),
+        solvedPuzzles: solvedCount,
+        totalPuzzles: room1Puzzles.length,
+        activePuzzleId,
+        nearStationId,
+        stations: room1Stations.map((station) => station.id),
+        inventory: inventoryLabels,
+        inspectedClues: state.inspectedClueIds,
+        frameOrder: state.frameOrder,
+        colorSequence: state.colorSequence,
+        selectedFloorCell: state.selectedFloorCell,
+        selectedSteak: state.selectedSteak,
+        hintsUsed: state.hintsUsed,
+        hintsLeft,
+        hintContracts: state.hintContracts,
+        penalties: hintPenalties.slice(0, state.hintsUsed).map((penalty) => penalty.label),
+        hintPenaltyUX: "three-step penalty contract sheet with stamped receipts kept until the ending",
+        roomClearReady: roomClearVisible,
+        room1Complete,
+        exitDoorOpen: room1Visual.doorOpen,
+        voiceOverlayOpen: voiceLineIndex !== null,
+        graphicsQuality,
+        graphicsQualityLabel: graphicsQualitySetting.label,
+        renderScaleCap: graphicsQualitySetting.renderScale,
+        performanceMode: graphicsQuality === "performance",
+        cameraMode: "first-person",
+        playSurface:
+          "full-viewport first-person memory escape room with keyboard movement, pointer-look, mobile joystick/look pad, and station-based interactions",
+        interactableInRange: nearInteractable,
+        unlockDetail: "animated latch lift, sliding bolts, glowing door seam, candle reactions, and station spotlights",
+        mobileControls: "touch joystick movement, right-side look pad, and drag-responsive first-person camera",
+        mobileLookActive: Boolean(window.hayoungTouchControls?.lookActive),
+        ambience: audioEnabled ? currentRoom.ambience.label : "muted",
+        message,
+        coordinateSystem: "Three.js first-person scene uses x/z floor plane; y is height; five rooms are laid out along +x.",
+      });
+  });
+
   const roomProgress = `${roomIndex + 1}/${rooms.length}`;
-  const puzzleProgress = `${solvedIds.length}/${puzzles.length}`;
   const playerIsMoving = movement.forward || movement.back || movement.left || movement.right;
-  const activeCasePuzzle = activePuzzle ?? availablePuzzle ?? blockedPuzzle;
-  const roomSolvedCount = currentRoomPuzzles.filter((puzzle) => solvedSet.has(puzzle.id)).length;
-  const caseStatus = activePuzzle
-    ? "잠금 장치 조작 중"
-    : roomClearVisible
-      ? "방 클리어"
-      : availablePuzzle
-        ? "다음 장치 감지"
-        : blockedPuzzle
-          ? "연계 단서 필요"
-          : "엔딩 준비";
-  const caseTitle = activeCasePuzzle?.title ?? (roomClearVisible ? `${nextRoomTitle}로 이동` : "모든 단서 정리");
-  const caseDetail = activePuzzle
-    ? activePuzzle.chainNote
-    : availablePuzzle
-      ? availablePuzzle.prompt
-      : blockedPuzzle
-        ? `${blockedPuzzle.title}은 앞 단서를 먼저 이어야 열립니다.`
-        : canAdvanceRoom
-          ? "이 방의 장치가 모두 반응했습니다. 문 앞의 빛을 따라가세요."
-          : currentRoom.mood;
-  const activePuzzleUnlocked = Boolean(activePuzzle && unlockFeedback?.puzzleId === activePuzzle.id);
-  const activePuzzleProgress = activePuzzle ? (activePuzzleUnlocked ? 100 : Math.round((answer.length / activePuzzle.answer.length) * 100)) : 0;
-  const activePuzzleRequirementLabel = activePuzzle?.requires?.length ? `연계 ${activePuzzle.requires.length}개` : "첫 단서";
-  const activePuzzleReadout = activePuzzle
-    ? activePuzzleUnlocked
-      ? "OPEN"
-      : answer.padEnd(activePuzzle.answer.length, "·")
-    : "";
+  const roomSolvedTotal = `${solvedCount}/${room1Puzzles.length}`;
+  const caseStatus =
+    roomIndex === 0
+      ? activePuzzle
+        ? "기억 복원 중"
+        : roomClearVisible
+          ? "방 클리어"
+          : nextPuzzle
+            ? "다음 기억 감지"
+            : "기억 정리"
+      : currentRoom.memoryStatus === "preparing"
+        ? "준비 중"
+        : "마지막 문";
+  const caseTitle =
+    roomIndex === 0
+      ? (activePuzzle ?? nextPuzzle)?.title ?? (roomClearVisible ? `${rooms[1].title}로 이동` : "모든 기억 회수")
+      : currentRoom.memoryStatus === "preparing"
+        ? comingSoonLine
+        : "500일의 문";
+  const caseDetail =
+    roomIndex === 0
+      ? (activePuzzle ?? nextPuzzle)?.prompt ?? "이 방의 기억이 모두 제자리를 찾았다. 문 앞의 빛을 따라가자."
+      : currentRoom.memoryStatus === "preparing"
+        ? `${currentRoom.days}의 실제 추억 문제는 준비 중이다. 환경을 둘러보고 다음 문으로 이동할 수 있다.`
+        : "구름길을 지나 하늘문 앞에서 마지막 편지를 열자.";
+  const interactLabel =
+    roomIndex === 0
+      ? nearStation
+        ? `E 조사하기 — ${nearStation.label}`
+        : "E 조사하기"
+      : roomIndex < rooms.length - 1
+        ? "다음 방"
+        : "엔딩 보기";
+  const inventorySlots: { label: string; kind: "item" | "clue" }[] = [
+    ...inventoryLabels.map((label) => ({ label, kind: "item" as const })),
+    ...clueLabels.map((label) => ({ label, kind: "clue" as const })),
+  ];
 
   return (
     <main className="site-shell">
@@ -996,6 +776,14 @@ function App() {
               <p className="couple-mark">HYUNSU × HAYOUNG / 500 DAYS</p>
               <h1>500일 기념 방탈출 테마를 골라주세요</h1>
               <p>오늘 열 수 있는 문은 하나예요. 나머지 사건은 더 귀엽고 무섭게 준비 중입니다.</p>
+              {savedGame && (
+                <button className="continue-chip" type="button" onClick={continueGame}>
+                  <Play aria-hidden="true" />
+                  <span>
+                    이어하기 — Room {savedGame.currentRoomId}/5 · 기억 {savedGame.completedPuzzleIds.length}/{room1Puzzles.length}
+                  </span>
+                </button>
+              )}
             </div>
 
             <div className="theme-grid" aria-label="500일 방탈출 테마 선택">
@@ -1065,7 +853,7 @@ function App() {
                   <span className="theme-start-eyebrow">{selectedIntroTheme.number}</span>
                   <h2>
                     {selectedIntroTheme.status === "open"
-                      ? "500일 기념으로 게임을 시작하시겠습니까?"
+                      ? "임현수와의 500일을 함께하실 준비가 되셨나요?"
                       : "이 테마는 아직 문이 잠겨 있어요"}
                   </h2>
                   <p>
@@ -1119,13 +907,14 @@ function App() {
           <AnniversaryScene
             roomIndex={roomIndex}
             phase={phase}
-            solvedCount={solvedIds.length}
+            solvedCount={solvedCount}
             movement={movement}
             lookInput={lookInput}
             unlockTick={unlockTick}
             graphicsQuality={graphicsQuality}
             onNearObject={handleNearObject}
             onInteractFocusChange={handleInteractFocusChange}
+            onNearStation={handleNearStation}
           />
 
           {phase === "game" && (
@@ -1139,14 +928,19 @@ function App() {
                 </div>
                 <div className="hud-cluster progress-chip">
                   <span>Room {roomProgress}</span>
-                  <span>Puzzle {puzzleProgress}</span>
+                  <span>기억 {roomSolvedTotal}</span>
                   <span>Hints {hintsLeft}</span>
                 </div>
                 <div className="hud-cluster icon-actions">
-                  <button type="button" onClick={requestHint} title="힌트 사용" aria-label="힌트 사용">
+                  <button type="button" onClick={() => setHintSheetOpen(true)} title="힌트 계약서" aria-label="힌트 계약서">
                     <HelpCircle aria-hidden="true" />
                   </button>
-                  <button type="button" onClick={() => setAudioEnabled((value) => !value)} title="배경음 전환" aria-label="배경음 전환">
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "SET_AUDIO", enabled: !audioEnabled })}
+                    title="배경음 전환"
+                    aria-label="배경음 전환"
+                  >
                     {audioEnabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
                   </button>
                   <button
@@ -1161,84 +955,104 @@ function App() {
                   <button type="button" onClick={toggleFullscreen} title="전체화면" aria-label="전체화면">
                     <Expand aria-hidden="true" />
                   </button>
-                  <button type="button" onClick={() => window.location.reload()} title="처음부터" aria-label="처음부터">
+                  <button type="button" onClick={restartFromBeginning} title="처음부터" aria-label="처음부터">
                     <RotateCcw aria-hidden="true" />
                   </button>
                 </div>
               </header>
 
-          <aside className="objective-panel">
-            <span>{currentRoom.days}</span>
-            <h2>{currentRoom.title}</h2>
-            <p>{currentRoom.subtitle}</p>
-            <small>{currentRoom.mood}</small>
-          </aside>
+              <aside className="objective-panel">
+                <span>{currentRoom.days}</span>
+                <h2>{currentRoom.title}</h2>
+                <p>{currentRoom.subtitle}</p>
+                <small>{currentRoom.mood}</small>
+              </aside>
 
-          <div className="room-beads" aria-label="방 진행도">
-            {rooms.map((room, index) => (
-              <button
-                key={room.id}
-                type="button"
-                className={index === roomIndex ? "is-current" : index < roomIndex ? "is-cleared" : ""}
-                disabled={index > roomIndex}
-                onClick={() => setRoomIndex(index)}
-              >
-                {room.id}
-              </button>
-            ))}
-          </div>
+              <div className="room-beads" aria-label="방 진행도">
+                {rooms.map((room, index) => (
+                  <button
+                    key={room.id}
+                    type="button"
+                    className={index === roomIndex ? "is-current" : index < roomIndex ? "is-cleared" : ""}
+                    disabled={index > roomIndex}
+                    onClick={() => dispatch({ type: "ENTER_ROOM", roomId: room.id })}
+                  >
+                    {room.id}
+                  </button>
+                ))}
+              </div>
 
-          <aside className="case-file-panel" aria-label="현재 사건 파일">
-            <div className="case-file-heading">
-              <KeyRound aria-hidden="true" />
-              <span>{caseStatus}</span>
-              <b>
-                {roomSolvedCount}/{currentRoomPuzzles.length}
-              </b>
-            </div>
-            <strong>{caseTitle}</strong>
-            <p>{caseDetail}</p>
-            <div className="case-file-meter" aria-hidden="true">
-              {currentRoomPuzzles.map((puzzle) => (
-                <span
-                  key={puzzle.id}
-                  className={solvedSet.has(puzzle.id) ? "is-solved" : activeCasePuzzle?.id === puzzle.id ? "is-current" : ""}
-                />
-              ))}
-            </div>
-          </aside>
-
-          <div className="message-strip">
-            <Sparkles aria-hidden="true" />
-            <span>{message}</span>
-          </div>
-
-          <footer className="inventory-dock">
-            <div className="dock-title">
-              <span className="player-avatar" aria-hidden="true">
-                <span />
-              </span>
-              <span className="player-name">하영</span>
-              <Backpack aria-hidden="true" />
-            </div>
-            <div className="item-slots">
-              {Array.from({ length: 10 }).map((_, index) => (
-                <div className="item-slot" key={index}>
-                  {inventory[index] ? <span>{inventory[index]}</span> : null}
+              <aside className="case-file-panel" aria-label="현재 기억 파일">
+                <div className="case-file-heading">
+                  <KeyRound aria-hidden="true" />
+                  <span>{caseStatus}</span>
+                  <b>
+                    {solvedCount}/{room1Puzzles.length}
+                  </b>
                 </div>
-              ))}
-            </div>
-          </footer>
+                <strong>{caseTitle}</strong>
+                <p>{caseDetail}</p>
+                <div className="case-file-meter" aria-hidden="true">
+                  {room1Puzzles.map((puzzle) => (
+                    <span
+                      key={puzzle.id}
+                      className={
+                        state.completedPuzzleIds.includes(puzzle.id)
+                          ? "is-solved"
+                          : (activePuzzle ?? nextPuzzle)?.id === puzzle.id
+                            ? "is-current"
+                            : ""
+                      }
+                    />
+                  ))}
+                </div>
+              </aside>
 
-          {phase === "game" && !roomClearVisible && (
-            <button className={`interact-button${nearInteractable ? " is-focused" : ""}`} type="button" onClick={openNextPuzzle}>
-              {canAdvanceRoom && roomIndex < rooms.length - 1 ? <DoorOpen aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
-              {availablePuzzle ? "E 조사하기" : roomIndex < rooms.length - 1 ? "다음 방" : "엔딩 보기"}
-            </button>
-          )}
+              <div className="message-strip">
+                <Sparkles aria-hidden="true" />
+                <span>{message}</span>
+              </div>
 
-          {phase === "game" && (
-            <>
+              {currentRoom.memoryStatus === "preparing" && (
+                <aside className="preparing-panel" aria-label="준비 중인 방">
+                  <b>{comingSoonLine}</b>
+                  <p>{currentRoom.days}의 실제 추억 문제를 준비하고 있어요. 문을 통해 다음 방으로 이동할 수 있습니다.</p>
+                </aside>
+              )}
+
+              <footer className="inventory-dock">
+                <div className="dock-title">
+                  <span className="player-avatar" aria-hidden="true">
+                    <span />
+                  </span>
+                  <span className="player-name">하영</span>
+                  <Backpack aria-hidden="true" />
+                </div>
+                <div className="item-slots">
+                  {Array.from({ length: 10 }).map((_, index) => {
+                    const slot = inventorySlots[index];
+                    return (
+                      <div className={`item-slot${slot?.kind === "clue" ? " is-clue" : ""}`} key={index}>
+                        {slot ? <span>{slot.label}</span> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </footer>
+
+              {!roomClearVisible && (
+                <button className={`interact-button${nearInteractable ? " is-focused" : ""}`} type="button" onClick={interact}>
+                  {roomIndex === 0 && nearStationId === "station-exit-door" && room1Complete ? (
+                    <DoorOpen aria-hidden="true" />
+                  ) : roomIndex > 0 ? (
+                    <DoorOpen aria-hidden="true" />
+                  ) : (
+                    <KeyRound aria-hidden="true" />
+                  )}
+                  {interactLabel}
+                </button>
+              )}
+
               <div className="mobile-pad" aria-label="모바일 이동 패드">
                 <span className="mobile-pad-ring" aria-hidden="true" />
                 <span className="mobile-pad-core" aria-hidden="true" />
@@ -1260,14 +1074,12 @@ function App() {
                 <span className="look-pad-orbit" aria-hidden="true" />
                 <span className="look-pad-dot" aria-hidden="true" />
               </div>
-            </>
-          )}
 
-              {hintCount > 0 && (
+              {state.hintsUsed > 0 && (
                 <aside className={`penalty-card penalty-card--${activeHintPenalty?.tone ?? "banana"}`} aria-label="힌트 벌칙 계약서">
                   <div className="penalty-card-header">
                     <span>Hint Contract</span>
-                    <b>{hintCount}/3</b>
+                    <b>{state.hintsUsed}/3</b>
                   </div>
                   <div className="penalty-current">
                     <span>{activeHintPenalty?.detail}</span>
@@ -1275,8 +1087,8 @@ function App() {
                   </div>
                   <div className="penalty-ticket-list" aria-label="힌트 벌칙 단계">
                     {hintPenalties.map((penalty, index) => {
-                      const used = index < hintCount;
-                      const active = index === hintCount - 1;
+                      const used = index < state.hintsUsed;
+                      const active = index === state.hintsUsed - 1;
                       return (
                         <span
                           className={`penalty-ticket${used ? " is-used" : ""}${active ? " is-active" : ""}`}
@@ -1290,114 +1102,71 @@ function App() {
                   </div>
                 </aside>
               )}
+
+              {voiceLineIndex !== null && (
+                <div className="voice-overlay" role="dialog" aria-label="현수의 음성">
+                  <div className="voice-panel">
+                    <span className="voice-kicker">어디선가 현수의 목소리가 들린다</span>
+                    <p>{openingVoiceLines[voiceLineIndex]}</p>
+                    <div className="voice-actions">
+                      <button
+                        className="voice-next"
+                        type="button"
+                        onClick={() =>
+                          setVoiceLineIndex((index) =>
+                            index !== null && index < openingVoiceLines.length - 1 ? index + 1 : null,
+                          )
+                        }
+                      >
+                        {voiceLineIndex < openingVoiceLines.length - 1 ? "…" : "방을 둘러본다"}
+                      </button>
+                      <button className="voice-skip" type="button" onClick={() => setVoiceLineIndex(null)}>
+                        건너뛰기
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
           {roomClearVisible && (
             <div className="room-clear-layer" aria-live="polite">
-              <section className="room-clear-panel" aria-label={`${currentRoom.title} 클리어`}>
-                <span className="clear-kicker">Room {roomProgress} Clear</span>
-                <h2>{currentRoom.title} 탈출 성공</h2>
-                <p>{currentRoom.mood}</p>
-                <div className="room-clear-rewards" aria-label="획득한 단서">
-                  {currentRoomPuzzles.map((puzzle) => (
-                    <span key={puzzle.id}>{puzzle.reward}</span>
+              <section className="room-clear-panel" aria-label="첫 번째 방 클리어">
+                <span className="clear-kicker">Room 1/5 Clear</span>
+                <h2>{room1ClearLine}</h2>
+                <p>여덟 개의 기억이 모두 제자리를 찾았다. 문틈으로 황금빛이 새어 나온다.</p>
+                <div className="room-clear-rewards" aria-label="되찾은 기억">
+                  {room1Puzzles.map((puzzle) => (
+                    <span key={puzzle.id}>{puzzle.rewardLabel}</span>
                   ))}
                 </div>
-                <button className="room-clear-button" type="button" onClick={openNextPuzzle}>
+                <button className="room-clear-button" type="button" onClick={() => goToRoom(2)}>
                   <DoorOpen aria-hidden="true" />
-                  {nextRoomTitle}으로 이동
+                  {rooms[1].title}으로 이동
                 </button>
               </section>
             </div>
           )}
 
           {activePuzzle && (
-            <div className="modal-layer">
-              <section
-                className={`puzzle-modal lock-console-modal${answer ? " has-answer" : ""}${activePuzzleUnlocked ? " is-unlocked" : ""}`}
-                role="dialog"
-                aria-label={activePuzzle.title}
-                aria-live="polite"
-                style={{ "--answer-progress": `${activePuzzleProgress}%` } as CSSProperties}
-              >
-                <button
-                  className="close-button"
-                  type="button"
-                  onClick={() => {
-                    if (!activePuzzleUnlocked) {
-                      setActivePuzzleId(null);
-                      setUnlockFeedback(null);
-                    }
-                  }}
-                  disabled={activePuzzleUnlocked}
-                >
-                  <X aria-hidden="true" />
-                </button>
-                <div className="lock-console-grid">
-                  <div className="lock-case-file">
-                    <span className="lock-kicker">
-                      문제 {activePuzzle.id}/10 · {kindLabel(activePuzzle.kind)}
-                    </span>
-                    <h2>{activePuzzle.title}</h2>
-                    <p>{activePuzzle.prompt}</p>
-                    <div className="lock-clue-chips" aria-label="잠금 정보">
-                      <span>{currentRoom.days}</span>
-                      <span>{activePuzzleRequirementLabel}</span>
-                      <span>{activePuzzle.reward}</span>
-                    </div>
-                    <p className="chain-note">{activePuzzle.chainNote}</p>
-                  </div>
+            <Room1PuzzleModal
+              puzzle={activePuzzle}
+              state={state}
+              dispatch={dispatch}
+              onSolve={handlePuzzleSolved}
+              onClose={() => setActivePuzzleId(null)}
+              onMessage={setMessage}
+            />
+          )}
 
-                  <div className="lock-device-console">
-                    <div className="lock-device-topline" aria-hidden="true">
-                      <span>{activePuzzleUnlocked ? "UNLOCKED" : "LOCK DEVICE"}</span>
-                      <b>{activePuzzleUnlocked ? "OPEN" : `${answer.length}/${activePuzzle.answer.length}`}</b>
-                    </div>
-                    <div className="device-readout" aria-label="입력 진행 상황">
-                      <span>{activePuzzleReadout}</span>
-                    </div>
-                    {activePuzzleUnlocked && (
-                      <div className="unlock-confirmation" role="status">
-                        <Check aria-hidden="true" />
-                        {unlockFeedback?.reward} 회로 연결
-                      </div>
-                    )}
-                    <div className="lock-status-rail" aria-hidden="true">
-                      <span>{activePuzzleUnlocked ? "CLEAR" : activePuzzle.requires?.length ? "CHAIN" : "FIRST"}</span>
-                      <b>{activePuzzleUnlocked ? "UNLOCKED" : activePuzzle.kind.toUpperCase()}</b>
-                      <span>{activePuzzleProgress}%</span>
-                    </div>
-                    <LockPreview kind={activePuzzle.kind} answer={activePuzzle.answer} />
-                    <PuzzleInputPad puzzle={activePuzzle} answer={answer} setAnswer={setAnswer} disabled={activePuzzleUnlocked} />
-                    <div className="answer-row">
-                      <input
-                        value={answer}
-                        onChange={(event) => setAnswer(normalizePuzzleAnswer(activePuzzle, event.target.value))}
-                        inputMode={activePuzzle.kind === "code" || activePuzzle.kind === "memory" ? "numeric" : "text"}
-                        maxLength={activePuzzle.answer.length}
-                        placeholder={`초안 정답: ${activePuzzle.answer}`}
-                        autoCapitalize="characters"
-                        spellCheck="false"
-                        autoFocus
-                        disabled={activePuzzleUnlocked}
-                      />
-                      <button type="button" onClick={submitPuzzle} disabled={activePuzzleUnlocked}>
-                        <Check aria-hidden="true" />
-                        {activePuzzleUnlocked ? "열림" : "확인"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {activePuzzleUnlocked && (
-                  <div className="lock-success-burst" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                )}
-              </section>
-            </div>
+          {hintSheetOpen && (
+            <HintSheet
+              state={state}
+              targetPuzzle={hintTargetPuzzle}
+              onIssueHint={issueHint}
+              onClose={() => setHintSheetOpen(false)}
+            />
           )}
 
           {phase === "ending" && (
@@ -1409,25 +1178,31 @@ function App() {
               </div>
               <div className="ending-copy">
                 <span>500일의 문이 열렸어</span>
-                <h2>하영아, 다음 방도 우리 둘이 같이 열자.</h2>
-                <p>
-                  지나온 날들에는 풋풋함도, 다툼도, 지친 밤도 있었지만 결국 우리는 서로의 편으로 돌아왔어. 500일 이후의 방은 혼자 푸는 문제가 아니라,
-                  같이 웃고 같이 쉬면서 천천히 열어가자.
-                </p>
+                <h2>{endingLetterTitle}</h2>
+                <p>{endingLetterBody}</p>
                 <div className="ending-vows" aria-label="다음 약속">
                   <span>
                     <b>500</b>
                     <small>함께 쌓은 날</small>
                   </span>
                   <span>
-                    <b>10</b>
-                    <small>풀어낸 단서</small>
+                    <b>
+                      {solvedCount}/{room1Puzzles.length}
+                    </b>
+                    <small>되찾은 기억</small>
                   </span>
                   <span>
-                    <b>∞</b>
-                    <small>다음 약속</small>
+                    <b>{state.hintsUsed}/3</b>
+                    <small>힌트 계약</small>
                   </span>
                 </div>
+                {state.hintsUsed > 0 && (
+                  <div className="ending-hint-record" aria-label="힌트 사용 기록">
+                    {hintPenalties.slice(0, state.hintsUsed).map((penalty) => (
+                      <span key={penalty.id}>{penalty.label}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="cloud-step-rail" aria-hidden="true">
                 {memorySlots.map((slot, index) => (
@@ -1447,7 +1222,7 @@ function App() {
                   </figure>
                 ))}
               </div>
-              <button className="ending-replay" type="button" onClick={() => window.location.reload()}>
+              <button className="ending-replay" type="button" onClick={restartFromBeginning}>
                 <RotateCcw aria-hidden="true" />
                 처음부터 다시 걷기
               </button>
@@ -1457,160 +1232,6 @@ function App() {
       )}
     </main>
   );
-}
-
-function LockPreview({ kind, answer }: { kind: PuzzleKind; answer: string }) {
-  if (kind === "direction") {
-    return (
-      <div className="lock-preview direction-preview" aria-hidden="true">
-        <ArrowUp />
-        <ArrowLeft />
-        <span>{answer}</span>
-        <ArrowRight />
-        <ArrowDown />
-      </div>
-    );
-  }
-
-  if (kind === "symbol" || kind === "final") {
-    return (
-      <div className="lock-preview symbol-preview" aria-hidden="true">
-        {answer.split("").map((letter, index) => (
-          <b key={`${letter}-${index}`}>{letter}</b>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="lock-preview code-preview" aria-hidden="true">
-      {answer.split("").map((digit, index) => (
-        <b key={`${digit}-${index}`}>{digit}</b>
-      ))}
-    </div>
-  );
-}
-
-function PuzzleInputPad({
-  puzzle,
-  answer,
-  setAnswer,
-  disabled = false,
-}: {
-  puzzle: Puzzle;
-  answer: string;
-  setAnswer: (value: string | ((current: string) => string)) => void;
-  disabled?: boolean;
-}) {
-  const appendValue = (value: string) => {
-    if (disabled) {
-      return;
-    }
-    setAnswer((current: string) => normalizePuzzleAnswer(puzzle, current + value));
-  };
-  const setPreset = (value: string) => {
-    if (disabled) {
-      return;
-    }
-    setAnswer(normalizePuzzleAnswer(puzzle, value));
-  };
-  const removeLast = () => {
-    if (disabled) {
-      return;
-    }
-    setAnswer((current: string) => current.slice(0, -1));
-  };
-  const clearValue = () => {
-    if (disabled) {
-      return;
-    }
-    setAnswer("");
-  };
-
-  if (puzzle.kind === "direction") {
-    return (
-      <div className="puzzle-pad direction-pad" aria-label="Direction lock controls" aria-disabled={disabled}>
-        <button className="dir-key dir-up" type="button" onClick={() => appendValue("U")} aria-label="Up" disabled={disabled}>
-          <ArrowUp aria-hidden="true" />
-        </button>
-        <button className="dir-key dir-left" type="button" onClick={() => appendValue("L")} aria-label="Left" disabled={disabled}>
-          <ArrowLeft aria-hidden="true" />
-        </button>
-        <button className="pad-utility dir-back" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기" disabled={disabled}>
-          <Delete aria-hidden="true" />
-        </button>
-        <button className="dir-key dir-right" type="button" onClick={() => appendValue("R")} aria-label="Right" disabled={disabled}>
-          <ArrowRight aria-hidden="true" />
-        </button>
-        <button className="dir-key dir-down" type="button" onClick={() => appendValue("D")} aria-label="Down" disabled={disabled}>
-          <ArrowDown aria-hidden="true" />
-        </button>
-        <button className="pad-utility dir-clear" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기" disabled={disabled}>
-          <RotateCcw aria-hidden="true" />
-        </button>
-      </div>
-    );
-  }
-
-  if (puzzle.kind === "code") {
-    return (
-      <div className="puzzle-pad code-pad" aria-label="Numeric lock controls" aria-disabled={disabled}>
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
-          <button type="button" key={digit} onClick={() => appendValue(digit)} aria-label={`Digit ${digit}`} disabled={disabled}>
-            {digit}
-          </button>
-        ))}
-        <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기" disabled={disabled}>
-          <Delete aria-hidden="true" />
-        </button>
-        <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기" disabled={disabled}>
-          <RotateCcw aria-hidden="true" />
-        </button>
-      </div>
-    );
-  }
-
-  const choicesByKind: Partial<Record<PuzzleKind, string[]>> = {
-    memory: ["1", "2", "3"],
-    symbol: ["STAR", "MOON", "LOVE"],
-    device: ["SCAN", "OPEN", "ON"],
-    final: ["YES", "NO"],
-  };
-  const choices = choicesByKind[puzzle.kind] ?? [];
-
-  return (
-    <div className="puzzle-pad choice-pad" aria-label="Puzzle choice controls" aria-disabled={disabled}>
-      {choices.map((choice) => (
-        <button
-          className={`choice-key${answer === choice ? " is-active" : ""}`}
-          type="button"
-          key={choice}
-          onClick={() => setPreset(choice)}
-          aria-pressed={answer === choice}
-          disabled={disabled}
-        >
-          {choice}
-        </button>
-      ))}
-      <button className="pad-utility" type="button" onClick={removeLast} aria-label="Delete one" title="한 글자 지우기" disabled={disabled}>
-        <Delete aria-hidden="true" />
-      </button>
-      <button className="pad-utility" type="button" onClick={clearValue} aria-label="Clear" title="전체 지우기" disabled={disabled}>
-        <RotateCcw aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
-function kindLabel(kind: PuzzleKind) {
-  return {
-    code: "숫자 자물쇠",
-    direction: "방향 자물쇠",
-    symbol: "상징 장치",
-    memory: "기억 단서",
-    device: "센서 장치",
-    final: "마지막 문",
-  }[kind];
 }
 
 function useRoomAmbience(phase: Phase, roomIndex: number, enabled: boolean) {
@@ -1713,6 +1334,7 @@ type SceneProps = {
   graphicsQuality: GraphicsQuality;
   onNearObject: (label: string) => void;
   onInteractFocusChange: (active: boolean) => void;
+  onNearStation: (stationId: string | null) => void;
 };
 
 type FirstPersonRig = {
@@ -1725,7 +1347,7 @@ type FirstPersonRig = {
   light: THREE.SpotLight;
 };
 
-function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, unlockTick, graphicsQuality, onNearObject, onInteractFocusChange }: SceneProps) {
+function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, unlockTick, graphicsQuality, onNearObject, onInteractFocusChange, onNearStation }: SceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const movementRef = useRef(movement);
   const lookInputRef = useRef(lookInput);
@@ -1773,7 +1395,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
     scene.fog = new THREE.FogExp2(0x120f12, 0.018);
 
     const camera = new THREE.PerspectiveCamera(66, mount.clientWidth / mount.clientHeight, 0.08, 260);
-    camera.position.set(0, 1.65, 3.25);
+    camera.position.set(roomIndexRef.current * 24, 1.65, 3.25);
     scene.add(camera);
 
     const renderer = new THREE.WebGLRenderer({
@@ -1821,7 +1443,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
     camera.add(firstPersonRig.group);
 
     const player = {
-      position: new THREE.Vector3(0, 1.65, 3.25),
+      position: new THREE.Vector3(roomIndexRef.current * 24, 1.65, 3.25),
       yaw: 0,
       pitch: -0.04,
     };
@@ -1948,7 +1570,12 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
       const consoleHalfWidth = 3.38;
       const consoleFrontZ = 0.18;
       const consoleBackZ = -2.62;
-      if (Math.abs(nextPlayerX - targetX) < consoleHalfWidth && nextPlayerZ < consoleFrontZ && nextPlayerZ > consoleBackZ) {
+      if (
+        roomIndexRef.current !== 0 &&
+        Math.abs(nextPlayerX - targetX) < consoleHalfWidth &&
+        nextPlayerZ < consoleFrontZ &&
+        nextPlayerZ > consoleBackZ
+      ) {
         if (player.position.z >= consoleFrontZ) {
           nextPlayerZ = consoleFrontZ;
         } else if (player.position.z <= consoleBackZ) {
@@ -1984,9 +1611,42 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
       const unlockProgress = THREE.MathUtils.clamp((elapsedTime - unlockStartedAt) / 1.2, 0, 1);
       animateFirstPersonRig(firstPersonRig, elapsedTime, isMoving, unlockProgress, solvedRef.current);
 
-      const puzzlePoint = new THREE.Vector3(targetX, 1.0, -1.35);
-      const distance = puzzlePoint.distanceTo(player.position);
-      const focusStrength = THREE.MathUtils.clamp(1 - (distance - 1.15) / 2.35, 0, 1);
+      let focusStrength = 0;
+      let nextFocusState = false;
+      let nearPingLabel: string | null = null;
+      if (roomIndexRef.current === 0 && phaseRef.current === "game") {
+        let nearestStation: Room1Station | null = null;
+        let nearestDistance = Infinity;
+        for (const station of room1Stations) {
+          const dx = player.position.x - (targetX + station.x);
+          const dz = player.position.z - station.z;
+          const stationDistance = Math.hypot(dx, dz);
+          if (stationDistance <= station.radius && stationDistance < nearestDistance) {
+            nearestStation = station;
+            nearestDistance = stationDistance;
+          }
+        }
+        const focusId = nearestStation?.id ?? null;
+        if (focusId !== room1Visual.focusStationId) {
+          room1Visual.focusStationId = focusId;
+          onNearStation(focusId);
+        }
+        if (nearestStation) {
+          focusStrength = THREE.MathUtils.clamp(1 - nearestDistance / Math.max(0.001, nearestStation.radius), 0, 1);
+          nextFocusState = true;
+          nearPingLabel = nearestStation.focusLine;
+        }
+      } else {
+        if (room1Visual.focusStationId !== null) {
+          room1Visual.focusStationId = null;
+          onNearStation(null);
+        }
+        const doorPoint = new THREE.Vector3(targetX + 4.95, 1.2, -4.45);
+        const distance = doorPoint.distanceTo(player.position);
+        focusStrength = THREE.MathUtils.clamp(1 - (distance - 1.15) / 2.6, 0, 1);
+        nextFocusState = distance < 3.4;
+        nearPingLabel = "다음 방으로 이어지는 문이 가까이에 있다.";
+      }
       const targetFov = 66 + (isMoving ? 1.1 : 0) - focusStrength * 2.45 - unlockProgress * 0.9 + (roomIndexRef.current === 4 ? -1.2 : 0);
       const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.055);
       if (Math.abs(camera.fov - nextFov) > 0.01) {
@@ -1996,7 +1656,6 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
       const roomExposure = roomIndexRef.current === 4 ? 0.98 : roomIndexRef.current === 2 ? 0.82 : 0.88;
       const targetExposure = roomExposure + focusStrength * 0.035 + unlockProgress * 0.075 + (phaseRef.current === "ending" ? 0.045 : 0);
       renderer.toneMappingExposure = THREE.MathUtils.lerp(renderer.toneMappingExposure, targetExposure, 0.045);
-      const nextFocusState = distance < 3.1;
       if (nextFocusState !== lastFocusState) {
         onInteractFocusChange(nextFocusState);
         lastFocusState = nextFocusState;
@@ -2016,8 +1675,8 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
         });
       }
 
-      if (distance < 3.1 && elapsedTime - lastNearPing > 2.5) {
-        onNearObject("잠금 장치 내부에서 금속 핀이 움직이는 소리가 납니다.");
+      if (nextFocusState && nearPingLabel && elapsedTime - lastNearPing > 2.5) {
+        onNearObject(nearPingLabel);
         lastNearPing = elapsedTime;
       }
 
@@ -2062,7 +1721,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
       window.hayoungCameraState = undefined;
       window.hayoungDebugSetCameraPose = undefined;
     };
-  }, [onInteractFocusChange, onNearObject]);
+  }, [onInteractFocusChange, onNearObject, onNearStation]);
 
   return <div className="three-mount" ref={mountRef} data-testid="three-scene" />;
 }
@@ -2085,7 +1744,8 @@ function createRoom(room: Room, index: number) {
   addRoomShell(group, room, floorMaterial, wallMaterial, trimMaterial, index);
 
   if (index === 0) {
-    addUnrealRoomOneMemoryMap(group, room);
+    addRoomOneMemoryMansion(group, room);
+    addRoomOneStationRings(group);
     addCinematicAtmosphere(group, room, index);
   } else {
     addPhotoWall(group, room, index);
@@ -2096,6 +1756,9 @@ function createRoom(room: Room, index: number) {
     addLivedInEscapeRoomDetails(group, room, index);
     addPhysicalClueNetwork(group, room, index);
     addCinematicAtmosphere(group, room, index);
+    if (index >= 1 && index <= 3) {
+      addComingSoonSign(group, room);
+    }
   }
 
   const keyLight = new THREE.PointLight(index === 0 ? 0xffa768 : room.palette[1], index === 0 ? 1.28 : index === 4 ? 3.6 : 2.15, index === 0 ? 10.6 : 13);
@@ -2108,6 +1771,83 @@ function createRoom(room: Room, index: number) {
   group.add(portalLight);
 
   return group;
+}
+
+function addRoomOneStationRings(group: THREE.Group) {
+  room1Stations.forEach((station, index) => {
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: station.id === "station-exit-door" ? 0xffe3a1 : 0xffc36f,
+      transparent: true,
+      opacity: 0.02,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 40), ringMaterial);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(station.x, 0.135, station.z);
+    ring.userData.stationRing = station.id;
+    ring.userData.ringSeed = index;
+    group.add(ring);
+  });
+}
+
+function addComingSoonSign(group: THREE.Group, room: Room) {
+  const texture = createComingSoonTexture(room);
+  const frame = box(
+    2.34,
+    0.96,
+    0.06,
+    mat(0x2c1c14, { roughness: 0.6, texture: "wood", textureRepeat: [1.4, 0.7], textureSeed: room.id * 77 }),
+    4.95,
+    3.05,
+    -4.44,
+  );
+  const material = new THREE.MeshStandardMaterial({
+    map: texture,
+    roughness: 0.72,
+    metalness: 0.02,
+    emissive: room.palette[1],
+    emissiveIntensity: 0.1,
+  });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.16, 0.8), material);
+  plane.position.set(4.95, 3.05, -4.4);
+  group.add(frame, plane);
+}
+
+function createComingSoonTexture(room: Room) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 200;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Coming soon sign texture context unavailable.");
+  }
+  const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+  gradient.addColorStop(0, "#221711");
+  gradient.addColorStop(1, "#171009");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 512, 200);
+  ctx.strokeStyle = "#c99858";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(12, 12, 488, 176);
+  ctx.strokeStyle = "#5a4633";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(24, 24, 464, 152);
+  ctx.fillStyle = "#ffd9a1";
+  ctx.font = "bold 44px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(comingSoonLine, 256, 86);
+  ctx.fillStyle = "#c9a97e";
+  ctx.font = "26px serif";
+  ctx.fillText(`${room.days} · ${room.title}`, 256, 142);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 type CinematicTextureKind = "shaft" | "reflection" | "streak";
@@ -3182,7 +2922,7 @@ function addRoomSpecifics(group: THREE.Group, room: Room, index: number) {
     addVines(group, room, -4.2, 3.7, -4.38, 18);
     addHeartParticles(group, room, 18);
     addPrologueMemoryStage(group, room);
-    addUnrealRoomOneMemoryMap(group, room);
+    addRoomOneMemoryMansion(group, room);
   }
 
   if (index === 1) {
@@ -3669,8 +3409,8 @@ function addPrologueMemoryStage(group: THREE.Group, room: Room) {
   group.add(stageLight);
 }
 
-function addUnrealRoomOneMemoryMap(group: THREE.Group, room: Room) {
-  group.userData.unrealRoomOneMirror = true;
+function addRoomOneMemoryMansion(group: THREE.Group, room: Room) {
+  group.userData.roomOneMemoryMansion = true;
   addRoomOneReferenceArchitecture(group, room);
   addRoomOneReferenceEntryDesk(group, room);
   addRoomOneReferenceMemoryWall(group, room);
@@ -3678,7 +3418,7 @@ function addUnrealRoomOneMemoryMap(group: THREE.Group, room: Room) {
   addRoomOneReferenceFloorPuzzle(group, room);
   addRoomOneReferenceBeefAndSteak(group, room);
   addRoomOneReferenceExitDoor(group, room);
-  addRoomOneUnrealMarkerLights(group, room);
+  addRoomOneMarkerLights(group, room);
 }
 
 function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
@@ -3713,7 +3453,7 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
   const rug = box(4.95, 0.026, 2.18, rugMaterial, 0.06, 0.095, 0.62);
   [rug].forEach((part) => {
     part.receiveShadow = true;
-    part.userData.roomOneUnrealMirror = true;
+    part.userData.roomOneMemorySet = true;
     group.add(part);
   });
 
@@ -3742,7 +3482,7 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
     arch.rotation.z = Math.PI;
     arch.scale.y = 0.48;
     [back, left, right, top, arch].forEach((part) => {
-      part.userData.roomOneUnrealMirror = true;
+      part.userData.roomOneMemorySet = true;
       group.add(part);
     });
   });
@@ -3763,7 +3503,7 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
 
   const chandelier = new THREE.Group();
   chandelier.position.set(-0.2, 4.25, -0.35);
-  chandelier.userData.roomOneUnrealMirror = true;
+  chandelier.userData.roomOneMemorySet = true;
   chandelier.add(new THREE.Mesh(new THREE.TorusGeometry(0.92, 0.025, 8, 60), brass));
   chandelier.add(box(0.035, 0.78, 0.035, brass, 0, 0.34, 0));
   for (let i = 0; i < 4; i += 1) {
@@ -3802,7 +3542,7 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
   const addCandleCluster = (x: number, z: number, seed: number) => {
     const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.045, 28), brass);
     tray.position.set(x, 0.18, z);
-    tray.userData.roomOneUnrealMirror = true;
+    tray.userData.roomOneMemorySet = true;
     group.add(tray);
 
     for (let i = 0; i < 3; i += 1) {
@@ -3811,7 +3551,7 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
       candle.position.set(x + Math.cos(angle) * 0.13, 0.34 + i * 0.028, z + Math.sin(angle) * 0.11);
       const wick = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), flame.clone());
       wick.position.set(candle.position.x, candle.position.y + 0.18 + i * 0.03, candle.position.z);
-      candle.userData.roomOneUnrealMirror = true;
+      candle.userData.roomOneMemorySet = true;
       wick.userData.statusLight = true;
       group.add(candle, wick);
     }
@@ -3828,7 +3568,7 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
 
   const chandelierLight = new THREE.PointLight(0xffb16a, 2.15, 7.6);
   chandelierLight.position.set(-0.2, 3.74, -0.35);
-  chandelierLight.userData.roomOneUnrealMirror = true;
+  chandelierLight.userData.roomOneMemorySet = true;
   group.add(chandelierLight);
 
   const fillLight = new THREE.PointLight(0xad7048, 1.08, 8.7);
@@ -3855,7 +3595,7 @@ function addRoomOneReferenceEntryDesk(group: THREE.Group, room: Room) {
   const desk = new THREE.Group();
   desk.position.set(-4.55, 0.76, 1.22);
   desk.rotation.y = -0.08;
-  desk.userData.roomOneUnrealMirror = true;
+  desk.userData.roomOneMemorySet = true;
   desk.add(box(2.08, 0.18, 0.88, wood, 0, 0, 0));
   desk.add(box(2.0, 0.08, 0.92, darkWood, 0, -0.13, 0));
   desk.add(box(0.1, 0.82, 0.1, darkWood, -0.86, -0.46, -0.3));
@@ -3922,13 +3662,26 @@ function addRoomOneReferenceMemoryWall(group: THREE.Group, room: Room) {
   const lowerRail = box(2.82, 0.06, 0.06, rail, -2.23, 0.98, -4.02);
   group.add(titlePlate, lowerRail);
 
-  exhibits.forEach((exhibit) => {
-    addTexturedWallPanel(group, `room1-${exhibit.key}`, exhibit.title, exhibit.caption, exhibit.x, exhibit.y, -4.08, 0.98, 0.66, exhibit.color, exhibit.key === "hundred-day" ? "photoStrip" : "memory");
+  exhibits.forEach((exhibit, exhibitIndex) => {
+    addTexturedWallPanel(
+      group,
+      `room1-${exhibit.key}`,
+      exhibit.title,
+      exhibit.caption,
+      exhibit.x,
+      exhibit.y,
+      -4.08,
+      0.98,
+      0.66,
+      exhibit.color,
+      exhibit.key === "hundred-day" ? "photoStrip" : "memory",
+      { memoryFrameKey: exhibit.key, memoryFrameOrder: exhibitIndex },
+    );
   });
 
   const console = new THREE.Group();
   console.position.set(-2.24, 0.62, -2.98);
-  console.userData.roomOneUnrealMirror = true;
+  console.userData.roomOneMemorySet = true;
   console.add(box(2.44, 0.22, 0.68, consoleWood, 0, 0, 0));
   console.add(box(2.32, 0.06, 0.58, velvet, 0, 0.16, 0));
   console.add(box(2.5, 0.08, 0.08, rail, 0, 0.22, -0.35));
@@ -3944,7 +3697,7 @@ function addRoomOneReferenceMemoryWall(group: THREE.Group, room: Room) {
     socket.position.set(-0.66 + index * 0.44, 0.24, 0.02);
     const button = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.072, 30), material);
     button.position.set(socket.position.x, 0.3, socket.position.z);
-    button.userData.roomOneUnrealMirror = true;
+    button.userData.roomOneMemorySet = true;
     button.userData.memoryButton = index;
     console.add(socket, button);
   });
@@ -3960,7 +3713,7 @@ function addRoomOneReferenceMusicCabinet(group: THREE.Group, room: Room) {
 
   const caseGroup = new THREE.Group();
   caseGroup.position.set(0.08, 2.1, -4.05);
-  caseGroup.userData.roomOneUnrealMirror = true;
+  caseGroup.userData.roomOneMemorySet = true;
   caseGroup.add(box(0.92, 1.32, 0.1, wood, 0, 0, -0.05));
   caseGroup.add(box(0.74, 1.08, 0.04, velvet, 0, 0, 0));
   caseGroup.add(box(0.66, 0.98, 0.028, glass, 0, 0, 0.055));
@@ -3976,11 +3729,15 @@ function addRoomOneReferenceMusicCabinet(group: THREE.Group, room: Room) {
   const keyStem = box(0.32, 0.025, 0.025, brass, 0.34, 2.31, -3.88);
   keyStem.rotation.z = Math.PI / 2;
   const keyBit = box(0.13, 0.08, 0.025, brass, 0.34, 2.13, -3.88);
+  [keyRing, keyStem, keyBit].forEach((part) => {
+    part.userData.roomOneCaseKeyring = true;
+    part.visible = false;
+  });
   group.add(keyRing, keyStem, keyBit);
 
   const cabinet = new THREE.Group();
   cabinet.position.set(1.42, 0.7, -2.76);
-  cabinet.userData.roomOneUnrealMirror = true;
+  cabinet.userData.roomOneMemorySet = true;
   cabinet.add(box(1.3, 0.82, 0.64, wood, 0, 0, 0));
   cabinet.add(box(1.18, 0.1, 0.68, brass, 0, 0.5, 0));
   cabinet.add(box(1.14, 0.08, 0.58, velvet, 0, 0.58, 0));
@@ -3992,8 +3749,10 @@ function addRoomOneReferenceMusicCabinet(group: THREE.Group, room: Room) {
   musicBase.position.set(0, 0.72, -0.02);
   const carousel = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.3, 30), mat(0xffb77a, { roughness: 0.34, metalness: 0.06, emissive: 0xff8a3b, emissiveIntensity: 0.16 }));
   carousel.position.set(0, 0.94, -0.02);
+  carousel.userData.roomOneCabinetCarousel = true;
   const cap = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.24, 32), brass);
   cap.position.set(0, 1.18, -0.02);
+  cap.userData.roomOneCabinetCarousel = true;
   cabinet.add(musicBase, carousel, cap);
   group.add(cabinet);
 
@@ -4020,7 +3779,7 @@ function addRoomOneReferenceFloorPuzzle(group: THREE.Group, room: Room) {
       emissiveIntensity: cell === 9 ? 0.13 : 0.03,
     });
     const tile = box(0.82, 0.032, 0.82, tileMaterial, -0.86 + col * 0.86, 0.108, -0.78 + row * 0.86);
-    tile.userData.roomOneUnrealMirror = true;
+    tile.userData.roomOneMemorySet = true;
     tile.userData.floorPuzzleCell = cell;
     const bevel = box(0.86, 0.014, 0.036, brass, tile.position.x, 0.135, tile.position.z - 0.43);
     const bevelB = box(0.86, 0.014, 0.036, brass, tile.position.x, 0.135, tile.position.z + 0.43);
@@ -4034,7 +3793,7 @@ function addRoomOneReferenceFloorPuzzle(group: THREE.Group, room: Room) {
   const paper = mat(0xe8cfaa, { roughness: 0.86, texture: "paper", textureSeed: 5634 });
   const bench = new THREE.Group();
   bench.position.set(0.05, 0.42, 2.08);
-  bench.userData.roomOneUnrealMirror = true;
+  bench.userData.roomOneMemorySet = true;
   bench.add(box(1.74, 0.16, 0.62, benchWood, 0, 0, 0));
   bench.add(box(1.58, 0.05, 0.5, brass, 0, 0.1, 0));
   bench.add(box(0.12, 0.5, 0.12, benchWood, -0.66, -0.32, -0.2));
@@ -4107,7 +3866,7 @@ function addRoomOneReferenceBeefAndSteak(group: THREE.Group, room: Room) {
 
   const shelf = new THREE.Group();
   shelf.position.set(3.82, 0.66, -3.72);
-  shelf.userData.roomOneUnrealMirror = true;
+  shelf.userData.roomOneMemorySet = true;
   shelf.add(box(2.58, 0.16, 0.38, wood, 0, 0, 0));
   shelf.add(box(2.46, 0.06, 0.42, brass, 0, 0.14, 0));
   [-0.84, 0, 0.84].forEach((x) => {
@@ -4123,7 +3882,7 @@ function addRoomOneReferenceBeefAndSteak(group: THREE.Group, room: Room) {
   const table = new THREE.Group();
   table.position.set(3.58, 0.56, 1.38);
   table.rotation.y = 0.04;
-  table.userData.roomOneUnrealMirror = true;
+  table.userData.roomOneMemorySet = true;
   table.add(box(2.05, 0.16, 0.92, wood, 0, 0, 0));
   table.add(box(1.94, 0.05, 0.82, brass, 0, 0.11, 0));
   [-0.72, 0.72].forEach((x) => {
@@ -4146,12 +3905,39 @@ function addRoomOneReferenceBeefAndSteak(group: THREE.Group, room: Room) {
   smallCandle.position.set(0, 0.3, -0.32);
   const flame = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), mat(0xffb35d, { emissive: 0xff9a2f, emissiveIntensity: 0.9, transparent: true, opacity: 0.9 }));
   flame.position.set(0, 0.48, -0.32);
+  flame.userData.roomOneSteakFlame = true;
   table.add(smallCandle, flame);
   group.add(table);
 
   const tableLight = new THREE.PointLight(0xff9d54, 0.34, 2);
   tableLight.position.set(3.56, 1.05, 1.02);
+  tableLight.userData.roomOneSteakLight = true;
   group.add(tableLight);
+
+  const paintingBrass = mat(0xd4a05b, { roughness: 0.3, metalness: 0.5, emissive: 0xffa13c, emissiveIntensity: 0.28, texture: "metal", textureSeed: 5645 });
+  const paintingCarousel = new THREE.Group();
+  paintingCarousel.position.set(3.92, 2.68, -4.0);
+  paintingCarousel.userData.roomOnePaintingCarousel = true;
+  paintingCarousel.visible = false;
+  const carouselBase = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, 0.06, 24), paintingBrass);
+  const carouselBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.15, 0.17, 24),
+    mat(0xffb77a, { roughness: 0.32, metalness: 0.08, emissive: 0xff8a3b, emissiveIntensity: 0.34 }),
+  );
+  carouselBody.position.y = 0.11;
+  const carouselCap = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.13, 24), paintingBrass);
+  carouselCap.position.y = 0.26;
+  paintingCarousel.add(carouselBase, carouselBody, carouselCap);
+  group.add(paintingCarousel);
+
+  const salchisalMarker = new THREE.Mesh(
+    new THREE.TorusGeometry(0.17, 0.028, 10, 32),
+    mat(0xff6a5a, { roughness: 0.3, metalness: 0.1, emissive: 0xff5040, emissiveIntensity: 0.7, transparent: true, opacity: 0.92 }),
+  );
+  salchisalMarker.position.set(2.52, 2.6, -4.24);
+  salchisalMarker.userData.roomOneSalchisalMarker = true;
+  salchisalMarker.visible = false;
+  group.add(salchisalMarker);
 }
 
 function addRoomOneReferenceExitDoor(group: THREE.Group, room: Room) {
@@ -4162,20 +3948,25 @@ function addRoomOneReferenceExitDoor(group: THREE.Group, room: Room) {
   const warmEdge = mat(0xffbd73, { roughness: 0.3, metalness: 0.18, emissive: 0xff9f32, emissiveIntensity: 0.24, transparent: true, opacity: 0.72 });
 
   const doorGroup = new THREE.Group();
-  doorGroup.userData.roomOneUnrealMirror = true;
-  const door = box(0.12, 1.86, 1.04, doorMat, 6.33, 1.16, -1.94);
+  doorGroup.userData.roomOneMemorySet = true;
+
+  const doorPivot = new THREE.Group();
+  doorPivot.position.set(6.33, 1.16, -2.46);
+  doorPivot.userData.roomOneExitDoorPivot = true;
+  const door = box(0.12, 1.86, 1.04, doorMat, 0, 0, 0.52);
   door.castShadow = true;
-  doorGroup.add(door);
+  doorPivot.add(door);
 
   [-0.34, 0, 0.34].forEach((offset) => {
-    doorGroup.add(box(0.135, 1.72, 0.035, darkWood, 6.25, 1.15, -1.94 + offset));
+    doorPivot.add(box(0.135, 1.72, 0.035, darkWood, -0.08, -0.01, 0.52 + offset));
   });
-  doorGroup.add(box(0.15, 0.08, 0.94, brass, 6.24, 1.86, -1.94));
-  doorGroup.add(box(0.15, 0.08, 0.94, brass, 6.24, 0.54, -1.94));
+  doorPivot.add(box(0.15, 0.08, 0.94, brass, -0.09, 0.7, 0.52));
+  doorPivot.add(box(0.15, 0.08, 0.94, brass, -0.09, -0.62, 0.52));
 
   const handle = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), brass);
-  handle.position.set(6.18, 1.12, -1.56);
-  doorGroup.add(handle);
+  handle.position.set(-0.15, -0.04, 0.9);
+  doorPivot.add(handle);
+  doorGroup.add(doorPivot);
 
   const leftJamb = box(0.22, 2.04, 0.18, stone, 6.22, 1.25, -2.58);
   const rightJamb = box(0.22, 2.04, 0.18, stone, 6.22, 1.25, -1.3);
@@ -4186,12 +3977,13 @@ function addRoomOneReferenceExitDoor(group: THREE.Group, room: Room) {
   doorGroup.add(leftJamb, rightJamb, lintel, arch);
 
   const seamLight = box(0.024, 1.54, 0.04, warmEdge, 6.14, 1.16, -1.36);
-  seamLight.userData.statusLight = true;
+  seamLight.userData.roomOneDoorSeam = true;
   doorGroup.add(seamLight);
   group.add(doorGroup);
 
   const exitLight = new THREE.PointLight(0xffae6e, 0.58, 3.1);
   exitLight.position.set(5.9, 1.9, -1.9);
+  exitLight.userData.roomOneExitLight = true;
   group.add(exitLight);
 }
 
@@ -4207,6 +3999,7 @@ function addTexturedWallPanel(
   height: number,
   accent: number,
   kind: "memory" | "beef" | "vista" | "photoStrip",
+  extraUserData?: Record<string, unknown>,
 ) {
   const frameMaterial = mat(0x49301f, { roughness: 0.5, metalness: 0.08, texture: "wood", textureSeed: width * 100 + height * 10 });
   const texture = createRoomOneMemoryTexture(key, title, caption, accent, kind);
@@ -4214,8 +4007,11 @@ function addTexturedWallPanel(
   const frame = box(width + 0.14, height + 0.14, 0.08, frameMaterial, x, y, z - 0.04);
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
   plane.position.set(x, y, z + 0.015);
-  plane.userData.roomOneUnrealMirror = true;
-  frame.userData.roomOneUnrealMirror = true;
+  plane.userData.roomOneMemorySet = true;
+  frame.userData.roomOneMemorySet = true;
+  if (extraUserData) {
+    Object.assign(plane.userData, extraUserData);
+  }
   group.add(frame, plane);
 }
 
@@ -4227,7 +4023,8 @@ function addMiniViolin(group: THREE.Group, x: number, y: number, z: number, scal
   violin.position.set(x, y, z);
   violin.scale.setScalar(scale);
   violin.rotation.z = -0.12;
-  violin.userData.roomOneUnrealMirror = true;
+  violin.userData.roomOneMemorySet = true;
+  violin.userData.roomOneViolinDoll = true;
   const lower = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 10), body);
   lower.scale.set(1.15, 0.7, 0.26);
   const upper = lower.clone();
@@ -4248,7 +4045,7 @@ function addRoomOneParkConfessionSet(group: THREE.Group, room: Room) {
   const warmHalo = mat(room.palette[1], { roughness: 0.2, metalness: 0.05, emissive: room.palette[1], emissiveIntensity: 0.45, transparent: true, opacity: 0.34 });
 
   const hedge = box(2.65, 0.92, 0.32, leaf, -4.52, 0.86, -3.92);
-  hedge.userData.roomOneUnrealMirror = true;
+  hedge.userData.roomOneMemorySet = true;
   group.add(hedge);
 
   for (let i = 0; i < 3; i += 1) {
@@ -4257,20 +4054,20 @@ function addRoomOneParkConfessionSet(group: THREE.Group, room: Room) {
     trunk.rotation.z = -0.08 + i * 0.07;
     trunk.castShadow = true;
     trunk.receiveShadow = true;
-    trunk.userData.roomOneUnrealMirror = true;
+    trunk.userData.roomOneMemorySet = true;
 
     const crown = new THREE.Mesh(new THREE.SphereGeometry(0.46 + i * 0.06, 18, 12), leaf);
     crown.position.set(trunk.position.x + 0.06, trunk.position.y + 0.95, trunk.position.z + 0.02);
     crown.scale.set(1.18, 0.74, 0.52);
     crown.castShadow = true;
-    crown.userData.roomOneUnrealMirror = true;
+    crown.userData.roomOneMemorySet = true;
     group.add(trunk, crown);
   }
 
   const bench = new THREE.Group();
   bench.position.set(-4.28, 0.58, -2.68);
   bench.rotation.y = 0.18;
-  bench.userData.roomOneUnrealMirror = true;
+  bench.userData.roomOneMemorySet = true;
   const seat = box(1.75, 0.14, 0.42, benchWood, 0, 0, 0);
   const back = box(1.82, 0.12, 0.38, benchWood, 0, 0.46, -0.22);
   back.rotation.x = -0.18;
@@ -4284,12 +4081,12 @@ function addRoomOneParkConfessionSet(group: THREE.Group, room: Room) {
   const memoryGlow = new THREE.Mesh(new THREE.CylinderGeometry(1.28, 1.64, 0.018, 48), warmHalo);
   memoryGlow.position.set(-4.2, 0.18, -2.68);
   memoryGlow.scale.set(1, 1, 0.62);
-  memoryGlow.userData.roomOneUnrealMirror = true;
+  memoryGlow.userData.roomOneMemorySet = true;
   group.add(memoryGlow);
 
   const lamp = new THREE.PointLight(room.palette[1], 1.9, 4.6);
   lamp.position.set(-4.12, 2.25, -2.46);
-  lamp.userData.roomOneUnrealMirror = true;
+  lamp.userData.roomOneMemorySet = true;
   group.add(lamp);
 }
 
@@ -4305,7 +4102,7 @@ function addRoomOneBirthdayGiftTable(group: THREE.Group, room: Room) {
   const table = new THREE.Group();
   table.position.set(-2.76, 0.72, 1.24);
   table.rotation.y = 0.14;
-  table.userData.roomOneUnrealMirror = true;
+  table.userData.roomOneMemorySet = true;
   table.add(box(2.52, 0.16, 1.08, wood, 0, 0, 0));
   table.add(box(0.1, 0.8, 0.1, wood, -1.06, -0.46, -0.36));
   table.add(box(0.1, 0.8, 0.1, wood, 1.06, -0.46, -0.36));
@@ -4333,7 +4130,7 @@ function addRoomOneBirthdayGiftTable(group: THREE.Group, room: Room) {
 
   const giftLight = new THREE.PointLight(room.palette[2], 1.35, 3.6);
   giftLight.position.set(-0.1, 1.72, 1.15);
-  giftLight.userData.roomOneUnrealMirror = true;
+  giftLight.userData.roomOneMemorySet = true;
   group.add(giftLight);
 }
 
@@ -4347,7 +4144,8 @@ function addRoomOneViolinKeyring(group: THREE.Group, room: Room) {
   violin.position.set(-2.48, 1.04, 0.9);
   violin.rotation.set(-0.55, -0.52, 0.08);
   violin.scale.setScalar(0.9);
-  violin.userData.roomOneUnrealMirror = true;
+  violin.userData.roomOneMemorySet = true;
+  violin.userData.roomOnePickupKeyring = true;
 
   const lowerBody = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 12), bodyMaterial);
   lowerBody.scale.set(1.18, 0.64, 0.28);
@@ -4402,13 +4200,13 @@ function addRoomOneMemoryInstallations(group: THREE.Group, room: Room) {
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(exhibit.width, exhibit.height), material);
     plane.position.set(exhibit.x, exhibit.y, exhibit.z + 0.035);
     plane.castShadow = true;
-    plane.userData.roomOneUnrealMirror = true;
-    frameMesh.userData.roomOneUnrealMirror = true;
+    plane.userData.roomOneMemorySet = true;
+    frameMesh.userData.roomOneMemorySet = true;
     group.add(frameMesh, plane);
 
     const pin = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 8), brass);
     pin.position.set(exhibit.x - 0.42 + exhibitIndex * 0.06, exhibit.y + 0.32, exhibit.z + 0.075);
-    pin.userData.roomOneUnrealMirror = true;
+    pin.userData.roomOneMemorySet = true;
     group.add(pin);
   });
 
@@ -4417,7 +4215,7 @@ function addRoomOneMemoryInstallations(group: THREE.Group, room: Room) {
   const vista = new THREE.Mesh(new THREE.PlaneGeometry(1.48, 0.9), vistaMaterial);
   vista.position.set(5.88, 2.32, -2.24);
   vista.rotation.y = -Math.PI / 2;
-  vista.userData.roomOneUnrealMirror = true;
+  vista.userData.roomOneMemorySet = true;
   group.add(vista);
 }
 
@@ -4429,10 +4227,10 @@ function addRoomOneBeefPuzzleWall(group: THREE.Group, room: Room) {
   const puzzleMaterial = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.76, metalness: 0.02, emissive: 0xffc36f, emissiveIntensity: 0.07 });
 
   const board = box(3.36, 2.24, 0.08, boardMaterial, 2.92, 2.22, -4.37);
-  board.userData.roomOneUnrealMirror = true;
+  board.userData.roomOneMemorySet = true;
   const puzzle = new THREE.Mesh(new THREE.PlaneGeometry(3.06, 1.94), puzzleMaterial);
   puzzle.position.set(2.92, 2.24, -4.315);
-  puzzle.userData.roomOneUnrealMirror = true;
+  puzzle.userData.roomOneMemorySet = true;
   group.add(board, puzzle);
 
   const topTrim = box(3.48, 0.045, 0.1, trimMaterial, 2.92, 3.38, -4.3);
@@ -4440,7 +4238,7 @@ function addRoomOneBeefPuzzleWall(group: THREE.Group, room: Room) {
   const leftTrim = box(0.045, 2.28, 0.1, trimMaterial, 1.16, 2.22, -4.3);
   const rightTrim = box(0.045, 2.28, 0.1, trimMaterial, 4.68, 2.22, -4.3);
   [topTrim, bottomTrim, leftTrim, rightTrim].forEach((trim) => {
-    trim.userData.roomOneUnrealMirror = true;
+    trim.userData.roomOneMemorySet = true;
     group.add(trim);
   });
 
@@ -4455,18 +4253,18 @@ function addRoomOneBeefPuzzleWall(group: THREE.Group, room: Room) {
   slots.forEach(([x, y], slotIndex) => {
     const magnet = box(0.23, 0.12, 0.045, magnetMaterial.clone(), x, y, -4.24);
     magnet.rotation.z = -0.08 + slotIndex * 0.035;
-    magnet.userData.roomOneUnrealMirror = true;
+    magnet.userData.roomOneMemorySet = true;
     magnet.userData.beefPuzzlePiece = true;
     group.add(magnet);
   });
 
   const focusLight = new THREE.PointLight(0xffc36f, 1.95, 5.4);
   focusLight.position.set(2.92, 2.66, -3.18);
-  focusLight.userData.roomOneUnrealMirror = true;
+  focusLight.userData.roomOneMemorySet = true;
   group.add(focusLight);
 }
 
-function addRoomOneUnrealMarkerLights(group: THREE.Group, room: Room) {
+function addRoomOneMarkerLights(group: THREE.Group, room: Room) {
   const markerMaterial = mat(0xc99858, { roughness: 0.32, metalness: 0.52, emissive: 0xffa13c, emissiveIntensity: 0.1, transparent: true, opacity: 0.76, texture: "metal", textureSeed: 5671 });
   const emberMaterial = mat(0xffb36a, { roughness: 0.26, metalness: 0.08, emissive: 0xff8a2f, emissiveIntensity: 0.62, transparent: true, opacity: 0.8 });
   const labels = [
@@ -4479,18 +4277,18 @@ function addRoomOneUnrealMarkerLights(group: THREE.Group, room: Room) {
     const plaque = new THREE.Mesh(new THREE.CylinderGeometry(0.16 + index * 0.006, 0.17 + index * 0.006, 0.022, 36), markerMaterial.clone());
     plaque.position.set(x, 0.145, z);
     plaque.scale.set(1.24, 0.7, 1);
-    plaque.userData.roomOneUnrealMirror = true;
+    plaque.userData.roomOneMemorySet = true;
 
     const inset = new THREE.Mesh(new THREE.TorusGeometry(0.12 + index * 0.004, 0.008, 8, 36), markerMaterial.clone());
     inset.position.set(x, 0.163, z);
     inset.rotation.x = Math.PI / 2;
     inset.scale.set(1.2, 0.7, 1);
-    inset.userData.roomOneUnrealMirror = true;
+    inset.userData.roomOneMemorySet = true;
 
     const ember = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), emberMaterial.clone());
     ember.position.set(x, 0.22, z);
     ember.userData.statusLight = true;
-    ember.userData.roomOneUnrealMirror = true;
+    ember.userData.roomOneMemorySet = true;
     group.add(plaque, inset, ember);
   });
 }
@@ -5058,8 +4856,128 @@ function animateFirstPersonRig(rig: FirstPersonRig, elapsedTime: number, moving:
   }
 }
 
+function animateRoomOneMemoryState(group: THREE.Group, elapsedTime: number) {
+  const solved = room1Visual.solved;
+  const framesLit = solved.has("room1-vita500");
+  const framesSolved = solved.has("room1-memory-frames");
+  const keyringAttached = solved.has("room1-violin-keyring");
+  const nineSolved = solved.has("room1-guro-pyeongsang-nine");
+  const salchisalSolved = solved.has("room1-salchisal");
+  const steakSolved = solved.has("room1-hyunsu-steak");
+  const doorOpen = room1Visual.doorOpen;
+  const candleOut = room1Visual.candleOutUntil > performance.now();
+
+  group.traverse((object) => {
+    const data = object.userData;
+
+    if (object instanceof THREE.Mesh && typeof data.stationRing === "string") {
+      const material = object.material as THREE.MeshBasicMaterial;
+      const stationId = data.stationRing as string;
+      const focused = room1Visual.focusStationId === stationId;
+      const available = room1Visual.availableStationIds.has(stationId);
+      const pulse = 0.5 + Math.sin(elapsedTime * 2.2 + ((data.ringSeed as number) ?? 0)) * 0.5;
+      material.opacity = focused ? 0.44 + pulse * 0.2 : available ? 0.08 + pulse * 0.1 : 0.02;
+      object.scale.setScalar(focused ? 1.08 + pulse * 0.06 : 1);
+      return;
+    }
+
+    if (object instanceof THREE.Mesh && data.memoryFrameKey !== undefined) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      const orderIndex = (data.memoryFrameOrder as number) ?? 0;
+      const litStage = framesSolved ? 1 : framesLit ? 0.45 : 0.1;
+      const cascade = framesSolved ? Math.max(0, Math.sin(elapsedTime * 1.4 - orderIndex * 0.7)) * 0.22 : 0;
+      material.emissiveIntensity = 0.05 + litStage * 0.3 + cascade;
+    }
+
+    if (data.roomOneViolinDoll && object instanceof THREE.Group) {
+      if (typeof data.baseY !== "number") {
+        data.baseY = object.position.y;
+      }
+      if (room1Visual.violinPlaying) {
+        object.rotation.z = -0.12 + Math.sin(elapsedTime * 4.2) * 0.06;
+        object.position.y = (data.baseY as number) + Math.sin(elapsedTime * 2.1) * 0.014 + 0.02;
+      } else {
+        object.rotation.z = -0.12;
+        object.position.y = data.baseY as number;
+      }
+    }
+
+    if (data.roomOneCaseKeyring) {
+      object.visible = keyringAttached;
+    }
+
+    if (data.roomOnePickupKeyring) {
+      object.visible = !framesSolved;
+    }
+
+    if (data.roomOneCabinetCarousel) {
+      object.visible = room1Visual.carouselOnCabinet;
+      if (object.visible && room1Visual.violinPlaying) {
+        object.rotation.y = elapsedTime * 1.6;
+      }
+    }
+
+    if (data.roomOnePaintingCarousel && object instanceof THREE.Group) {
+      object.visible = room1Visual.carouselInPainting;
+      if (object.visible) {
+        object.rotation.y = elapsedTime * 1.2;
+      }
+    }
+
+    if (object instanceof THREE.Mesh && data.floorPuzzleCell === 9) {
+      if (typeof data.baseY !== "number") {
+        data.baseY = object.position.y;
+      }
+      const targetY = nineSolved ? (data.baseY as number) - 0.13 : (data.baseY as number);
+      object.position.y = THREE.MathUtils.lerp(object.position.y, targetY, 0.07);
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = nineSolved ? 0.32 + Math.sin(elapsedTime * 3) * 0.1 : 0.13;
+    }
+
+    if (object instanceof THREE.Mesh && data.roomOneSalchisalMarker) {
+      object.visible = salchisalSolved;
+      if (salchisalSolved) {
+        const material = object.material as THREE.MeshStandardMaterial;
+        material.emissiveIntensity = 0.62 + Math.sin(elapsedTime * 3.4) * 0.24;
+        object.rotation.z = elapsedTime * 0.6;
+      }
+    }
+
+    if (object instanceof THREE.Mesh && data.roomOneSteakFlame) {
+      object.visible = !candleOut;
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = steakSolved ? 1.4 + Math.sin(elapsedTime * 6) * 0.3 : 0.9 + Math.sin(elapsedTime * 5) * 0.18;
+      object.scale.setScalar(steakSolved ? 1.35 + Math.sin(elapsedTime * 7) * 0.08 : 1 + Math.sin(elapsedTime * 6.4) * 0.05);
+    }
+
+    if (data.roomOneSteakLight && object instanceof THREE.PointLight) {
+      object.intensity = candleOut ? 0.04 : salchisalSolved ? 0.72 + Math.sin(elapsedTime * 4.4) * 0.1 : 0.34;
+    }
+
+    if (data.roomOneExitDoorPivot && object instanceof THREE.Group) {
+      const target = doorOpen ? 1.18 : 0;
+      object.rotation.y = THREE.MathUtils.lerp(object.rotation.y, target, 0.045);
+    }
+
+    if (object instanceof THREE.Mesh && data.roomOneDoorSeam) {
+      const material = object.material as THREE.MeshStandardMaterial;
+      material.emissiveIntensity = doorOpen ? 0.95 + Math.sin(elapsedTime * 4) * 0.24 : 0.24 + Math.sin(elapsedTime * 3) * 0.1;
+      if (material.transparent) {
+        material.opacity = doorOpen ? 0.95 : 0.72;
+      }
+    }
+
+    if (data.roomOneExitLight && object instanceof THREE.PointLight) {
+      object.intensity = doorOpen ? 1.9 + Math.sin(elapsedTime * 3.2) * 0.3 : 0.58;
+    }
+  });
+}
+
 function animateRoom(group: THREE.Group, elapsedTime: number, unlockProgress: number, solvedCount: number, phase: Phase) {
   const eased = easeOutCubic(unlockProgress);
+  if (group.userData.roomOneMemoryMansion) {
+    animateRoomOneMemoryState(group, elapsedTime);
+  }
   const door = group.userData.door as THREE.Mesh | undefined;
   const ring = group.userData.ring as THREE.Mesh | undefined;
   const lockBox = group.userData.lockBox as THREE.Mesh | undefined;

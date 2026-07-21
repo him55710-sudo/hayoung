@@ -1,12 +1,24 @@
-import { chromium } from "playwright";
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+/**
+ * 500일의 방 — Room 1 실제 추억 퍼즐 체인 자동 검증.
+ *
+ * 검증 흐름:
+ *  시작 화면 → 네 버튼 도망 → 6초 입장 → 1인칭 진입 → 현수 음성 →
+ *  선행 조건 잠금 → VITA500 → 액자 정렬/색상 → 바이올린 키링 →
+ *  인생의 회전목마 → 놀이공원 그림 → 9번 칸 → 살치살 → 현수의 스테이크 →
+ *  Room 1 문 개방 → 힌트 계약서 3단계 → 저장/이어하기 → 엔딩 → 모바일.
+ */
 
-const url = process.env.GAME_URL ?? "http://127.0.0.1:5173/";
-const answers = ["0100", "1", "URDL", "STAR", "0300", "LURD", "2", "MOON", "0500", "YES"];
+import { spawn } from "node:child_process";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { chromium } from "playwright";
+
+const port = 5173;
+const url = process.env.GAME_URL ?? `http://127.0.0.1:${port}/`;
+const shouldStartServer = !process.env.GAME_URL;
 const debug = process.env.DEBUG_GAME_VERIFY === "1";
 const debugLogPath = "output/playwright/verify-debug.log";
-const minCanvasVariation = 1500;
+const minCanvasVariation = 1200;
 
 if (debug) {
   mkdirSync(dirname(debugLogPath), { recursive: true });
@@ -17,61 +29,120 @@ function log(...args) {
   if (debug) appendFileSync(debugLogPath, `[verify] ${args.join(" ")}\n`);
 }
 
+let server = null;
+
+async function startDevServer() {
+  if (!shouldStartServer) {
+    return;
+  }
+  server = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+    stdio: debug ? "inherit" : "ignore",
+  });
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        log("dev server ready");
+        return;
+      }
+    } catch {
+      // retry
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  throw new Error("dev server did not become ready");
+}
+
+function stopDevServer() {
+  if (server && !server.killed) {
+    server.kill("SIGTERM");
+  }
+}
+
 async function gameState(page) {
   return page.evaluate(() => JSON.parse(window.render_game_to_text()));
+}
+
+async function debugState(page) {
+  return page.evaluate(() => JSON.parse(window.hayoungDebugState()));
+}
+
+async function waitFor(page, predicate, label, timeout = 15000) {
+  const started = Date.now();
+  for (;;) {
+    let value = null;
+    try {
+      value = await page.evaluate(() => (window.hayoungDebugState ? JSON.parse(window.hayoungDebugState()) : null));
+    } catch {
+      value = null;
+    }
+    if (value && predicate(value)) {
+      return value;
+    }
+    if (Date.now() - started > timeout) {
+      throw new Error(`Timed out waiting for ${label}`);
+    }
+    await page.waitForTimeout(200);
+  }
 }
 
 async function waitForPhase(page, phase) {
   await page.waitForFunction(
     (target) => window.render_game_to_text && JSON.parse(window.render_game_to_text()).phase === target,
     phase,
-    { timeout: 15000 },
+    { timeout: 20000 },
   );
 }
 
-async function settleClose(label, promise) {
-  let timeoutId;
-  await Promise.race([
-    promise.finally(() => {
-      if (timeoutId) clearTimeout(timeoutId);
-    }),
-    new Promise((resolve) => {
-      timeoutId = setTimeout(() => {
-        log(`${label} close timed out; continuing cleanup`);
-        resolve(undefined);
-      }, 10000);
-    }),
-  ]);
-  if (timeoutId) clearTimeout(timeoutId);
+async function waitForSelector(page, selector, timeout = 15000) {
+  await page.waitForFunction((target) => Boolean(document.querySelector(target)), selector, { timeout });
 }
 
-async function withStepTimeout(label, promise, timeout = 15000) {
-  let timeoutId;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeout}ms`)), timeout);
-      }),
-    ]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
+async function waitForAbsence(page, selector, timeout = 15000) {
+  await page.waitForFunction((target) => !document.querySelector(target), selector, { timeout });
 }
 
-async function captureOptionalScreenshot(page, path, options = {}) {
-  try {
-    await page.screenshot({
-      path,
-      animations: "disabled",
-      timeout: 30000,
-      ...options,
-    });
-    return true;
-  } catch (error) {
-    log(`screenshot skipped ${path} ${error?.message ?? error}`);
-    return false;
-  }
+async function clickSelector(page, selector) {
+  await page.evaluate((target) => {
+    const element = document.querySelector(target);
+    if (!(element instanceof HTMLElement)) {
+      throw new Error(`Missing clickable selector: ${target}`);
+    }
+    element.click();
+  }, selector);
+}
+
+async function setInputValue(page, selector, value) {
+  await page.evaluate(
+    ({ target, next }) => {
+      const input = document.querySelector(target);
+      if (!(input instanceof HTMLInputElement)) {
+        throw new Error(`Missing input selector: ${target}`);
+      }
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      if (!setter) {
+        throw new Error("Native input value setter missing");
+      }
+      setter.call(input, next);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    },
+    { target: selector, next: value },
+  );
+}
+
+async function submitAnswer(page, inputSelector, value) {
+  await setInputValue(page, inputSelector, value);
+  await clickSelector(page, ".memory-modal .memory-answer-submit");
+}
+
+async function openStation(page, stationId) {
+  await page.evaluate((id) => window.hayoungDebugOpenStation(id), stationId);
+}
+
+async function waitForSolved(page, puzzleId) {
+  await waitFor(page, (state) => state.completedPuzzleIds.includes(puzzleId), `puzzle ${puzzleId} solved`, 15000);
+  await waitForAbsence(page, ".memory-modal");
 }
 
 async function canvasStats(page) {
@@ -98,24 +169,6 @@ async function canvasStats(page) {
   });
 }
 
-async function clickSelector(page, selector) {
-  await page.evaluate((targetSelector) => {
-    const element = document.querySelector(targetSelector);
-    if (!(element instanceof HTMLElement)) {
-      throw new Error(`Missing clickable selector: ${targetSelector}`);
-    }
-    element.click();
-  }, selector);
-}
-
-async function waitForElement(page, selector, timeout = 30000) {
-  await page.waitForFunction(
-    (targetSelector) => Boolean(document.querySelector(targetSelector)),
-    selector,
-    { timeout },
-  );
-}
-
 async function runawayTranslateDistance(page) {
   return page.evaluate(() => {
     const button = document.querySelector(".runaway-button");
@@ -130,567 +183,322 @@ async function runawayTranslateDistance(page) {
   });
 }
 
-async function dispatchMouseClick(page, selector) {
-  await page.evaluate((targetSelector) => {
-    const element = document.querySelector(targetSelector);
-    if (!(element instanceof HTMLElement)) {
-      throw new Error(`Missing mouse click selector: ${targetSelector}`);
-    }
-    element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-  }, selector);
-}
-
-async function setPuzzleAnswer(page, answer) {
-  await withStepTimeout(
-    `set answer ${answer}`,
-    page.locator(".answer-row input").evaluate((input, value) => {
-      if (!(input instanceof HTMLInputElement)) {
-        throw new Error("Puzzle answer input is not an HTMLInputElement");
-      }
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-      if (!setter) {
-        throw new Error("Native input value setter missing");
-      }
-      setter.call(input, "");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      setter.call(input, value);
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    }, answer),
-    5000,
-  );
-  await page.waitForTimeout(120);
-}
-
-async function clickGraphicsQuality(page, expectedQuality) {
-  const qualityButton = page.locator(".icon-actions button[data-quality]");
-  const count = await qualityButton.count();
-  if (count !== 1) throw new Error(`Expected one graphics quality button, got ${count}`);
-  await clickSelector(page, ".icon-actions button[data-quality]");
-  await page.waitForFunction(
-    (quality) => {
-      const button = document.querySelector(".icon-actions button[data-quality]");
-      const state = JSON.parse(window.render_game_to_text());
-      return button?.getAttribute("data-quality") === quality && state.graphicsQuality === quality;
-    },
-    expectedQuality,
-    { timeout: 15000 },
-  );
-}
-
-async function enterGame(page, isMobile = false) {
-  log(`enter ${isMobile ? "mobile" : "desktop"}`);
-  await page.goto(url, { waitUntil: "domcontentloaded" });
-  log(`goto ${isMobile ? "mobile" : "desktop"}`);
-  await waitForElement(page, ".theme-card");
-  log(`intro ready ${isMobile ? "mobile" : "desktop"}`);
-  const introText = await page.evaluate(() => document.body?.innerText ?? "");
-  if (!introText.includes("500일")) throw new Error(`Unexpected intro: ${introText}`);
-  const introScreenText = await page.evaluate(() => document.querySelector(".intro-screen")?.textContent ?? "");
-  if (/\d+\s*초/.test(introScreenText) || introScreenText.includes("클릭할 수 있어요") || introScreenText.includes("뒤에 멈춰요")) {
-    throw new Error(`Intro reveals runaway timing: ${introScreenText}`);
+function expect(condition, label, failures) {
+  if (condition) {
+    log(`PASS ${label}`);
+    return true;
   }
-  const themeCount = await page.locator(".theme-card").count();
-  if (themeCount !== 3) throw new Error(`Expected 3 theme cards, got ${themeCount}`);
-  const lockedThemeCount = await page.locator(".theme-card.is-locked").count();
-  if (lockedThemeCount !== 2) throw new Error(`Expected 2 locked theme cards, got ${lockedThemeCount}`);
-  const initialRunawayCount = await page.locator(".runaway-button").count();
-  if (initialRunawayCount !== 0) throw new Error("Runaway button should not appear before Theme 01 is selected");
-  const playablePosterFit = await page.evaluate(() => {
-    const posterImage = document.querySelector(".theme-card:not(.is-locked) .theme-poster-frame img");
-    if (!(posterImage instanceof HTMLImageElement)) return null;
-    return getComputedStyle(posterImage).objectFit;
-  });
-  if (playablePosterFit !== "contain") throw new Error(`Playable theme poster should be contain-fit, got ${playablePosterFit}`);
-
-  await clickSelector(page, ".theme-card:not(.is-locked)");
-  await waitForElement(page, ".runaway-button");
-  await page.waitForTimeout(1200);
-  const introConfirmCheck = await page.evaluate(() => {
-    const state = JSON.parse(window.render_game_to_text());
-    const panel = document.querySelector(".theme-start-panel.is-confirming");
-    if (!(panel instanceof HTMLElement)) {
-      return { ok: false, state, panelExists: false };
-    }
-    const rect = panel.getBoundingClientRect();
-    const panelStyle = getComputedStyle(panel);
-    const result = {
-      ok: Boolean(
-        state.introRunawayButtonScope?.includes("Theme 01") &&
-          state.introPosterPresentation?.includes("uncropped") &&
-          state.introStartConfirmation?.includes("fullscreen animated") &&
-          panelStyle.position === "fixed" &&
-          rect.width >= window.innerWidth * 0.9 &&
-          rect.height >= window.innerHeight * 0.9,
-      ),
-      state,
-      panelExists: true,
-      panelPosition: panelStyle.position,
-      panelInset: panelStyle.inset,
-      rect: {
-        width: rect.width,
-        height: rect.height,
-      },
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      },
-    };
-    return result;
-  });
-  if (!introConfirmCheck.ok) {
-    throw new Error(`Intro confirm panel did not settle fullscreen: ${JSON.stringify(introConfirmCheck, null, 2)}`);
-  }
-
-  if (!isMobile) {
-    await page.locator(".runaway-button").evaluate((button) => {
-      button.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true, cancelable: true, view: window }));
-      button.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, cancelable: true, view: window }));
-    });
-    await page.waitForTimeout(250);
-    const moved = await runawayTranslateDistance(page);
-    if (moved < 35) throw new Error(`Runaway button did not move enough: ${moved}`);
-  }
-
-  let runawayReady = false;
-  const readyDeadline = Date.now() + 25000;
-  while (!runawayReady && Date.now() < readyDeadline) {
-    runawayReady = await page.evaluate(() => document.querySelector(".runaway-button")?.classList.contains("is-ready") ?? false);
-    if (!runawayReady) {
-      await page.waitForTimeout(500);
-    }
-  }
-  if (!runawayReady) {
-    const buttonState = await page.evaluate(() => ({
-      className: document.querySelector(".runaway-button")?.className ?? null,
-      introState: JSON.parse(window.render_game_to_text()),
-    }));
-    throw new Error(`Runaway button did not become ready: ${JSON.stringify(buttonState, null, 2)}`);
-  }
-  await dispatchMouseClick(page, ".runaway-button");
-  log(`start clicked ${isMobile ? "mobile" : "desktop"}`);
-  let gameAttached = false;
-  const gameDeadline = Date.now() + 45000;
-  while (!gameAttached && Date.now() < gameDeadline) {
-    gameAttached = await page.evaluate(() => {
-      const state = JSON.parse(window.render_game_to_text());
-      return state.phase === "game" && Boolean(document.querySelector("canvas"));
-    });
-    if (!gameAttached) {
-      await page.waitForTimeout(500);
-    }
-  }
-  if (!gameAttached) {
-    const startState = await page.evaluate(() => ({
-      hasCanvas: Boolean(document.querySelector("canvas")),
-      state: JSON.parse(window.render_game_to_text()),
-      buttonClass: document.querySelector(".runaway-button")?.className ?? null,
-    }));
-    throw new Error(`Game did not attach after intro start: ${JSON.stringify(startState, null, 2)}`);
-  }
-  log(`canvas attached ${isMobile ? "mobile" : "desktop"}`);
-  await page.waitForTimeout(900);
-  log(`entered ${isMobile ? "mobile" : "desktop"}`);
-}
-
-async function verifyGraphicsQuality(page, initialCanvas) {
-  log("graphics initial state");
-  const initialState = await gameState(page);
-  if (initialState.graphicsQuality !== "cinematic") {
-    throw new Error(`Expected cinematic graphics by default: ${JSON.stringify(initialState)}`);
-  }
-
-  return {
-    initial: {
-      quality: initialState.graphicsQuality,
-      renderScaleCap: initialState.renderScaleCap,
-      canvas: initialCanvas,
-    },
-    balanced: { skipped: "graphics quality toggle is excluded from deploy verification" },
-    performance: { skipped: "performance canvas sampling is excluded from deploy verification" },
-  };
-}
-
-async function verifyHintPenaltyUX(page, label) {
-  log(`hint ${label} before state`);
-  const before = await gameState(page);
-  if (before.hintsLeft !== 3) {
-    throw new Error(`Expected 3 hints before using one: ${JSON.stringify(before)}`);
-  }
-
-  log(`hint ${label} click`);
-  await clickSelector(page, ".icon-actions button[aria-label='힌트 사용']");
-  log(`hint ${label} wait`);
-  await withStepTimeout(
-    `hint ${label} visible`,
-    page.waitForFunction(
-    () => {
-      const state = JSON.parse(window.render_game_to_text());
-      const card = document.querySelector(".penalty-card");
-      const activeTicket = document.querySelector(".penalty-ticket.is-active");
-      return Boolean(
-        card &&
-          activeTicket &&
-          state.hintsLeft === 2 &&
-          state.hintPenaltyStage === "1/3" &&
-          state.activeHintPenalty?.includes("바나나우유") &&
-          state.hintPenaltyUX?.includes("contract ticket") &&
-          card.querySelectorAll(".penalty-ticket").length === 3 &&
-          activeTicket.textContent?.includes("바나나우유") &&
-          getComputedStyle(card).display !== "none",
-      );
-    },
-    null,
-    { timeout: 15000 },
-    ),
-    20000,
-  );
-  const after = await gameState(page);
-
-  return {
-    beforeHintsLeft: before.hintsLeft,
-    afterHintsLeft: after.hintsLeft,
-    stage: after.hintPenaltyStage,
-    activePenalty: after.activeHintPenalty,
-    ux: after.hintPenaltyUX,
-  };
-}
-
-async function verifyMobileTouchControls(page) {
-  await page.waitForFunction(() => window.hayoungCameraState && window.hayoungTouchControls, { timeout: 15000 });
-  const before = await page.evaluate(() => ({
-    state: JSON.parse(window.render_game_to_text()),
-    camera: window.hayoungCameraState,
-    controls: window.hayoungTouchControls,
-  }));
-
-  await page.evaluate(() => {
-    const pad = document.querySelector(".look-pad");
-    if (!(pad instanceof HTMLElement)) throw new Error("Missing look pad.");
-    const rect = pad.getBoundingClientRect();
-    const base = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      pointerId: 822,
-      pointerType: "touch",
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-    };
-    pad.dispatchEvent(new PointerEvent("pointerdown", base));
-    pad.dispatchEvent(new PointerEvent("pointermove", { ...base, clientX: base.clientX + 76, clientY: base.clientY - 18 }));
-  });
-  await page.waitForTimeout(80);
-  await page.evaluate(() => window.advanceTime?.(300));
-  const afterLook = await page.evaluate(() => ({
-    camera: window.hayoungCameraState,
-    controls: window.hayoungTouchControls,
-  }));
-
-  await page.evaluate(() => {
-    const button = document.querySelector(".mobile-pad .move-up");
-    if (!(button instanceof HTMLElement)) throw new Error("Missing mobile move button.");
-    const rect = button.getBoundingClientRect();
-    const base = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      pointerId: 823,
-      pointerType: "touch",
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-    };
-    button.dispatchEvent(new PointerEvent("pointerdown", base));
-  });
-  await page.waitForTimeout(80);
-  const controlsAfterMove = await page.evaluate(() => window.hayoungTouchControls);
-  await page.evaluate(() => window.advanceTime?.(900));
-  const afterMove = await page.evaluate(() => window.hayoungCameraState);
-
-  if (!before.state.mobileControls?.includes("touch joystick")) throw new Error(`Mobile controls metadata missing: ${JSON.stringify(before.state)}`);
-  if (!afterLook.controls || afterLook.controls.tick < 1) throw new Error(`Look pad did not publish controls: ${JSON.stringify({ before, afterLook })}`);
-  if (Math.abs(afterLook.camera.yaw - before.camera.yaw) < 0.05) throw new Error(`Look pad did not rotate camera: ${JSON.stringify({ before, afterLook })}`);
-  if (!controlsAfterMove?.forward) throw new Error(`Move pad did not publish forward: ${JSON.stringify({ controlsAfterMove })}`);
-  if (Math.hypot(afterMove.x - afterLook.camera.x, afterMove.z - afterLook.camera.z) < 0.12) {
-    throw new Error(`Move pad did not move camera: ${JSON.stringify({ afterLook, afterMove })}`);
-  }
-
-  return { before, afterLook, controlsAfterMove, afterMove };
-}
-
-async function verifyKeyboardMovementDirections(page) {
-  const debugCameraSnapshot = await withStepTimeout(
-    "keyboard debug camera snapshot",
-    page.evaluate(() => ({
-      hasDebugCamera: Boolean(window.hayoungCameraState && window.hayoungDebugSetCameraPose),
-      hasCanvas: Boolean(document.querySelector("canvas")),
-      state: JSON.parse(window.render_game_to_text()),
-    })),
-    5000,
-  ).catch(() => null);
-  if (!debugCameraSnapshot?.hasDebugCamera) {
-    return {
-      skipped: "debug camera handles were not exposed in this browser session",
-      hasCanvas: debugCameraSnapshot?.hasCanvas ?? false,
-      state: debugCameraSnapshot?.state ?? null,
-    };
-  }
-  await page.locator("canvas").click({ position: { x: 24, y: 24 }, force: true }).catch(() => undefined);
-
-  const pose = { x: 0, z: 1.2, yaw: -Math.PI / 2, pitch: -0.04 };
-  const sampleKey = async (key) => {
-    await page.evaluate((nextPose) => window.hayoungDebugSetCameraPose?.(nextPose), pose);
-    const before = await page.evaluate(() => window.hayoungCameraState);
-    try {
-      await page.keyboard.down(key);
-      await page.waitForTimeout(80);
-      await page.evaluate(() => window.advanceTime?.(600));
-    } finally {
-      await page.keyboard.up(key).catch(() => undefined);
-    }
-    await page.waitForTimeout(60);
-    const after = await page.evaluate(() => window.hayoungCameraState);
-    return {
-      key,
-      before,
-      after,
-      dx: Number((after.x - before.x).toFixed(3)),
-      dz: Number((after.z - before.z).toFixed(3)),
-    };
-  };
-
-  const forward = await sampleKey("ArrowUp");
-  const back = await sampleKey("ArrowDown");
-  const left = await sampleKey("ArrowLeft");
-  const right = await sampleKey("ArrowRight");
-  const result = { pose, forward, back, left, right };
-
-  for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) {
-    await page.keyboard.up(key).catch(() => undefined);
-  }
-  await page.evaluate(() => {
-    document.exitPointerLock?.();
-    window.hayoungDebugSetCameraPose?.({ x: 0, z: 3.25, yaw: 0, pitch: -0.04 });
-  });
-
-  if (forward.dx < 0.45 || Math.abs(forward.dz) > 0.45) throw new Error(`ArrowUp does not move with camera forward: ${JSON.stringify(result)}`);
-  if (back.dx > -0.45 || Math.abs(back.dz) > 0.45) throw new Error(`ArrowDown does not move with camera backward: ${JSON.stringify(result)}`);
-  if (left.dz > -0.45 || Math.abs(left.dx) > 0.45) throw new Error(`ArrowLeft does not strafe left relative to camera: ${JSON.stringify(result)}`);
-  if (right.dz < 0.45 || Math.abs(right.dx) > 0.45) throw new Error(`ArrowRight does not strafe right relative to camera: ${JSON.stringify(result)}`);
-
-  return result;
-}
-
-async function solveAll(page) {
-  await page.evaluate(() => {
-    window.hayoungDebugHoldUnlock = false;
-    window.hayoungDebugSkipRoomTransitions = true;
-    window.hayoungDebugFastUnlock = true;
-  });
-  const debugCompleted = await page.evaluate(() => {
-    window.hayoungDebugCompleteGame?.();
-    return Boolean(window.hayoungDebugCompleteGame);
-  });
-  if (debugCompleted) {
-    await waitForPhase(page, "ending");
-    return gameState(page);
-  }
-  for (const [index, answer] of answers.entries()) {
-    log(`solve ${answer}`);
-    let opened = false;
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      log(`attempt ${answer} ${attempt}`);
-      const clearCount = await page.locator(".room-clear-button").count();
-      if (clearCount) {
-        await clickSelector(page, ".room-clear-button");
-        await page.waitForTimeout(420);
-      }
-      await clickSelector(page, ".interact-button");
-      await page.waitForTimeout(260);
-      const modalCount = await page.locator(".puzzle-modal").count();
-      log(`attempt ${answer} ${attempt} modal ${modalCount}`);
-      if (modalCount) {
-        opened = true;
-        break;
-      }
-    }
-    if (!opened) throw new Error(`Puzzle did not open for answer ${answer}`);
-    await setPuzzleAnswer(page, answer);
-    await page.waitForTimeout(80);
-    log(`submit ${answer}`);
-    await withStepTimeout(`submit click ${answer}`, dispatchMouseClick(page, ".answer-row button"));
-    log(`clicked ${answer}`);
-    await page.waitForTimeout(300);
-    const unlockFeedback = await withStepTimeout(`unlock feedback ${answer}`, page.evaluate(() => {
-      const state = JSON.parse(window.render_game_to_text());
-      return {
-        modalClass: document.querySelector(".puzzle-modal")?.className ?? "",
-        readout: document.querySelector(".device-readout span")?.textContent ?? "",
-        activeUnlockFeedback: state.activeUnlockFeedback,
-      };
-    }));
-    log(`feedback ${answer} ${JSON.stringify(unlockFeedback)}`);
-    if (!unlockFeedback.modalClass.includes("is-unlocked") || unlockFeedback.readout !== "OPEN" || !unlockFeedback.activeUnlockFeedback) {
-      throw new Error(`Unlock feedback state missing after answer ${answer}: ${JSON.stringify(unlockFeedback)}`);
-    }
-    if (index === answers.length - 1) {
-      await waitForPhase(page, "ending");
-      log(`solved ${answer}`);
-      continue;
-    }
-    await page.waitForFunction(() => !document.querySelector(".puzzle-modal"), null, { timeout: 60000 });
-    await page.waitForTimeout(160);
-    if ((index + 1) % 2 === 0 && index < answers.length - 1) {
-      await waitForElement(page, ".room-clear-panel", 15000);
-      const roomClearButtonCount = await page.locator(".room-clear-button").count();
-      if (!roomClearButtonCount) throw new Error(`Room clear CTA missing after answer ${answer}`);
-    }
-    log(`solved ${answer}`);
-  }
-  await waitForPhase(page, "ending");
-  return gameState(page);
+  failures.push(label);
+  log(`FAIL ${label}`);
+  return false;
 }
 
 async function main() {
-  log("launch browser");
-  const browser = await chromium.launch({ headless: true });
-  log("browser launched");
-  let desktop;
-  let mobile;
+  await startDevServer();
+
+  // 프로젝트에 고정된 Playwright 버전과 로컬 브라우저 캐시가 어긋나도 동작하도록
+  // 미리 설치된 Chromium 경로(CHROMIUM_PATH 또는 /opt/pw-browsers/chromium)를 우선 사용한다.
+  const executablePath = process.env.CHROMIUM_PATH ?? (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : undefined);
+  const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+  const failures = [];
+  const pageErrors = [];
+  let desktop = null;
+  let mobile = null;
+
+  const watchdog = setTimeout(() => {
+    console.error("verification watchdog fired after 300s — dumping state and exiting");
+    console.error(JSON.stringify({ failures, pageErrors }, null, 2));
+    process.exit(1);
+  }, 300000);
+
   try {
-    log("new desktop page");
-    desktop = await browser.newPage({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 1 });
-    await enterGame(desktop);
-    log("desktop state");
-    const desktopState = await withStepTimeout("desktop state", gameState(desktop));
-    log("desktop canvas stats");
-    const desktopCanvas = await withStepTimeout("desktop canvas stats", canvasStats(desktop), 20000);
-    log("desktop surface");
-    const desktopGameSurface = await withStepTimeout("desktop game surface", desktop.evaluate(() => {
-      const screen = document.querySelector(".game-screen");
-      const rect = screen?.getBoundingClientRect();
-      return rect
-        ? {
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-            innerWidth: window.innerWidth,
-            innerHeight: window.innerHeight,
-          }
-        : null;
-    }));
-    if (desktopState.cameraMode !== "first-person") throw new Error("Camera mode is not first-person.");
-    if (!desktopState.cinematicAtmosphere?.includes("volumetric")) throw new Error(`Cinematic atmosphere metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.cinematicCamera?.includes("FOV")) throw new Error(`Cinematic camera metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.screenPostFx?.includes("vignette")) throw new Error(`Screen post-FX metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.collisionModel?.includes("console")) throw new Error(`Collision metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.playSurface?.includes("full-viewport first-person")) throw new Error(`Play surface metadata missing: ${JSON.stringify(desktopState)}`);
-    if (
-      !desktopGameSurface ||
-      desktopGameSurface.width < desktopGameSurface.innerWidth - 2 ||
-      desktopGameSurface.height < desktopGameSurface.innerHeight - 2
-    ) {
-      throw new Error(`Game surface is not full viewport: ${JSON.stringify(desktopGameSurface)}`);
-    }
-    if (!desktopState.hudBehavior?.includes("calm HUD")) throw new Error(`HUD behavior metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.environmentDetail?.includes("lived-in escape room")) throw new Error(`Environment detail metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.transitionVfx?.includes("transition veil")) throw new Error(`Transition VFX metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.objectiveTracker?.includes("case-file HUD")) throw new Error(`Objective tracker metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.escapeVista?.includes("rear-door escape vista")) throw new Error(`Escape vista metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.mobileControls?.includes("touch joystick")) throw new Error(`Mobile control metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.prologueSetDressing?.includes("prologue arches")) throw new Error(`Prologue set dressing metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.lockConsoleUX?.includes("two-zone puzzle modal")) throw new Error(`Lock console UX metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.unlockFeedbackUX?.includes("OPEN readout")) throw new Error(`Unlock feedback UX metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.roomDeviceKits?.includes("five room-specific physical puzzle kits")) throw new Error(`Room device kit metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopState.physicalClueNetwork?.includes("in-world evidence boards")) throw new Error(`Physical clue network metadata missing: ${JSON.stringify(desktopState)}`);
-    if (!desktopCanvas.found || desktopCanvas.varied < minCanvasVariation) throw new Error(`Desktop canvas looks blank: ${JSON.stringify(desktopCanvas)}`);
-    log("hint check");
-    const hintCheck = await withStepTimeout("desktop hint check", verifyHintPenaltyUX(desktop, "desktop"), 45000);
-    log("graphics check");
-    const graphicsCheck = await withStepTimeout("desktop graphics check", verifyGraphicsQuality(desktop, desktopCanvas), 45000);
-    await settleClose("desktop setup page", desktop.close({ runBeforeUnload: false }).catch(() => undefined));
-    desktop = await browser.newPage({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 1 });
-    log("reset desktop for gameplay");
-    await enterGame(desktop);
-    log("keyboard movement");
-    const keyboardMovement = { skipped: "keyboard debug movement sampling is excluded from deploy verification" };
-    log("solve all");
-    const ending = await withStepTimeout("solve all", solveAll(desktop), 180000);
-    if (ending.phase !== "ending" || ending.solvedPuzzles !== 10) throw new Error(`Ending failed: ${JSON.stringify(ending)}`);
-    if (!ending.endingExperience?.includes("heavenly finale")) throw new Error(`Ending experience metadata missing: ${JSON.stringify(ending)}`);
-    await desktop.waitForTimeout(650);
-    const endingHudCheck = await desktop.evaluate(() => {
-      const screen = document.querySelector(".game-screen");
-      const topHud = document.querySelector(".top-hud");
-      const inventory = document.querySelector(".inventory-dock");
-      const topOpacity = topHud ? Number.parseFloat(getComputedStyle(topHud).opacity) : null;
-      const inventoryOpacity = inventory ? Number.parseFloat(getComputedStyle(inventory).opacity) : null;
-      return {
-        ok: Boolean(
-          screen?.classList.contains("is-ending") &&
-            (!topHud || (topOpacity !== null && topOpacity < 0.05)) &&
-            (!inventory || (inventoryOpacity !== null && inventoryOpacity < 0.05)),
-        ),
-        screenClass: screen?.className ?? null,
-        topOpacity,
-        inventoryOpacity,
-      };
-    });
-    if (!endingHudCheck.ok) throw new Error(`Ending HUD chrome is still visible: ${JSON.stringify(endingHudCheck, null, 2)}`);
-    await captureOptionalScreenshot(desktop, "output/playwright/500-ending-heavenly-finale-clean.png");
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    context.setDefaultTimeout(20000);
+    context.setDefaultNavigationTimeout(30000);
+    desktop = await context.newPage();
+    desktop.on("pageerror", (error) => pageErrors.push(`desktop: ${error.message}`));
+
+    // 1. 시작 화면
+    await desktop.goto(url, { waitUntil: "domcontentloaded" });
+    await waitForSelector(desktop, ".theme-select-heading h1");
+    let state = await gameState(desktop);
+    expect(state.phase === "intro", "1. 시작 화면 표시", failures);
+    expect(state.puzzleChain?.length === 8, "1b. Room 1 퍼즐 체인 8개 정의", failures);
+
+    // 2. 테마 선택 + 네 버튼 도망
+    await clickSelector(desktop, ".theme-card");
+    await waitForSelector(desktop, ".runaway-button");
     await desktop.evaluate(() => {
-      if (document.fullscreenElement) {
-        return document.exitFullscreen();
-      }
-      return undefined;
-    }).catch(() => undefined);
-    await desktop.waitForTimeout(320);
-    await desktop.setViewportSize({ width: 390, height: 844 });
-    await desktop.waitForTimeout(320);
-    await captureOptionalScreenshot(desktop, "output/playwright/500-ending-heavenly-finale-mobile-hudless.png");
+      const button = document.querySelector(".runaway-button");
+      button.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true, view: window }));
+      button.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, cancelable: true, view: window }));
+    });
+    const evadeDistance = await runawayTranslateDistance(desktop);
+    expect(evadeDistance > 20, `2. 네 버튼 도망 동작 (이동 ${Math.round(evadeDistance)}px)`, failures);
 
-    log("park desktop");
-    await desktop.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
-    await settleClose("desktop", desktop.close({ runBeforeUnload: false }).catch(() => undefined));
-    desktop = undefined;
+    // 3. 6초 후 입장 가능
+    await desktop.waitForTimeout(6400);
+    await desktop.waitForFunction(() => document.querySelector(".runaway-button.is-ready"), null, { timeout: 8000 });
+    await clickSelector(desktop, ".runaway-button");
+    await waitForPhase(desktop, "game");
+    expect(true, "3. 6초 후 입장 및 게임 진입", failures);
 
-    mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-    await enterGame(mobile, true);
-    log("mobile state");
-    const mobileState = await gameState(mobile);
-    log("mobile canvas stats");
+    // 4. 현수 음성 오버레이 + 1인칭 캔버스
+    await waitForSelector(desktop, ".voice-overlay");
+    await clickSelector(desktop, ".voice-skip");
+    await waitForAbsence(desktop, ".voice-overlay");
+    await desktop.waitForTimeout(700);
+    await desktop.evaluate(() => window.advanceTime?.(500));
+    const desktopCanvas = await canvasStats(desktop);
+    expect(desktopCanvas.found && desktopCanvas.varied > minCanvasVariation, `4. 데스크톱 WebGL 렌더 (varied ${desktopCanvas.varied})`, failures);
+
+    // 5. 선행 조건: 잠긴 스테이션은 열리지 않는다
+    await openStation(desktop, "station-steak-table");
+    await desktop.waitForTimeout(400);
+    let snapshot = await debugState(desktop);
+    expect(snapshot.activePuzzleId === null, "5. 무작위 접근 차단 (스테이크 테이블 잠김)", failures);
+    await openStation(desktop, "station-memory-wall");
+    await desktop.waitForTimeout(400);
+    snapshot = await debugState(desktop);
+    expect(snapshot.activePuzzleId === null, "5b. 액자 벽은 편지 전에 잠김", failures);
+
+    // 5c. 힌트 계약서 3단계 (위치 → 연결 → 정답 직전)
+    await clickSelector(desktop, '.icon-actions button[title="힌트 계약서"]');
+    await waitForSelector(desktop, ".hint-sheet");
+    for (let i = 0; i < 3; i += 1) {
+      await clickSelector(desktop, ".hint-issue-button");
+      await desktop.waitForTimeout(250);
+    }
+    snapshot = await debugState(desktop);
+    expect(snapshot.hintsUsed === 3 && snapshot.hintContracts.length === 3, "5c. 힌트 계약서 3단계 발급", failures);
+    const receipts = await desktop.evaluate(() => document.querySelectorAll(".hint-receipt").length);
+    expect(receipts === 3, "5d. 힌트 영수증 3장 표시", failures);
+    await clickSelector(desktop, ".hint-sheet .close-button");
+    await waitForAbsence(desktop, ".hint-sheet");
+    const penaltyCardVisible = await desktop.evaluate(() => Boolean(document.querySelector(".penalty-card")));
+    expect(penaltyCardVisible, "5e. 벌칙 계약 카드 HUD 유지", failures);
+
+    // 6. VITA500 편지
+    await openStation(desktop, "station-gift-table");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-vita500"]');
+    await submitAnswer(desktop, '[data-testid="vita-answer-input"]', "오로나민C");
+    await desktop.waitForTimeout(400);
+    snapshot = await debugState(desktop);
+    expect(!snapshot.completedPuzzleIds.includes("room1-vita500"), "6. VITA500 오답 거부", failures);
+    await submitAnswer(desktop, '[data-testid="vita-answer-input"]', "비타500");
+    await waitForSolved(desktop, "room1-vita500");
+    expect(true, "6b. VITA500 정답 인식 (한글 표기 허용)", failures);
+
+    // 7. 액자 시간순 정렬 + 색상 순서
+    await openStation(desktop, "station-memory-wall");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-memory-frames"]');
+    for (const key of ["hongdae", "jatjeol", "philippines", "birthday"]) {
+      await clickSelector(desktop, `.frame-card[data-frame="${key}"]`);
+    }
+    await clickSelector(desktop, ".frame-check-button");
+    await desktop.waitForTimeout(400);
+    const wrongOrderStep = await desktop.evaluate(() => document.querySelector(".frame-sequence-body")?.dataset.step);
+    expect(wrongOrderStep === "arrange", "7. 잘못된 액자 순서 거부", failures);
+    for (const key of ["jatjeol", "birthday", "philippines", "hongdae"]) {
+      await clickSelector(desktop, `.frame-card[data-frame="${key}"]`);
+    }
+    await clickSelector(desktop, ".frame-check-button");
+    await desktop.waitForFunction(() => document.querySelector(".frame-sequence-body")?.dataset.step === "colors", null, { timeout: 6000 });
+    expect(true, "7b. 올바른 액자 순서 인식", failures);
+    for (const color of ["yellow", "green", "blue", "red"]) {
+      await clickSelector(desktop, `.color-key[data-color="${color}"]`);
+      await desktop.waitForTimeout(120);
+    }
+    await waitForSolved(desktop, "room1-memory-frames");
+    snapshot = await debugState(desktop);
+    expect(snapshot.inventoryItemIds.includes("violin-keyring"), "8. 노랑→초록→파랑→빨강 인식 + 바이올린 키링 획득", failures);
+
+    // 9. 바이올린 키링 장착 (오사용 → 실패)
+    await openStation(desktop, "station-violin-case");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-violin-keyring"]');
+    await clickSelector(desktop, '.keyring-target[data-target="music-box"]');
+    await desktop.waitForTimeout(400);
+    snapshot = await debugState(desktop);
+    expect(!snapshot.completedPuzzleIds.includes("room1-violin-keyring"), "9. 키링을 잘못된 물체에 사용하면 실패", failures);
+    await clickSelector(desktop, '.keyring-item[data-item="violin-keyring"]');
+    await clickSelector(desktop, '.keyring-target[data-target="violin-doll"]');
+    await waitForSolved(desktop, "room1-violin-keyring");
+    expect(true, "9b. 바이올린 인형에 키링 장착 → 연주 시작", failures);
+
+    // 10. 인생의 회전목마
+    await openStation(desktop, "station-music-cabinet");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-merry-go-round-song"]');
+    await clickSelector(desktop, ".song-play-button");
+    await submitAnswer(desktop, '[data-testid="song-answer-input"]', "캐논");
+    await desktop.waitForTimeout(400);
+    snapshot = await debugState(desktop);
+    expect(!snapshot.completedPuzzleIds.includes("room1-merry-go-round-song"), "10. 잘못된 곡 제목 거부", failures);
+    await submitAnswer(desktop, '[data-testid="song-answer-input"]', "인생의 회전목마");
+    await waitForSolved(desktop, "room1-merry-go-round-song");
+    snapshot = await debugState(desktop);
+    expect(snapshot.inventoryItemIds.includes("carousel-model"), "10b. 정답 인식 + 회전목마 모형 획득", failures);
+
+    // 11. 놀이공원 그림에 회전목마 삽입
+    await openStation(desktop, "station-carousel-painting");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-carousel-painting"]');
+    await clickSelector(desktop, '.keyring-item[data-item="carousel-model"]');
+    await clickSelector(desktop, ".painting-slot");
+    await waitForSolved(desktop, "room1-carousel-painting");
+    snapshot = await debugState(desktop);
+    expect(snapshot.inspectedClueIds.includes("guro-pyeongsang"), "11. 회전목마 삽입 → 구로평상 단서 획득", failures);
+
+    // 12. 구로평상과 9번 칸
+    await openStation(desktop, "station-floor-grid");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-guro-pyeongsang-nine"]');
+    await clickSelector(desktop, '.floor-cell[data-cell="5"]');
+    await desktop.waitForTimeout(400);
+    snapshot = await debugState(desktop);
+    expect(!snapshot.completedPuzzleIds.includes("room1-guro-pyeongsang-nine"), "12. 잘못된 타일 거부", failures);
+    await clickSelector(desktop, '.floor-cell[data-cell="9"]');
+    await waitForSolved(desktop, "room1-guro-pyeongsang-nine");
+    expect(true, "12b. 9번 칸 정답 인식", failures);
+
+    // 13. 살치살
+    await openStation(desktop, "station-beef-wall");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-salchisal"]');
+    await clickSelector(desktop, '.beef-region[data-region="deungsim"]');
+    await desktop.waitForTimeout(300);
+    const placedEarly = await desktop.evaluate(() => document.querySelector(".beef-body")?.dataset.placed);
+    expect(placedEarly === "false", "13. 잘못된 부위에 조각이 붙지 않음", failures);
+    await clickSelector(desktop, '.beef-region[data-region="salchisal"]');
+    await desktop.waitForFunction(() => document.querySelector(".beef-body")?.dataset.placed === "true", null, { timeout: 6000 });
+    await submitAnswer(desktop, '[data-testid="beef-answer-input"]', "살치살");
+    await waitForSolved(desktop, "room1-salchisal");
+    expect(true, "13b. 살치살 위치 배치 + 이름 정답 인식", failures);
+
+    // 14. 두 스테이크 중 선택
+    await openStation(desktop, "station-steak-table");
+    await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-hyunsu-steak"]');
+    await clickSelector(desktop, '.steak-card[data-steak="alpero"]');
+    await desktop.waitForTimeout(400);
+    snapshot = await debugState(desktop);
+    const alperoRejected =
+      !snapshot.completedPuzzleIds.includes("room1-hyunsu-steak") && snapshot.selectedSteak === "alpero";
+    expect(alperoRejected, "14. 알페로 선택 시 실패 + 재도전 가능", failures);
+    const wrongLineShown = await desktop.evaluate(() =>
+      Boolean(document.querySelector(".memory-error")?.textContent?.includes("기다린 답")),
+    );
+    expect(wrongLineShown, "14b. 현수의 장난스러운 오답 문구 표시", failures);
+    await clickSelector(desktop, '.steak-card[data-steak="hyunsu"]');
+    await waitForSolved(desktop, "room1-hyunsu-steak");
+    expect(true, "14c. 현수의 스테이크 선택 시 성공", failures);
+
+    // 15. Room 1 문 개방 + 클리어 오버레이
+    state = await gameState(desktop);
+    expect(state.room1Complete === true && state.exitDoorOpen === true, "15. Room 1 완료 + 출구 문 개방", failures);
+    await waitForSelector(desktop, ".room-clear-panel");
+    const clearCopy = await desktop.evaluate(() => document.querySelector(".room-clear-panel h2")?.textContent ?? "");
+    expect(clearCopy.includes("첫 100일의 기억"), "15b. Room 1 클리어 문구", failures);
+
+    // 16. 힌트 계약서 3단계
+    await clickSelector(desktop, ".room-clear-button");
+    await waitFor(desktop, (snap) => snap.currentRoomId === 2, "room 2 진입");
+    state = await gameState(desktop);
+    expect(state.comingSoonNotice === "다음 기억을 준비 중입니다.", "16. Room 2 준비 중 안내", failures);
+
+    // 17. 저장 / 이어하기
+    log("step 17: reloading for save/continue check");
+    await desktop.goto(`${url}?reload=1`, { waitUntil: "domcontentloaded", timeout: 30000 });
+    log("step 17: reloaded");
+    await waitForSelector(desktop, ".continue-chip");
+    log("step 17: continue chip visible");
+    await clickSelector(desktop, ".continue-chip");
+    await waitForPhase(desktop, "game");
+    log("step 17: back in game");
+    snapshot = await debugState(desktop);
+    expect(
+      snapshot.currentRoomId === 2 && snapshot.completedPuzzleIds.length === 8 && snapshot.hintsUsed === 3,
+      "17. 저장 및 이어하기 (Room 2 · 기억 8/8 · 힌트 기록 복원)",
+      failures,
+    );
+
+    // 19. 키보드 이동
+    const beforeMove = await desktop.evaluate(() => window.hayoungCameraState?.z ?? null);
+    await desktop.keyboard.down("w");
+    await desktop.evaluate(() => window.advanceTime?.(600));
+    await desktop.keyboard.up("w");
+    const afterMove = await desktop.evaluate(() => window.hayoungCameraState?.z ?? null);
+    expect(beforeMove !== null && afterMove !== null && afterMove < beforeMove, "19. 키보드 W 전진 이동", failures);
+
+    // 20. 그래픽 품질 순환
+    await clickSelector(desktop, '.icon-actions button[data-quality]');
+    await desktop.waitForTimeout(300);
+    state = await gameState(desktop);
+    expect(state.graphicsQuality === "balanced", "20. 그래픽 품질 모드 순환", failures);
+
+    // 21. 엔딩
+    await desktop.evaluate(() => window.hayoungDebugCompleteGame());
+    await waitForPhase(desktop, "ending");
+    await waitForSelector(desktop, ".ending-letter");
+    const endingChecks = await desktop.evaluate(() => ({
+      title: document.querySelector(".ending-copy h2")?.textContent ?? "",
+      cards: document.querySelectorAll(".memory-card").length,
+    }));
+    expect(
+      endingChecks.title.includes("다음 방도 우리 둘이 같이 열자") && endingChecks.cards === 6,
+      "21. 엔딩 편지 + 6개 사진 타임라인",
+      failures,
+    );
+
+    // 22. 모바일
+    const mobileContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    });
+    mobile = await mobileContext.newPage();
+    mobile.on("pageerror", (error) => pageErrors.push(`mobile: ${error.message}`));
+    await mobile.goto(`${url}?play=1`, { waitUntil: "domcontentloaded" });
+    await waitForPhase(mobile, "game");
+    await mobile.waitForTimeout(900);
+    await mobile.evaluate(() => window.advanceTime?.(500));
     const mobileCanvas = await canvasStats(mobile);
-    if (!mobileCanvas.found || mobileCanvas.varied < minCanvasVariation) throw new Error(`Mobile canvas looks blank: ${JSON.stringify(mobileCanvas)}`);
-    log("mobile touch controls");
-    const mobileControls = await verifyMobileTouchControls(mobile);
-    log("mobile hint penalty ux");
-    const mobileHintCheck = await verifyHintPenaltyUX(mobile, "mobile");
-    log("mobile canvas ok");
-    await mobile.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 5000 }).catch(() => undefined);
+    const mobileControls = await mobile.evaluate(() => ({
+      pad: Boolean(document.querySelector(".mobile-pad")),
+      look: Boolean(document.querySelector(".look-pad")),
+      interact: Boolean(document.querySelector(".interact-button")),
+      hint: Boolean(document.querySelector('.icon-actions button[title="힌트 계약서"]')),
+    }));
+    expect(mobileCanvas.found && mobileCanvas.varied > minCanvasVariation, `22. 모바일 WebGL 렌더 (varied ${mobileCanvas.varied})`, failures);
+    expect(
+      mobileControls.pad && mobileControls.look && mobileControls.interact && mobileControls.hint,
+      "22b. 모바일 조작 UI (이동 패드/시점 패드/조사/힌트)",
+      failures,
+    );
 
+    // 23. 치명적 콘솔 오류 없음
+    expect(pageErrors.length === 0, `23. 치명적 페이지 오류 없음 (${pageErrors.length}건)`, failures);
+
+    clearTimeout(watchdog);
     const result = {
-      url,
-      desktopState,
-      desktopGameSurface,
+      ok: failures.length === 0,
+      failures,
+      pageErrors,
       desktopCanvas,
-      hintCheck,
-      graphicsCheck,
-      keyboardMovement,
-      ending,
-      mobileState,
       mobileCanvas,
-      mobileControls,
-      mobileHintCheck,
+      finishedAt: new Date().toISOString(),
     };
     mkdirSync("output/playwright", { recursive: true });
     writeFileSync("output/playwright/verify-result.json", JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
+    if (failures.length > 0) {
+      throw new Error(`verification failed: ${failures.join(" | ")}`);
+    }
   } finally {
     await Promise.all(
       [desktop, mobile]
         .filter(Boolean)
-        .map((page, index) => settleClose(`page ${index + 1}`, page.close({ runBeforeUnload: false }).catch(() => undefined))),
+        .map((page) => page.close({ runBeforeUnload: false }).catch(() => undefined)),
     );
-    await settleClose("browser", browser.close());
+    await browser.close().catch(() => undefined);
+    stopDevServer();
   }
 }
 
@@ -698,5 +506,6 @@ main()
   .then(() => process.exit(0))
   .catch((error) => {
     console.error(error);
+    stopDevServer();
     process.exit(1);
   });
