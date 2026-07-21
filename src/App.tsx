@@ -264,10 +264,17 @@ declare global {
 }
 
 function App() {
-  const skipIntroForHarness = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("play") === "1";
+  const harnessParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const skipIntroForHarness = harnessParams?.get("play") === "1";
+  const gfxParam = harnessParams?.get("gfx");
+  const initialGraphics: GraphicsQuality | undefined =
+    gfxParam === "performance" || gfxParam === "balanced" || gfxParam === "cinematic" ? gfxParam : undefined;
 
   const [state, dispatch] = useReducer(gameReducer, undefined, () =>
-    createInitialGameState(skipIntroForHarness ? { phase: "game", selectedTheme: playableIntroThemeId } : {}),
+    createInitialGameState({
+      ...(skipIntroForHarness ? { phase: "game" as const, selectedTheme: playableIntroThemeId } : {}),
+      ...(initialGraphics ? { graphicsQuality: initialGraphics } : {}),
+    }),
   );
 
   const phase = state.phase;
