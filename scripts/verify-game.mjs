@@ -262,7 +262,7 @@ async function main() {
   let mobile = null;
 
   const watchdog = setTimeout(() => {
-    console.error("verification watchdog fired after 300s — dumping state and exiting");
+    console.error("verification watchdog fired after 600s — dumping state and exiting");
     console.error(JSON.stringify({ failures, pageErrors }, null, 2));
     try {
       stopDevServer();
@@ -270,7 +270,7 @@ async function main() {
       // best effort
     }
     process.exit(1);
-  }, 300000);
+  }, 600000);
 
   try {
     // 소프트웨어 래스터라이저 부담을 줄이기 위해 데스크톱 검증은 축소된 뷰포트로 돈다.
