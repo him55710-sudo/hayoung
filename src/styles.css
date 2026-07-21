@@ -4653,3 +4653,51 @@ button {
     padding: 12px;
   }
 }
+
+/* --- 구로평상(9로) 평상 옮기기 --- */
+
+.pyeongsang-piece {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  justify-self: center;
+  padding: 10px 22px 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 216, 138, 0.45);
+  background: rgba(255, 216, 138, 0.06);
+}
+
+.pyeongsang-piece.is-placed {
+  border-style: solid;
+  border-color: rgba(110, 231, 183, 0.5);
+  background: rgba(47, 124, 87, 0.14);
+}
+
+.pyeongsang-top {
+  width: 74px;
+  height: 22px;
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(90deg, #8a5a34 0 12px, #744422 12px 24px);
+  box-shadow:
+    0 6px 0 -2px #4a2d1a,
+    0 10px 0 -4px #33200f;
+}
+
+.pyeongsang-piece b {
+  font-size: 13px;
+  color: #ffe9c4;
+}
+
+.pyeongsang-piece em {
+  font-style: normal;
+  font-size: 11px;
+  color: #c9b391;
+}
+
+.floor-cell.has-pyeongsang {
+  font-size: 15px;
+  background:
+    repeating-linear-gradient(90deg, #8a5a34 0 14px, #744422 14px 28px);
+  color: #ffe9c4;
+}

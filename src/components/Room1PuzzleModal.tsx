@@ -592,31 +592,37 @@ function FloorNinePuzzle({
         <b>{clue.label}</b>
         <p>{clue.description}</p>
       </div>
+      <div className={`pyeongsang-piece${solved ? " is-placed" : ""}`} aria-label="구로평상 모형">
+        <span className="pyeongsang-top" aria-hidden="true" />
+        <b>구로평상</b>
+        <em>{solved ? "제자리를 찾았다" : "올려놓을 칸을 골라라"}</em>
+      </div>
       <div className="floor-grid" aria-label="아홉 칸 바닥 타일">
         {Array.from({ length: 9 }).map((_, index) => {
           const cell = index + 1;
+          const isAnswer = cell === FLOOR_ANSWER_CELL;
           return (
             <button
               key={cell}
               type="button"
-              className={`floor-cell${solved && cell === FLOOR_ANSWER_CELL ? " is-sunk" : ""}`}
+              className={`floor-cell${solved && isAnswer ? " is-sunk has-pyeongsang" : ""}`}
               data-cell={cell}
               onClick={() => {
                 if (solved) {
                   return;
                 }
                 dispatch({ type: "SELECT_FLOOR_CELL", cell });
-                if (cell === FLOOR_ANSWER_CELL) {
+                if (isAnswer) {
                   audioManager.play("tile-press");
                   onSuccess();
                   return;
                 }
                 audioManager.play("tile-wrong");
-                onFail("타일이 꿈쩍도 하지 않는다.");
+                onFail("평상이 이 칸에는 맞지 않는다.");
               }}
               disabled={solved}
             >
-              {cell}
+              {solved && isAnswer ? "평상" : cell}
             </button>
           );
         })}

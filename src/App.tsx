@@ -3678,10 +3678,10 @@ function addRoomOneReferenceMemoryWall(group: THREE.Group, room: Room) {
   const consoleWood = mat(0x4b2a19, { roughness: 0.58, texture: "wood", textureRepeat: [1.3, 0.8], textureSeed: 5629 });
   const velvet = mat(0x26120f, { roughness: 0.76, texture: "fabric", textureSeed: 5630 });
   const exhibits = [
-    { key: "jatjeol", title: "첫 고백", caption: "잣절 공원 벤치", color: 0xffd37e, x: -2.86, y: 2.58 },
-    { key: "birthday", title: "현수 생일", caption: "하영이가 준 선물", color: 0x9be88a, x: -1.6, y: 2.58 },
-    { key: "philippines", title: "필리핀 여행", caption: "함께 본 높은 하늘", color: 0x91d8ff, x: -2.86, y: 1.58 },
-    { key: "hundred-day", title: "100일 네 컷", caption: "홍대의 네 장면", color: 0xff92a6, x: -1.6, y: 1.58 },
+    { key: "jatjeol", title: "첫 고백", caption: "잣절 공원 벤치", color: 0xffd37e, x: -2.86, y: 2.58, photo: "/memories/frame-jatjeol.jpeg" },
+    { key: "birthday", title: "현수 생일", caption: "하영이가 준 선물", color: 0x9be88a, x: -1.6, y: 2.58, photo: "/memories/frame-birthday.jpeg" },
+    { key: "philippines", title: "필리핀 여행", caption: "함께 본 높은 하늘", color: 0x91d8ff, x: -2.86, y: 1.58, photo: "/memories/frame-philippines.jpeg" },
+    { key: "hundred-day", title: "100일 네 컷", caption: "홍대의 네 장면", color: 0xff92a6, x: -1.6, y: 1.58, photo: "/memories/frame-hongdae.jpeg" },
   ];
 
   const titlePlate = box(2.82, 0.08, 0.06, rail, -2.23, 3.22, -4.02);
@@ -3702,6 +3702,7 @@ function addRoomOneReferenceMemoryWall(group: THREE.Group, room: Room) {
       exhibit.color,
       exhibit.key === "hundred-day" ? "photoStrip" : "memory",
       { memoryFrameKey: exhibit.key, memoryFrameOrder: exhibitIndex },
+      exhibit.photo,
     );
   });
 
@@ -3820,6 +3821,7 @@ function addRoomOneReferenceFloorPuzzle(group: THREE.Group, room: Room) {
   const bench = new THREE.Group();
   bench.position.set(0.05, 0.42, 2.08);
   bench.userData.roomOneMemorySet = true;
+  bench.userData.roomOnePyeongsangBench = true;
   bench.add(box(1.74, 0.16, 0.62, benchWood, 0, 0, 0));
   bench.add(box(1.58, 0.05, 0.5, brass, 0, 0.1, 0));
   bench.add(box(0.12, 0.5, 0.12, benchWood, -0.66, -0.32, -0.2));
@@ -4026,9 +4028,12 @@ function addTexturedWallPanel(
   accent: number,
   kind: "memory" | "beef" | "vista" | "photoStrip",
   extraUserData?: Record<string, unknown>,
+  photoPath?: string,
 ) {
   const frameMaterial = mat(0x49301f, { roughness: 0.5, metalness: 0.08, texture: "wood", textureSeed: width * 100 + height * 10 });
-  const texture = createRoomOneMemoryTexture(key, title, caption, accent, kind);
+  const texture = photoPath
+    ? getCoverPhotoTexture(photoPath, width / height)
+    : createRoomOneMemoryTexture(key, title, caption, accent, kind);
   const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.72, metalness: 0.02, emissive: accent, emissiveIntensity: 0.06 });
   const frame = box(width + 0.14, height + 0.14, 0.08, frameMaterial, x, y, z - 0.04);
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
@@ -4208,14 +4213,16 @@ function addRoomOneMemoryInstallations(group: THREE.Group, room: Room) {
   const frame = mat(0x6b4934, { roughness: 0.42, metalness: 0.14, texture: "wood", textureSeed: 5401 });
   const brass = mat(room.palette[1], { roughness: 0.28, metalness: 0.42, emissive: room.palette[1], emissiveIntensity: 0.18, texture: "metal", textureSeed: 5402 });
   const exhibits = [
-    { key: "park", title: "잣절공원 고백", caption: "벤치와 가로등 아래 첫 마음", color: 0xffd88a, x: -2.72, y: 2.48, z: -4.38, width: 1.18, height: 0.78 },
-    { key: "philippines", title: "필리핀 전망", caption: "하늘과 능선, 장난스러운 손길", color: 0x8fd7ff, x: -1.16, y: 2.48, z: -4.38, width: 1.18, height: 0.78 },
-    { key: "photo-strip", title: "100일 네 컷", caption: "검은 프레임 속 네 번의 표정", color: 0xff8ea4, x: 0.4, y: 2.48, z: -4.38, width: 1.18, height: 0.78 },
+    { key: "park", title: "잣절공원 고백", caption: "벤치와 가로등 아래 첫 마음", color: 0xffd88a, x: -2.72, y: 2.48, z: -4.38, width: 1.18, height: 0.78, photo: "/memories/frame-jatjeol.jpeg" },
+    { key: "philippines", title: "필리핀 전망", caption: "하늘과 능선, 장난스러운 손길", color: 0x8fd7ff, x: -1.16, y: 2.48, z: -4.38, width: 1.18, height: 0.78, photo: "/memories/frame-philippines.jpeg" },
+    { key: "photo-strip", title: "100일 네 컷", caption: "검은 프레임 속 네 번의 표정", color: 0xff8ea4, x: 0.4, y: 2.48, z: -4.38, width: 1.18, height: 0.78, photo: "/memories/frame-hongdae.jpeg" },
   ];
 
   exhibits.forEach((exhibit, exhibitIndex) => {
     const frameMesh = box(exhibit.width + 0.16, exhibit.height + 0.16, 0.07, frame, exhibit.x, exhibit.y, exhibit.z - 0.018);
-    const texture = createRoomOneMemoryTexture(exhibit.key, exhibit.title, exhibit.caption, exhibit.color, exhibit.key === "photo-strip" ? "photoStrip" : "memory");
+    const texture = exhibit.photo
+      ? getCoverPhotoTexture(exhibit.photo, exhibit.width / exhibit.height)
+      : createRoomOneMemoryTexture(exhibit.key, exhibit.title, exhibit.caption, exhibit.color, exhibit.key === "photo-strip" ? "photoStrip" : "memory");
     const material = new THREE.MeshStandardMaterial({
       map: texture,
       roughness: 0.78,
@@ -4663,6 +4670,41 @@ function getMemoryTexture(path: string) {
   return texture;
 }
 
+/** 실제 사진을 액자 비율에 맞게 중앙 크롭(cover)해서 로드한다. */
+function getCoverPhotoTexture(path: string, planeAspect: number) {
+  const cacheKey = `${path}@${planeAspect.toFixed(3)}`;
+  const cached = memoryTextureCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const texture = memoryTextureLoader.load(path, (loaded) => {
+    const image = loaded.image as { width?: number; height?: number } | undefined;
+    if (!image?.width || !image.height) {
+      return;
+    }
+    const imageAspect = image.width / image.height;
+    if (imageAspect > planeAspect) {
+      const repeatX = planeAspect / imageAspect;
+      loaded.repeat.set(repeatX, 1);
+      loaded.offset.set((1 - repeatX) / 2, 0);
+    } else {
+      const repeatY = imageAspect / planeAspect;
+      loaded.repeat.set(1, repeatY);
+      loaded.offset.set(0, (1 - repeatY) / 2);
+    }
+    loaded.needsUpdate = true;
+  });
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  memoryTextureCache.set(cacheKey, texture);
+  return texture;
+}
+
 function addLightBeams(group: THREE.Group, room: Room) {
   const beamMat = mat(room.palette[1], { emissive: room.palette[1], emissiveIntensity: 0.55, transparent: true, opacity: 0.18, roughness: 1 });
   for (let i = 0; i < 5; i += 1) {
@@ -4958,6 +5000,22 @@ function animateRoomOneMemoryState(group: THREE.Group, elapsedTime: number) {
       object.position.y = THREE.MathUtils.lerp(object.position.y, targetY, 0.07);
       const material = object.material as THREE.MeshStandardMaterial;
       material.emissiveIntensity = nineSolved ? 0.32 + Math.sin(elapsedTime * 3) * 0.1 : 0.13;
+    }
+
+    // 구(9)로 평상: 정답을 맞히면 평상이 9번 타일 위로 미끄러진다.
+    if (data.roomOnePyeongsangBench && object instanceof THREE.Group) {
+      if (typeof data.baseX !== "number") {
+        data.baseX = object.position.x;
+        data.baseY = object.position.y;
+        data.baseZ = object.position.z;
+      }
+      const targetX = nineSolved ? 0.86 : (data.baseX as number);
+      const targetY = nineSolved ? (data.baseY as number) - 0.05 : (data.baseY as number);
+      const targetZ = nineSolved ? 0.94 : (data.baseZ as number);
+      object.position.x = THREE.MathUtils.lerp(object.position.x, targetX, 0.045);
+      object.position.y = THREE.MathUtils.lerp(object.position.y, targetY, 0.045);
+      object.position.z = THREE.MathUtils.lerp(object.position.z, targetZ, 0.045);
+      object.rotation.y = THREE.MathUtils.lerp(object.rotation.y, nineSolved ? 0.12 : 0, 0.045);
     }
 
     if (object instanceof THREE.Mesh && data.roomOneSalchisalMarker) {

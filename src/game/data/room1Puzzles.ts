@@ -65,10 +65,11 @@ export const FLOOR_ANSWER_CELL = 9;
 export const STEAK_ANSWER: "alpero" | "hyunsu" = "hyunsu";
 
 /**
- * TODO_USER_MEMORY: 구로평상과 9번 칸의 정확한 연결 근거.
- * 근거 자료가 도착하기 전까지 이유를 임의로 만들지 않는다.
+ * 구로평상과 9번 칸의 연결 근거 (사용자 확인 완료):
+ * '구로평상'의 '구로'가 '구(9)로'로 읽히는 말장난 —
+ * 그래서 평상을 9번 칸 위로 옮겨 놓아야 한다.
  */
-export const GURO_NINE_REASON_TODO = "TODO_USER_MEMORY: 구로평상과 9번 칸의 정확한 연결 근거";
+export const GURO_NINE_REASON = "구로평상 = 구(9)로 평상 — 평상을 9번 칸으로 옮긴다";
 
 export const room1Puzzles: PuzzleDefinition[] = [
   {
@@ -176,15 +177,15 @@ export const room1Puzzles: PuzzleDefinition[] = [
     order: 5,
     title: "구로평상과 바닥 타일",
     type: "floor_choice",
-    prompt: "바닥의 아홉 칸 타일. 구로평상의 기억이 가리키는 칸을 밟아라.",
+    prompt: "바닥의 아홉 칸 타일. 구로평상이 있어야 할 자리를 찾아 평상을 옮겨 놓아라.",
     prerequisiteIds: ["room1-carousel-painting"],
     rewardLabel: "숨겨진 소고기 조각",
     unlockTargets: ["station-beef-wall"],
-    successNote: "9번 타일이 황금빛으로 빛나며 아래로 내려갔다. 숨어 있던 소고기 부위 조각이 나타났다.",
+    successNote: "평상이 제자리로 미끄러지자 타일이 황금빛으로 빛나며 아래로 내려갔다. 숨어 있던 소고기 부위 조각이 나타났다.",
     hints: [
       "놀이공원 그림이 가리킨 장소의 단서를 먼저 확인해.",
-      "구로평상 — 썸 타던 시절 처음 함께 갔던 곳. 바닥의 아홉 칸 중 하나만 반응해.",
-      "앞줄도 가운데 줄도 아니야. 마지막 줄의 끝을 봐.",
+      "'구로'평상을 소리 내어 읽어봐. 평상이 가야 할 칸의 번호가 들리지 않아?",
+      "구(9)로 평상 — 평상은 9번 칸 위로.",
     ],
     stationId: "station-floor-grid",
   },

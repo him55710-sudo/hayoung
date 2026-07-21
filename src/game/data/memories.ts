@@ -1,7 +1,7 @@
 /**
  * 실제 추억 데이터.
- * 사진은 사용자가 제공하기 전까지 TODO_USER_MEMORY 슬롯으로 남긴다.
- * 임의의 커플 사진을 생성해 채우지 않는다.
+ * 액자 사진 4장은 사용자가 직접 제공한 실제 사진이다 (public/memories/frame-*.jpeg).
+ * 아직 제공되지 않은 자료는 TODO_USER_MEMORY 슬롯으로 남기고, 임의의 커플 사진을 생성해 채우지 않는다.
  */
 
 export type FrameColorKey = "yellow" | "green" | "blue" | "red";
@@ -27,7 +27,7 @@ export const memoryFrames: MemoryFrame[] = [
     colorKey: "yellow",
     colorName: "노랑",
     colorHex: "#ffd36f",
-    image: null, // TODO_USER_MEMORY: 잣절공원 고백 실제 사진
+    image: "/memories/frame-jatjeol.jpeg",
   },
   {
     key: "birthday",
@@ -37,7 +37,7 @@ export const memoryFrames: MemoryFrame[] = [
     colorKey: "green",
     colorName: "초록",
     colorHex: "#8be883",
-    image: null, // TODO_USER_MEMORY: 현수 생일 실제 사진
+    image: "/memories/frame-birthday.jpeg",
   },
   {
     key: "philippines",
@@ -47,7 +47,7 @@ export const memoryFrames: MemoryFrame[] = [
     colorKey: "blue",
     colorName: "파랑",
     colorHex: "#82cfff",
-    image: null, // TODO_USER_MEMORY: 필리핀 여행 실제 사진
+    image: "/memories/frame-philippines.jpeg",
   },
   {
     key: "hongdae",
@@ -57,7 +57,7 @@ export const memoryFrames: MemoryFrame[] = [
     colorKey: "red",
     colorName: "빨강",
     colorHex: "#ff748b",
-    image: null, // TODO_USER_MEMORY: 100일 홍대 실제 사진
+    image: "/memories/frame-hongdae.jpeg",
   },
 ];
 
@@ -107,7 +107,7 @@ export const clueRecords: Record<string, ClueRecord> = {
     id: "guro-pyeongsang",
     label: "구로평상 단서",
     description:
-      "놀이공원의 길이 한 장소를 가리킨다 — 구로평상. 썸 타던 시절 처음 함께 갔던 자리. (TODO_USER_MEMORY: 구로평상과 9번 칸의 정확한 연결 근거)",
+      "놀이공원의 길이 한 장소를 가리킨다 — 구로평상. 썸 타던 시절 처음 함께 갔던 자리. '구로'평상... 어딘가 숫자처럼 들리지 않아?",
   },
 };
 
