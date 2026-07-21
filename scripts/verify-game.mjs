@@ -107,24 +107,48 @@ async function waitFor(page, predicate, label, timeout = 20000) {
     if (Date.now() - started > timeout) {
       throw new Error(`Timed out waiting for ${label}`);
     }
-    await page.waitForTimeout(200);
+    await sleep(200);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * page.waitForFunction/waitForTimeout 같은 프로토콜 기반 대기는 렌더러가
+ * 웨지되면 반환하지 않을 수 있어, 전부 클라이언트 측 폴링으로 대기한다.
+ */
+async function pollUntil(page, pageFunction, arg, label, timeout = 20000) {
+  const started = Date.now();
+  for (;;) {
+    const value = await ev(page, pageFunction, arg, `poll ${label}`, 12000).catch(() => undefined);
+    if (value) {
+      return value;
+    }
+    if (Date.now() - started > timeout) {
+      throw new Error(`Timed out waiting for ${label}`);
+    }
+    await sleep(250);
   }
 }
 
 async function waitForPhase(page, phase) {
-  await page.waitForFunction(
-    (target) => window.render_game_to_text && JSON.parse(window.render_game_to_text()).phase === target,
+  await pollUntil(
+    page,
+    (target) => Boolean(window.render_game_to_text && JSON.parse(window.render_game_to_text()).phase === target),
     phase,
-    { timeout: 20000 },
+    `phase ${phase}`,
+    25000,
   );
 }
 
-async function waitForSelector(page, selector, timeout = 15000) {
-  await page.waitForFunction((target) => Boolean(document.querySelector(target)), selector, { timeout });
+async function waitForSelector(page, selector, timeout = 20000) {
+  await pollUntil(page, (target) => Boolean(document.querySelector(target)), selector, `selector ${selector}`, timeout);
 }
 
-async function waitForAbsence(page, selector, timeout = 15000) {
-  await page.waitForFunction((target) => !document.querySelector(target), selector, { timeout });
+async function waitForAbsence(page, selector, timeout = 20000) {
+  await pollUntil(page, (target) => !document.querySelector(target), selector, `absence of ${selector}`, timeout);
 }
 
 async function clickSelector(page, selector) {
@@ -240,11 +264,17 @@ async function main() {
   const watchdog = setTimeout(() => {
     console.error("verification watchdog fired after 300s — dumping state and exiting");
     console.error(JSON.stringify({ failures, pageErrors }, null, 2));
+    try {
+      stopDevServer();
+    } catch {
+      // best effort
+    }
     process.exit(1);
   }, 300000);
 
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    // 소프트웨어 래스터라이저 부담을 줄이기 위해 데스크톱 검증은 축소된 뷰포트로 돈다.
+    const context = await browser.newContext({ viewport: { width: 960, height: 600 } });
     context.setDefaultTimeout(20000);
     context.setDefaultNavigationTimeout(30000);
     desktop = await context.newPage();
@@ -269,7 +299,7 @@ async function main() {
     expect(evadeDistance > 20, `2. 네 버튼 도망 동작 (이동 ${Math.round(evadeDistance)}px)`, failures);
 
     // 3. 6초 후 입장 가능
-    await desktop.waitForTimeout(6400);
+    await sleep(6400);
     await desktop.waitForFunction(() => document.querySelector(".runaway-button.is-ready"), null, { timeout: 8000 });
     await clickSelector(desktop, ".runaway-button");
     await waitForPhase(desktop, "game");
@@ -279,18 +309,18 @@ async function main() {
     await waitForSelector(desktop, ".voice-overlay");
     await clickSelector(desktop, ".voice-skip");
     await waitForAbsence(desktop, ".voice-overlay");
-    await desktop.waitForTimeout(700);
+    await sleep(700);
     await ev(desktop, () => window.advanceTime?.(300), undefined, "advanceTime desktop", 60000);
     const desktopCanvas = await canvasStats(desktop);
     expect(desktopCanvas.found && desktopCanvas.varied > minCanvasVariation, `4. 데스크톱 WebGL 렌더 (varied ${desktopCanvas.varied})`, failures);
 
     // 5. 선행 조건: 잠긴 스테이션은 열리지 않는다
     await openStation(desktop, "station-steak-table");
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     let snapshot = await debugState(desktop);
     expect(snapshot.activePuzzleId === null, "5. 무작위 접근 차단 (스테이크 테이블 잠김)", failures);
     await openStation(desktop, "station-memory-wall");
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     snapshot = await debugState(desktop);
     expect(snapshot.activePuzzleId === null, "5b. 액자 벽은 편지 전에 잠김", failures);
 
@@ -299,7 +329,7 @@ async function main() {
     await waitForSelector(desktop, ".hint-sheet");
     for (let i = 0; i < 3; i += 1) {
       await clickSelector(desktop, ".hint-issue-button");
-      await desktop.waitForTimeout(250);
+      await sleep(250);
     }
     snapshot = await debugState(desktop);
     expect(snapshot.hintsUsed === 3 && snapshot.hintContracts.length === 3, "5c. 힌트 계약서 3단계 발급", failures);
@@ -314,7 +344,7 @@ async function main() {
     await openStation(desktop, "station-gift-table");
     await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-vita500"]');
     await submitAnswer(desktop, '[data-testid="vita-answer-input"]', "오로나민C");
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     snapshot = await debugState(desktop);
     expect(!snapshot.completedPuzzleIds.includes("room1-vita500"), "6. VITA500 오답 거부", failures);
     await submitAnswer(desktop, '[data-testid="vita-answer-input"]', "비타500");
@@ -328,7 +358,7 @@ async function main() {
       await clickSelector(desktop, `.frame-card[data-frame="${key}"]`);
     }
     await clickSelector(desktop, ".frame-check-button");
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     const wrongOrderStep = await ev(desktop, () => document.querySelector(".frame-sequence-body")?.dataset.step, undefined, "frame step");
     expect(wrongOrderStep === "arrange", "7. 잘못된 액자 순서 거부", failures);
     for (const key of ["jatjeol", "birthday", "philippines", "hongdae"]) {
@@ -339,7 +369,7 @@ async function main() {
     expect(true, "7b. 올바른 액자 순서 인식", failures);
     for (const color of ["yellow", "green", "blue", "red"]) {
       await clickSelector(desktop, `.color-key[data-color="${color}"]`);
-      await desktop.waitForTimeout(120);
+      await sleep(120);
     }
     await waitForSolved(desktop, "room1-memory-frames");
     snapshot = await debugState(desktop);
@@ -349,7 +379,7 @@ async function main() {
     await openStation(desktop, "station-violin-case");
     await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-violin-keyring"]');
     await clickSelector(desktop, '.keyring-target[data-target="music-box"]');
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     snapshot = await debugState(desktop);
     expect(!snapshot.completedPuzzleIds.includes("room1-violin-keyring"), "9. 키링을 잘못된 물체에 사용하면 실패", failures);
     await clickSelector(desktop, '.keyring-item[data-item="violin-keyring"]');
@@ -362,7 +392,7 @@ async function main() {
     await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-merry-go-round-song"]');
     await clickSelector(desktop, ".song-play-button");
     await submitAnswer(desktop, '[data-testid="song-answer-input"]', "캐논");
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     snapshot = await debugState(desktop);
     expect(!snapshot.completedPuzzleIds.includes("room1-merry-go-round-song"), "10. 잘못된 곡 제목 거부", failures);
     await submitAnswer(desktop, '[data-testid="song-answer-input"]', "인생의 회전목마");
@@ -383,7 +413,7 @@ async function main() {
     await openStation(desktop, "station-floor-grid");
     await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-guro-pyeongsang-nine"]');
     await clickSelector(desktop, '.floor-cell[data-cell="5"]');
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     snapshot = await debugState(desktop);
     expect(!snapshot.completedPuzzleIds.includes("room1-guro-pyeongsang-nine"), "12. 잘못된 타일 거부", failures);
     await clickSelector(desktop, '.floor-cell[data-cell="9"]');
@@ -394,7 +424,7 @@ async function main() {
     await openStation(desktop, "station-beef-wall");
     await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-salchisal"]');
     await clickSelector(desktop, '.beef-region[data-region="deungsim"]');
-    await desktop.waitForTimeout(300);
+    await sleep(300);
     const placedEarly = await ev(desktop, () => document.querySelector(".beef-body")?.dataset.placed, undefined, "beef placed");
     expect(placedEarly === "false", "13. 잘못된 부위에 조각이 붙지 않음", failures);
     await clickSelector(desktop, '.beef-region[data-region="salchisal"]');
@@ -407,7 +437,7 @@ async function main() {
     await openStation(desktop, "station-steak-table");
     await waitForSelector(desktop, '.memory-modal[data-puzzle="room1-hyunsu-steak"]');
     await clickSelector(desktop, '.steak-card[data-steak="alpero"]');
-    await desktop.waitForTimeout(400);
+    await sleep(400);
     snapshot = await debugState(desktop);
     const alperoRejected =
       !snapshot.completedPuzzleIds.includes("room1-hyunsu-steak") && snapshot.selectedSteak === "alpero";
@@ -459,7 +489,7 @@ async function main() {
 
     // 20. 그래픽 품질 순환
     await clickSelector(desktop, '.icon-actions button[data-quality]');
-    await desktop.waitForTimeout(300);
+    await sleep(300);
     state = await gameState(desktop);
     expect(state.graphicsQuality === "cinematic", "20. 그래픽 품질 모드 순환 (performance → cinematic)", failures);
 
@@ -489,7 +519,7 @@ async function main() {
     mobile.on("pageerror", (error) => pageErrors.push(`mobile: ${error.message}`));
     await mobile.goto(`${url}?play=1&gfx=performance`, { waitUntil: "domcontentloaded" });
     await waitForPhase(mobile, "game");
-    await mobile.waitForTimeout(900);
+    await sleep(900);
     await ev(mobile, () => window.advanceTime?.(300), undefined, "advanceTime mobile", 60000);
     const mobileCanvas = await canvasStats(mobile);
     const mobileControls = await ev(mobile, () => ({
