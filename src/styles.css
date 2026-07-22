@@ -4701,3 +4701,585 @@ button {
     repeating-linear-gradient(90deg, #8a5a34 0 14px, #744422 14px 28px);
   color: #ffe9c4;
 }
+
+/* ==========================================================================
+   V2 스킨 — "한밤의 기억 극장"
+   잉크빛 청록 밤, 금박 트림, 왁스 실. 아래 블록이 기존 스킨을 덮어쓴다.
+   ========================================================================== */
+
+:root {
+  --ink: #08131a;
+  --ink-2: #0d1f28;
+  --ink-3: #14303c;
+  --gold: #d8b36a;
+  --gold-bright: #f2d391;
+  --wax: #a12b35;
+  --parchment: #f0e3c8;
+  --moon: #9fd8ff;
+}
+
+body,
+.site-shell {
+  background:
+    radial-gradient(circle at 18% -10%, rgba(31, 69, 80, 0.55), transparent 42rem),
+    radial-gradient(circle at 84% 112%, rgba(161, 43, 53, 0.16), transparent 36rem),
+    linear-gradient(175deg, #0a1720 0%, #08131a 52%, #060d12 100%);
+}
+
+/* --- 인트로: 한밤의 복도와 세 개의 문 --- */
+
+.intro-screen {
+  background: transparent;
+}
+
+.intro-backdrop {
+  background:
+    radial-gradient(ellipse 130% 60% at 50% 118%, rgba(216, 179, 106, 0.16), transparent 62%),
+    radial-gradient(circle at 12% 16%, rgba(159, 216, 255, 0.08), transparent 24rem),
+    radial-gradient(circle at 88% 8%, rgba(159, 216, 255, 0.05), transparent 20rem),
+    linear-gradient(180deg, #060e14 0%, #0a1c25 46%, #123039 78%, #0a161c 100%);
+}
+
+.intro-backdrop::before {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 118px, rgba(216, 179, 106, 0.05) 118px 120px),
+    repeating-linear-gradient(0deg, transparent 0 88px, rgba(6, 13, 18, 0.5) 88px 90px);
+  opacity: 0.5;
+}
+
+.intro-backdrop::after {
+  background: radial-gradient(ellipse 68% 34% at 50% 100%, rgba(216, 179, 106, 0.2), transparent 70%);
+  opacity: 1;
+}
+
+.intro-stage span {
+  display: none;
+}
+
+.intro-stage .intro-floor-path {
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -50% 0;
+  width: min(860px, 86vw);
+  height: 30vh;
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+  background:
+    repeating-linear-gradient(0deg, rgba(216, 179, 106, 0.13) 0 2px, transparent 2px 34px),
+    linear-gradient(180deg, transparent, rgba(216, 179, 106, 0.12));
+  opacity: 0.75;
+  animation: none;
+}
+
+.couple-mark {
+  color: var(--gold);
+  letter-spacing: 0.34em;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.theme-select-heading {
+  gap: 10px;
+}
+
+.theme-select-heading h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(46px, 7vw, 84px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.04;
+  color: var(--parchment);
+  background: linear-gradient(178deg, #f6e7c4 20%, #d8b36a 58%, #9c7a3c 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+.heading-subtitle {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 17px;
+  letter-spacing: 0.2em;
+  color: rgba(240, 227, 200, 0.85);
+}
+
+.theme-select-heading > p:not(.couple-mark):not(.heading-subtitle) {
+  color: rgba(159, 216, 255, 0.62);
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+}
+
+/* 문(door) 카드 */
+
+.theme-card {
+  position: relative;
+  border: none;
+  border-radius: 200px 200px 8px 8px;
+  padding: 14px 14px 18px;
+  background:
+    linear-gradient(180deg, #16333e 0%, #0e2129 64%, #0a161c 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(216, 179, 106, 0.34),
+    inset 0 0 0 7px rgba(6, 13, 18, 0.85),
+    inset 0 0 0 8px rgba(216, 179, 106, 0.2),
+    0 30px 60px rgba(0, 0, 0, 0.55);
+  transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.theme-card:hover,
+.theme-card:focus-visible,
+.theme-card.is-selected {
+  transform: translateY(-10px);
+  border: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(242, 211, 145, 0.8),
+    inset 0 0 0 7px rgba(6, 13, 18, 0.85),
+    inset 0 0 0 8px rgba(216, 179, 106, 0.4),
+    0 0 46px rgba(216, 179, 106, 0.24),
+    0 34px 60px rgba(0, 0, 0, 0.6);
+}
+
+.theme-card.is-locked {
+  filter: saturate(0.35) brightness(0.72);
+}
+
+.door-number-plate {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 30px;
+  border-radius: 6px;
+  background: linear-gradient(160deg, #e8c987, #a8823f);
+  color: #241708;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 244, 214, 0.8);
+}
+
+.theme-poster-frame {
+  border-radius: 170px 170px 4px 4px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2px rgba(216, 179, 106, 0.4);
+  background: #06090c;
+}
+
+.theme-poster-frame::before {
+  display: none;
+}
+
+.door-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 90% 76% at 50% 34%, transparent 46%, rgba(4, 8, 11, 0.72) 100%),
+    linear-gradient(180deg, rgba(4, 8, 11, 0.24), transparent 26%, transparent 62%, rgba(4, 8, 11, 0.66));
+}
+
+.door-handle {
+  position: absolute;
+  right: 9%;
+  top: 55%;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #f6e2ac, #a8823f 72%);
+  box-shadow:
+    0 0 12px rgba(216, 179, 106, 0.7),
+    0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.door-chains {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(24deg, transparent 0 34px, rgba(9, 13, 16, 0.92) 34px 44px, rgba(88, 96, 104, 0.5) 44px 46px, rgba(9, 13, 16, 0.92) 46px 56px, transparent 56px 200px),
+    repeating-linear-gradient(-18deg, transparent 0 60px, rgba(9, 13, 16, 0.9) 60px 70px, rgba(88, 96, 104, 0.45) 70px 72px, rgba(9, 13, 16, 0.9) 72px 82px, transparent 82px 260px);
+}
+
+.door-sill {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -13px;
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #1a333d, #0a161c);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(216, 179, 106, 0.28);
+}
+
+.theme-lock {
+  background: rgba(6, 10, 13, 0.78);
+  border: 1px solid rgba(216, 179, 106, 0.5);
+  color: var(--gold);
+}
+
+.theme-card-body {
+  padding-top: 14px;
+  gap: 6px;
+}
+
+.theme-kicker b {
+  color: var(--gold);
+  border-color: rgba(216, 179, 106, 0.4);
+}
+
+.theme-kicker i,
+.theme-meta small {
+  color: rgba(159, 216, 255, 0.66);
+  border-color: rgba(159, 216, 255, 0.24);
+}
+
+.theme-card strong {
+  font-family: Georgia, serif;
+  color: var(--parchment);
+  letter-spacing: 0.01em;
+}
+
+.theme-card em,
+.theme-description {
+  color: rgba(216, 199, 163, 0.72);
+}
+
+/* 시작 확인 패널 + 도망가는 네 버튼 */
+
+.theme-start-panel {
+  border: 1px solid rgba(216, 179, 106, 0.3);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(216, 179, 106, 0.12), transparent 20rem),
+    linear-gradient(180deg, rgba(10, 22, 28, 0.97), rgba(6, 13, 18, 0.99));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.theme-start-panel.is-confirming {
+  background:
+    radial-gradient(ellipse 60% 42% at 50% 78%, rgba(216, 179, 106, 0.18), transparent 68%),
+    radial-gradient(circle at 50% 10%, rgba(159, 216, 255, 0.07), transparent 26rem),
+    linear-gradient(180deg, #060e14 0%, #0b1d26 58%, #0a161c 100%);
+}
+
+.theme-start-eyebrow {
+  color: var(--gold);
+  letter-spacing: 0.3em;
+}
+
+.theme-start-panel h2 {
+  font-family: Georgia, serif;
+  color: var(--parchment);
+  letter-spacing: 0.02em;
+}
+
+.runaway-button {
+  border: 2px solid rgba(242, 211, 145, 0.65);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 28%, #c9505c, #8e2432 70%),
+    var(--wax);
+  color: #ffe9d8;
+  font-family: Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  box-shadow:
+    0 0 0 5px rgba(6, 13, 18, 0.9),
+    0 0 0 6px rgba(216, 179, 106, 0.45),
+    0 0 34px rgba(161, 43, 53, 0.5),
+    0 14px 30px rgba(0, 0, 0, 0.55);
+}
+
+.runaway-button.is-ready {
+  border-color: var(--gold-bright);
+  box-shadow:
+    0 0 0 5px rgba(6, 13, 18, 0.9),
+    0 0 0 6px rgba(242, 211, 145, 0.85),
+    0 0 46px rgba(216, 179, 106, 0.55),
+    0 14px 30px rgba(0, 0, 0, 0.55);
+}
+
+.theme-back-button {
+  border: 1px solid rgba(159, 216, 255, 0.28);
+  background: transparent;
+  color: rgba(159, 216, 255, 0.75);
+}
+
+.continue-chip {
+  border-color: rgba(216, 179, 106, 0.55);
+  background: rgba(216, 179, 106, 0.1);
+  color: var(--gold-bright);
+}
+
+.continue-chip:hover {
+  box-shadow: 0 0 22px rgba(216, 179, 106, 0.3);
+}
+
+/* --- 게임 HUD: 잉크 + 금박 + 왁스 실 --- */
+
+.hud-cluster,
+.objective-panel,
+.case-file-panel,
+.inventory-dock,
+.penalty-card,
+.preparing-panel {
+  border: 1px solid rgba(216, 179, 106, 0.32);
+  background:
+    linear-gradient(165deg, rgba(10, 25, 32, 0.9), rgba(6, 13, 18, 0.92));
+  backdrop-filter: blur(7px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.42);
+}
+
+.objective-panel,
+.case-file-panel {
+  border-radius: 4px;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+}
+
+.brand-chip {
+  font-family: Georgia, serif;
+  letter-spacing: 0.08em;
+  color: var(--gold-bright);
+}
+
+.brand-chip svg {
+  color: var(--wax);
+  fill: var(--wax);
+}
+
+.progress-chip span {
+  color: rgba(240, 227, 200, 0.85);
+}
+
+.icon-actions button {
+  border: 1px solid rgba(216, 179, 106, 0.3);
+  background: rgba(8, 19, 26, 0.72);
+  color: var(--gold);
+}
+
+.icon-actions button:hover {
+  border-color: var(--gold-bright);
+  color: var(--gold-bright);
+  box-shadow: 0 0 14px rgba(216, 179, 106, 0.3);
+}
+
+.objective-panel span {
+  color: var(--gold);
+  letter-spacing: 0.16em;
+}
+
+.objective-panel h2 {
+  font-family: Georgia, serif;
+  color: var(--parchment);
+}
+
+.objective-panel p,
+.objective-panel small {
+  color: rgba(198, 214, 222, 0.72);
+}
+
+.room-beads button {
+  border: 1px solid rgba(216, 179, 106, 0.34);
+  background: rgba(8, 19, 26, 0.8);
+  color: rgba(216, 179, 106, 0.85);
+  font-family: Georgia, serif;
+}
+
+.room-beads button.is-current {
+  background: linear-gradient(160deg, #e8c987, #a8823f);
+  border-color: var(--gold-bright);
+  color: #241708;
+  box-shadow: 0 0 16px rgba(216, 179, 106, 0.45);
+}
+
+.room-beads button.is-cleared {
+  border-color: rgba(110, 231, 183, 0.5);
+  color: #8fe7bf;
+}
+
+.case-file-heading {
+  color: var(--gold);
+}
+
+.case-file-heading svg {
+  color: var(--gold);
+}
+
+.case-file-panel strong {
+  font-family: Georgia, serif;
+  color: var(--parchment);
+}
+
+.case-file-panel p {
+  color: rgba(198, 214, 222, 0.75);
+}
+
+.case-file-meter span {
+  background: rgba(216, 179, 106, 0.16);
+  border-radius: 1px;
+}
+
+.case-file-meter span.is-solved {
+  background: linear-gradient(90deg, #e8c987, #b98f47);
+  box-shadow: 0 0 8px rgba(216, 179, 106, 0.55);
+}
+
+.case-file-meter span.is-current {
+  background: var(--wax);
+  box-shadow: 0 0 10px rgba(161, 43, 53, 0.65);
+}
+
+.message-strip {
+  border: 1px solid rgba(216, 179, 106, 0.26);
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(6, 13, 18, 0.55), rgba(8, 19, 26, 0.88) 18%, rgba(8, 19, 26, 0.88) 82%, rgba(6, 13, 18, 0.55));
+  color: rgba(240, 227, 200, 0.92);
+  font-family: Georgia, serif;
+  letter-spacing: 0.01em;
+}
+
+.message-strip svg {
+  color: var(--gold);
+}
+
+.inventory-dock {
+  border-radius: 4px;
+}
+
+.player-name {
+  color: var(--gold-bright);
+  font-family: Georgia, serif;
+}
+
+.item-slot {
+  border: 1px solid rgba(216, 179, 106, 0.22);
+  background: rgba(6, 13, 18, 0.66);
+  border-radius: 3px;
+}
+
+.item-slot span {
+  color: var(--gold-bright);
+}
+
+.item-slot.is-clue span {
+  color: var(--moon);
+}
+
+.interact-button {
+  border: 2px solid rgba(242, 211, 145, 0.6);
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 28%, #c9505c, #8e2432 74%);
+  color: #ffe9d8;
+  font-family: Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow:
+    0 0 0 4px rgba(6, 13, 18, 0.85),
+    0 0 0 5px rgba(216, 179, 106, 0.4),
+    0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.interact-button.is-focused {
+  box-shadow:
+    0 0 0 4px rgba(6, 13, 18, 0.85),
+    0 0 0 5px rgba(242, 211, 145, 0.8),
+    0 0 34px rgba(216, 179, 106, 0.5),
+    0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.center-reticle {
+  border-color: rgba(216, 179, 106, 0.65);
+}
+
+.center-reticle.is-focused {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 18px rgba(216, 179, 106, 0.6);
+}
+
+.room-clear-panel {
+  border: 1px solid rgba(216, 179, 106, 0.45);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(216, 179, 106, 0.16), transparent 18rem),
+    linear-gradient(170deg, rgba(12, 26, 33, 0.98), rgba(6, 13, 18, 0.99));
+  clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+}
+
+.room-clear-panel h2 {
+  font-family: Georgia, serif;
+  color: var(--parchment);
+}
+
+.clear-kicker {
+  color: var(--gold);
+  letter-spacing: 0.28em;
+}
+
+.room-clear-rewards span {
+  border: 1px dashed rgba(216, 179, 106, 0.42);
+  background: rgba(216, 179, 106, 0.08);
+  color: var(--gold-bright);
+}
+
+.room-clear-button {
+  border: 2px solid rgba(242, 211, 145, 0.65);
+  background: radial-gradient(circle at 34% 28%, #c9505c, #8e2432 74%);
+  color: #ffe9d8;
+  font-family: Georgia, serif;
+}
+
+.preparing-panel b {
+  color: var(--gold-bright);
+}
+
+.voice-panel {
+  border-color: rgba(216, 179, 106, 0.4);
+  background: linear-gradient(170deg, rgba(10, 22, 28, 0.97), rgba(6, 13, 18, 0.98));
+}
+
+.voice-kicker {
+  color: var(--wax);
+  color: #e2707c;
+}
+
+.memory-modal,
+.hint-sheet {
+  border-color: rgba(216, 179, 106, 0.4);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(216, 179, 106, 0.12), transparent 16rem),
+    linear-gradient(165deg, rgba(11, 24, 30, 0.98), rgba(6, 12, 16, 0.99));
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+}
+
+.memory-kicker {
+  color: var(--gold);
+}
+
+.memory-answer-submit,
+.hint-issue-button {
+  border-color: rgba(242, 211, 145, 0.55);
+  background: radial-gradient(circle at 34% 28%, #c9505c, #8e2432 74%);
+}
+
+.penalty-card {
+  border-radius: 4px;
+}
+
+@media (max-width: 900px) {
+  .theme-card {
+    border-radius: 120px 120px 8px 8px;
+  }
+
+  .theme-poster-frame {
+    border-radius: 100px 100px 4px 4px;
+  }
+
+  .theme-select-heading h1 {
+    font-size: clamp(38px, 11vw, 56px);
+  }
+}

@@ -780,9 +780,10 @@ function App() {
           </div>
           <div className="intro-copy theme-select-shell">
             <div className="theme-select-heading">
-              <p className="couple-mark">HYUNSU × HAYOUNG / 500 DAYS</p>
-              <h1>500일 기념 방탈출 테마를 골라주세요</h1>
-              <p>오늘 열 수 있는 문은 하나예요. 나머지 사건은 더 귀엽고 무섭게 준비 중입니다.</p>
+              <p className="couple-mark">MIDNIGHT MEMORY THEATRE · HYUNSU × HAYOUNG</p>
+              <h1>500일의 방</h1>
+              <p className="heading-subtitle">임현수와 정하영의 기억 방탈출</p>
+              <p>한밤의 복도에 세 개의 문이 서 있다. 오늘 밤 열리는 문은 단 하나.</p>
               {savedGame && (
                 <button className="continue-chip" type="button" onClick={continueGame}>
                   <Play aria-hidden="true" />
@@ -794,7 +795,7 @@ function App() {
             </div>
 
             <div className="theme-grid" aria-label="500일 방탈출 테마 선택">
-              {introThemes.map((theme) => {
+              {introThemes.map((theme, themeIndex) => {
                 const selected = selectedIntroThemeId === theme.id;
                 const locked = theme.status === "locked";
                 const posterStyle: PosterCardStyle = { "--poster-aspect": `${theme.posterWidth} / ${theme.posterHeight}` };
@@ -808,6 +809,9 @@ function App() {
                     aria-label={`${theme.title} ${locked ? "잠금, 곧 출시 예정" : "선택 가능"}`}
                     onClick={() => selectIntroTheme(theme)}
                   >
+                    <span className="door-number-plate" aria-hidden="true">
+                      {String(themeIndex + 1).padStart(2, "0")}
+                    </span>
                     <span className="theme-poster-frame">
                       <img
                         src={theme.poster}
@@ -815,16 +819,19 @@ function App() {
                         width={theme.posterWidth}
                         height={theme.posterHeight}
                       />
+                      <span className="door-vignette" aria-hidden="true" />
+                      {locked && <span className="door-chains" aria-hidden="true" />}
                       {locked && (
                         <span className="theme-lock" aria-hidden="true">
                           <LockKeyhole />
                         </span>
                       )}
+                      <span className="door-handle" aria-hidden="true" />
                     </span>
                     <span className="theme-card-body">
                       <span className="theme-kicker">
                         <b>{theme.number}</b>
-                        <i>{locked ? "곧 출시 예정" : "지금 플레이 가능"}</i>
+                        <i>{locked ? "곧 출시 예정" : "지금 입장 가능"}</i>
                       </span>
                       <strong>{theme.title}</strong>
                       <em>{theme.subtitle}</em>
@@ -835,6 +842,7 @@ function App() {
                         ))}
                       </span>
                     </span>
+                    <span className="door-sill" aria-hidden="true" />
                   </button>
                 );
               })}
@@ -1679,7 +1687,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
         camera.fov = nextFov;
         camera.updateProjectionMatrix();
       }
-      const roomExposure = roomIndexRef.current === 4 ? 0.98 : roomIndexRef.current === 2 ? 0.82 : 0.88;
+      const roomExposure = roomIndexRef.current === 4 ? 0.98 : roomIndexRef.current === 2 ? 0.82 : roomIndexRef.current === 0 ? 0.97 : 0.88;
       const targetExposure = roomExposure + focusStrength * 0.035 + unlockProgress * 0.075 + (phaseRef.current === "ending" ? 0.045 : 0);
       renderer.toneMappingExposure = THREE.MathUtils.lerp(renderer.toneMappingExposure, targetExposure, 0.045);
       if (nextFocusState !== lastFocusState) {
@@ -1787,12 +1795,12 @@ function createRoom(room: Room, index: number) {
     }
   }
 
-  const keyLight = new THREE.PointLight(index === 0 ? 0xffa768 : room.palette[1], index === 0 ? 1.28 : index === 4 ? 3.6 : 2.15, index === 0 ? 10.6 : 13);
+  const keyLight = new THREE.PointLight(index === 0 ? 0xffc890 : room.palette[1], index === 0 ? 2.05 : index === 4 ? 3.6 : 2.15, index === 0 ? 11.4 : 13);
   keyLight.position.set(index === 0 ? -2.2 : -3.7, index === 0 ? 3.45 : 3.15, index === 0 ? 1.35 : -1.6);
   group.add(keyLight);
   group.userData.keyLight = keyLight;
 
-  const portalLight = new THREE.PointLight(index === 0 ? 0xffc17d : room.palette[2], index === 0 ? 0.92 : index === 4 ? 4.2 : 2.1, index === 0 ? 7.2 : 10);
+  const portalLight = new THREE.PointLight(index === 0 ? 0xffc17d : room.palette[2], index === 0 ? 1.25 : index === 4 ? 4.2 : 2.1, index === 0 ? 7.8 : 10);
   portalLight.position.set(index === 0 ? 5.2 : 4.85, index === 0 ? 1.86 : 2.3, index === 0 ? -1.72 : -4.05);
   group.add(portalLight);
 
@@ -2059,7 +2067,10 @@ function addRoomShell(
 
   for (let i = 0; i < 14; i += 1) {
     const plank = box(0.9, 0.035, 8.8, trimMaterial, -6.2 + i * 0.95, 0.035, 0);
-    plank.material = mat(i % 2 ? 0x765234 : 0x916944, { roughness: 0.78, texture: "wood", textureRepeat: [0.35, 4.8], textureSeed: index * 41 + i });
+    plank.material =
+      index === 0
+        ? mat(i % 2 ? 0x1b2a33 : 0x24363f, { roughness: 0.52, metalness: 0.08, texture: "wood", textureRepeat: [0.35, 4.8], textureSeed: index * 41 + i })
+        : mat(i % 2 ? 0x765234 : 0x916944, { roughness: 0.78, texture: "wood", textureRepeat: [0.35, 4.8], textureSeed: index * 41 + i });
     plank.receiveShadow = true;
     group.add(plank);
   }
@@ -3448,17 +3459,18 @@ function addRoomOneMemoryMansion(group: THREE.Group, room: Room) {
 }
 
 function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
-  const floorInset = mat(0x4a2d1f, { roughness: 0.62, metalness: 0.04, texture: "wood", textureRepeat: [6.2, 4.6], textureSeed: 5601 });
-  const redPlaster = mat(0x8f4638, { roughness: 0.9, texture: "plaster", textureRepeat: [4.8, 2.4], textureSeed: 5602 });
-  const stone = mat(0x766454, { roughness: 0.86, metalness: 0.02, texture: "plaster", textureRepeat: [1.2, 1.6], textureSeed: 5603 });
-  const darkWood = mat(0x3a2116, { roughness: 0.58, texture: "wood", textureRepeat: [2.4, 1.4], textureSeed: 5604 });
-  const carvedWood = mat(0x5b3521, { roughness: 0.52, metalness: 0.03, texture: "wood", textureRepeat: [1.3, 1.2], textureSeed: 5605 });
-  const velvet = mat(0x5f2328, { roughness: 0.74, emissive: 0x1d0709, emissiveIntensity: 0.06, texture: "fabric", textureRepeat: [1.5, 0.9], textureSeed: 5606 });
-  const candleWax = mat(0xffead4, { roughness: 0.72, emissive: 0xffc785, emissiveIntensity: 0.08 });
-  const flame = mat(0xffbf6f, { roughness: 0.2, metalness: 0.04, emissive: 0xffa13c, emissiveIntensity: 0.85, transparent: true, opacity: 0.88 });
-  const brass = mat(0xc3914d, { roughness: 0.28, metalness: 0.58, emissive: 0xffaa51, emissiveIntensity: 0.1, texture: "metal", textureSeed: 5607 });
-  const shadowWood = mat(0x17100c, { roughness: 0.7, texture: "wood", textureRepeat: [0.4, 4.8], textureSeed: 5608 });
-  const rugMaterial = mat(0x55201d, { roughness: 0.86, emissive: 0x160505, emissiveIntensity: 0.05, texture: "fabric", textureRepeat: [2.6, 1.4], textureSeed: 5609 });
+  // "한밤의 기억 극장" — 깊은 청록 벽, 잉크빛 목재, 금박 트림, 촛불 앰버.
+  const floorInset = mat(0x22303a, { roughness: 0.5, metalness: 0.1, texture: "wood", textureRepeat: [6.2, 4.6], textureSeed: 5601 });
+  const redPlaster = mat(0x1f4550, { roughness: 0.88, texture: "plaster", textureRepeat: [4.8, 2.4], textureSeed: 5602 });
+  const stone = mat(0x3d5560, { roughness: 0.82, metalness: 0.04, texture: "plaster", textureRepeat: [1.2, 1.6], textureSeed: 5603 });
+  const darkWood = mat(0x101c24, { roughness: 0.55, texture: "wood", textureRepeat: [2.4, 1.4], textureSeed: 5604 });
+  const carvedWood = mat(0x1c333e, { roughness: 0.5, metalness: 0.06, texture: "wood", textureRepeat: [1.3, 1.2], textureSeed: 5605 });
+  const velvet = mat(0x5c1f30, { roughness: 0.74, emissive: 0x22050c, emissiveIntensity: 0.08, texture: "fabric", textureRepeat: [1.5, 0.9], textureSeed: 5606 });
+  const candleWax = mat(0xfff0d8, { roughness: 0.72, emissive: 0xffd79a, emissiveIntensity: 0.1 });
+  const flame = mat(0xffcf8a, { roughness: 0.2, metalness: 0.04, emissive: 0xffb254, emissiveIntensity: 0.95, transparent: true, opacity: 0.9 });
+  const brass = mat(0xe0b568, { roughness: 0.24, metalness: 0.66, emissive: 0xffc46a, emissiveIntensity: 0.14, texture: "metal", textureSeed: 5607 });
+  const shadowWood = mat(0x0a1218, { roughness: 0.7, texture: "wood", textureRepeat: [0.4, 4.8], textureSeed: 5608 });
+  const rugMaterial = mat(0x143038, { roughness: 0.84, emissive: 0x06181d, emissiveIntensity: 0.08, texture: "fabric", textureRepeat: [2.6, 1.4], textureSeed: 5609 });
 
   const floor = box(12.7, 0.042, 7.65, floorInset, 0, 0.05, -0.22);
   floor.receiveShadow = true;
@@ -3499,7 +3511,7 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
   }
 
   [-4.6, -1.75, 1.75, 4.6].forEach((x, alcoveIndex) => {
-    const back = box(1.64, 1.86, 0.05, mat(alcoveIndex % 2 ? 0x6f332b : 0x81513a, { roughness: 0.9, texture: "plaster", textureRepeat: [1.2, 1.1], textureSeed: 5680 + alcoveIndex }), x, 2.32, -4.08);
+    const back = box(1.64, 1.86, 0.05, mat(alcoveIndex % 2 ? 0x16333d : 0x1d4450, { roughness: 0.9, texture: "plaster", textureRepeat: [1.2, 1.1], textureSeed: 5680 + alcoveIndex }), x, 2.32, -4.08);
     const left = box(0.12, 2.0, 0.16, stone, x - 0.9, 2.26, -3.98);
     const right = box(0.12, 2.0, 0.16, stone, x + 0.9, 2.26, -3.98);
     const top = box(1.88, 0.14, 0.16, stone, x, 3.24, -3.98);
@@ -3591,19 +3603,74 @@ function addRoomOneReferenceArchitecture(group: THREE.Group, room: Room) {
   addCandleCluster(5.72, 2.48, 1.7);
   addCandleCluster(-5.85, -3.2, 2.4);
   addCandleCluster(5.82, -3.34, 3.1);
+  addCandleCluster(-1.2, 3.1, 5.2);
+  addCandleCluster(1.9, 3.4, 5.9);
 
-  const chandelierLight = new THREE.PointLight(0xffb16a, 2.15, 7.6);
+  const chandelierLight = new THREE.PointLight(0xffc07a, 2.35, 8.2);
   chandelierLight.position.set(-0.2, 3.74, -0.35);
   chandelierLight.userData.roomOneMemorySet = true;
   group.add(chandelierLight);
 
-  const fillLight = new THREE.PointLight(0xad7048, 1.08, 8.7);
+  const fillLight = new THREE.PointLight(0x6fa3b8, 0.9, 9.2);
   fillLight.position.set(3.7, 2.3, 1.9);
   group.add(fillLight);
 
-  const deskSideFill = new THREE.PointLight(0xffb47a, 0.68, 6.8);
+  const deskSideFill = new THREE.PointLight(0xffc98e, 0.72, 6.8);
   deskSideFill.position.set(-4.9, 2.05, 2.15);
   group.add(deskSideFill);
+
+  // 왼쪽 벽의 달빛 창 — 차가운 밤빛이 방을 가로지른다.
+  const moonFrame = box(0.14, 1.68, 1.24, darkWood, -7.0, 2.62, 0.4);
+  const moonGlass = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.02, 1.46),
+    new THREE.MeshStandardMaterial({
+      color: 0x9cc8e8,
+      emissive: 0x86bede,
+      emissiveIntensity: 0.3,
+      transparent: true,
+      opacity: 0.78,
+      roughness: 0.24,
+    }),
+  );
+  moonGlass.position.set(-6.9, 2.62, 0.4);
+  moonGlass.rotation.y = Math.PI / 2;
+  moonGlass.userData.statusLight = true;
+  const moonBarH = box(0.06, 0.06, 1.1, darkWood, -6.88, 2.62, 0.4);
+  const moonBarV = box(0.06, 1.5, 0.06, darkWood, -6.88, 2.62, 0.4);
+  const moonDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(0.26, 30),
+    new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: 0.95 }),
+  );
+  moonDisc.position.set(-6.86, 2.94, 0.62);
+  moonDisc.rotation.y = Math.PI / 2;
+  group.add(moonFrame, moonGlass, moonBarH, moonBarV, moonDisc);
+
+  const moonLight = new THREE.PointLight(0x9fd8ff, 1.5, 8.8);
+  moonLight.position.set(-6.1, 2.7, 0.4);
+  group.add(moonLight);
+
+  // 천장을 가로지르는 사진 갈란드 — 끈에 매달린 작은 기억 조각들.
+  const garlandString = mat(0xd8b36a, { roughness: 0.4, metalness: 0.3, emissive: 0xd8b36a, emissiveIntensity: 0.16 });
+  const photoPaper = mat(0xf4e8cf, { roughness: 0.8, emissive: 0xffdf9e, emissiveIntensity: 0.12, texture: "paper", textureSeed: 5690 });
+  [
+    { fromX: -5.6, toX: -0.4, z: -1.4, y: 3.62 },
+    { fromX: 0.2, toX: 5.6, z: 0.9, y: 3.5 },
+  ].forEach((run, runIndex) => {
+    const length = run.toX - run.fromX;
+    const line = box(length, 0.018, 0.018, garlandString, run.fromX + length / 2, run.y, run.z);
+    line.rotation.z = runIndex % 2 ? 0.02 : -0.02;
+    group.add(line);
+    for (let i = 0; i < 6; i += 1) {
+      const x = run.fromX + (length / 5) * i;
+      const sag = Math.sin((i / 5) * Math.PI) * 0.16;
+      const card = box(0.2, 0.26, 0.012, photoPaper, x, run.y - 0.16 - sag, run.z);
+      card.rotation.y = Math.sin(i * 2.1 + runIndex) * 0.3;
+      card.rotation.z = Math.sin(i * 1.3) * 0.06;
+      card.userData.float = true;
+      const clip = box(0.03, 0.05, 0.02, garlandString, x, run.y - 0.03 - sag * 0.4, run.z);
+      group.add(card, clip);
+    }
+  });
 }
 
 function addRoomOneReferenceEntryDesk(group: THREE.Group, room: Room) {
