@@ -133,13 +133,13 @@ async function pollUntil(page, pageFunction, arg, label, timeout = 20000) {
   }
 }
 
-async function waitForPhase(page, phase) {
+async function waitForPhase(page, phase, timeout = 180000) {
   await pollUntil(
     page,
     (target) => Boolean(window.render_game_to_text && JSON.parse(window.render_game_to_text()).phase === target),
     phase,
     `phase ${phase}`,
-    25000,
+    timeout,
   );
 }
 
@@ -262,7 +262,7 @@ async function main() {
   let mobile = null;
 
   const watchdog = setTimeout(() => {
-    console.error("verification watchdog fired after 600s — dumping state and exiting");
+    console.error("verification watchdog fired after 900s — dumping state and exiting");
     console.error(JSON.stringify({ failures, pageErrors }, null, 2));
     try {
       stopDevServer();
@@ -270,7 +270,7 @@ async function main() {
       // best effort
     }
     process.exit(1);
-  }, 600000);
+  }, 900000);
 
   try {
     // 소프트웨어 래스터라이저 부담을 줄이기 위해 데스크톱 검증은 축소된 뷰포트로 돈다.
@@ -306,7 +306,7 @@ async function main() {
     expect(true, "3. 6초 후 입장 및 게임 진입", failures);
 
     // 4. 현수 음성 오버레이 + 1인칭 캔버스
-    await waitForSelector(desktop, ".voice-overlay");
+    await waitForSelector(desktop, ".voice-overlay", 60000);
     await clickSelector(desktop, ".voice-skip");
     await waitForAbsence(desktop, ".voice-overlay");
     await sleep(700);
@@ -541,7 +541,7 @@ async function main() {
         await page.goto(`${url}?play=1&gfx=performance`, { waitUntil: "domcontentloaded", timeout: 30000 });
         return page;
       })(),
-      sleep(60000).then(() => {
+      sleep(150000).then(() => {
         throw new Error("mobile page bring-up timed out");
       }),
     ]);

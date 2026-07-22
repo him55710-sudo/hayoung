@@ -1437,11 +1437,15 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
     composer.addPass(bloomPass);
 
     // 물리 기반 재질(황동/대리석/유리)이 실제로 반사할 환경광 — IBL.
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    const environmentTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmremGenerator.dispose();
-    scene.environment = environmentTexture;
-    scene.environmentIntensity = 0.24;
+    // 소프트웨어 렌더러(검증 하네스)의 performance 모드에서는 큐브맵 생성이
+    // 메인 스레드를 오래 막으므로 건너뛴다.
+    if (graphicsQualityRef.current !== "performance") {
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      const environmentTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmremGenerator.dispose();
+      scene.environment = environmentTexture;
+      scene.environmentIntensity = 0.24;
+    }
 
     const root = new THREE.Group();
     scene.add(root);
