@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { AnimationEvent, CSSProperties } from "react";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -45,6 +46,7 @@ import type { PuzzleDefinition, Room1Station } from "./game/data/room1Puzzles";
 import { rooms } from "./game/data/rooms";
 import type { Room } from "./game/data/rooms";
 import { room1Visual, resetRoom1Visual, syncRoom1Visual } from "./game/scenes/room1SceneState";
+import { buildRoomOnePremium } from "./game/scenes/roomOnePremiumScene";
 import { gameReducer } from "./game/state/gameReducer";
 import { createInitialGameState } from "./game/state/gameState";
 import type { GamePhase, GameState, GraphicsQuality } from "./game/state/gameState";
@@ -1434,6 +1436,13 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
     composer.addPass(renderPass);
     composer.addPass(bloomPass);
 
+    // 물리 기반 재질(황동/대리석/유리)이 실제로 반사할 환경광 — IBL.
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const environmentTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmremGenerator.dispose();
+    scene.environment = environmentTexture;
+    scene.environmentIntensity = 0.24;
+
     const root = new THREE.Group();
     scene.add(root);
 
@@ -1687,7 +1696,7 @@ function AnniversaryScene({ roomIndex, phase, solvedCount, movement, lookInput, 
         camera.fov = nextFov;
         camera.updateProjectionMatrix();
       }
-      const roomExposure = roomIndexRef.current === 4 ? 0.98 : roomIndexRef.current === 2 ? 0.82 : roomIndexRef.current === 0 ? 0.97 : 0.88;
+      const roomExposure = roomIndexRef.current === 4 ? 0.98 : roomIndexRef.current === 2 ? 0.82 : roomIndexRef.current === 0 ? 0.9 : 0.88;
       const targetExposure = roomExposure + focusStrength * 0.035 + unlockProgress * 0.075 + (phaseRef.current === "ending" ? 0.045 : 0);
       renderer.toneMappingExposure = THREE.MathUtils.lerp(renderer.toneMappingExposure, targetExposure, 0.045);
       if (nextFocusState !== lastFocusState) {
@@ -1775,10 +1784,12 @@ function createRoom(room: Room, index: number) {
   const accentMaterial = mat(room.palette[1], { roughness: 0.28, metalness: 0.18, emissive: room.palette[1], emissiveIntensity: 0.16, texture: "metal", textureSeed: index + 12 });
   const glowMaterial = mat(room.palette[2], { roughness: 0.18, metalness: 0.12, emissive: room.palette[2], emissiveIntensity: 0.46 });
 
-  addRoomShell(group, room, floorMaterial, wallMaterial, trimMaterial, index);
+  if (index !== 0) {
+    addRoomShell(group, room, floorMaterial, wallMaterial, trimMaterial, index);
+  }
 
   if (index === 0) {
-    addRoomOneMemoryMansion(group, room);
+    buildRoomOnePremium(group);
     addRoomOneStationRings(group);
     addCinematicAtmosphere(group, room, index);
   } else {
@@ -1795,14 +1806,16 @@ function createRoom(room: Room, index: number) {
     }
   }
 
-  const keyLight = new THREE.PointLight(index === 0 ? 0xffc890 : room.palette[1], index === 0 ? 2.05 : index === 4 ? 3.6 : 2.15, index === 0 ? 11.4 : 13);
-  keyLight.position.set(index === 0 ? -2.2 : -3.7, index === 0 ? 3.45 : 3.15, index === 0 ? 1.35 : -1.6);
-  group.add(keyLight);
-  group.userData.keyLight = keyLight;
+  if (index !== 0) {
+    const keyLight = new THREE.PointLight(room.palette[1], index === 4 ? 3.6 : 2.15, 13);
+    keyLight.position.set(-3.7, 3.15, -1.6);
+    group.add(keyLight);
+    group.userData.keyLight = keyLight;
 
-  const portalLight = new THREE.PointLight(index === 0 ? 0xffc17d : room.palette[2], index === 0 ? 1.25 : index === 4 ? 4.2 : 2.1, index === 0 ? 7.8 : 10);
-  portalLight.position.set(index === 0 ? 5.2 : 4.85, index === 0 ? 1.86 : 2.3, index === 0 ? -1.72 : -4.05);
-  group.add(portalLight);
+    const portalLight = new THREE.PointLight(room.palette[2], index === 4 ? 4.2 : 2.1, 10);
+    portalLight.position.set(4.85, 2.3, -4.05);
+    group.add(portalLight);
+  }
 
   return group;
 }
